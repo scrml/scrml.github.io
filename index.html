@@ -2,10 +2,35 @@
 <html>
     <head>
         <meta charset="utf-8"/>
-        <title>SCRML on Gitpages</title>
+        <title>SCRML</title>
+        <link rel="stylesheet" type="text/css" href="styles/main.css"/>
     </head>
     <body>
-        <p>hello from the internet</p>
+        <div class="main">
+            <p>Welcome to the SCRML homepage!</p>
+            <div class="blurb">
+                <h3>Is this Math?</h3>
+                <p>You have found yourself on the home page of a project in mathematics. What some people think math is can be very different than what other people think, so we need to make some things clear right away. This is a project in <em>abstract</em> math, which you may or may not have explicit experience with. Fear not: we will not be delving into lofty and difficult math concepts on this site. Instead we are interested more in discovering what math looks like to people who have fallen in love with it. Yes, we exist, and we can be normal people too -- math is beautiful if you catch it in the right light.</p>
+                <p>Everybody has at some point enjoyed something which a mathematician would consider math. Have you ever enjoyed a puzzle or board game? Are you familiar with the sense of accomplishment which comes from planning something, be it a party, vacation, budget, etc. and watching the plan work out? Have you ever been presented a problem which stumped you at first but, after putting in some thought and a little work, and maybe spending some time finding the right questions to ask, found that the solution appears in your head, waiting for you to bring it into the world? These images are much more what we mean when talking about math, at least here on this website, than images of furiously scribbled calculations filling so many pages that it takes three hours just to read the whole thing.</p>
+                <p>Let's see an example of the type of math we are talking about here. Suppose we are playing tic-tac-toe. I am X and you are O, the board is as below and it is your turn.</p>
+                <table class="tictactoe">
+                    <tr><td/><td>X</td><td/></tr>
+                    <tr><td>X</td><td>O</td><td/></tr>
+                    <tr><td/><td>O</td><td/></tr>
+                </table>
+                <p>Where do you choose? If you see that choosing either the bottom-left or bottom-right corner will guarantee you a win, then you have just done some abstract math. How do you know that you will win if you choose the bottom-left corner? If you wanted to be a good sport, would you be able to explain to me why you are certain that you will win? This type of thinking is a large part of what we do when we do math. We set up a problem with clear rules, then we pose a potential solution and try to justify it with reasoning and logic.</p>
+            </div>
+            <div class="blurb">
+                <h3>About the Project</h3>
+                <p>In the example above with tic tac toe, you may have found it difficult to put into words how you are certain that you will win. You have the idea but it can be awkward to actually describe your thought process. The goal of this project is to create a language designed for exactly this, designed for the different parts of mathematical ideas. We want the ability to create definitions, make claims, and prove our claims in a standardized way to help us organize our thoughts. This language is intended to be natural enough that a person can read and write it while also being rigid and unambiguous so that a computer can be used to compile the statements made.</p>
+                <p>There are several layers to this project. To see the abstract mathematical description of the language see <a href="downloads/introductionPaper.pdf">this paper</a>. On this website, however, we take a more computer-oriented approach to describing the language. This is where SCRML comes in.</p>
+            </div>
+            <div class="blurb">
+                <h3>What is SCRML?</h3>
+                <p>SCRML is a markup language which encapsulates the goal of the overarching project. The acronym SCRML can stand for <span class="acronym">Self Contained Rigor Markup Language</span> or for <span class="acronym">Self Contained Resources Markup Language</span>, depending on the reader's preference. SCRML is an XML-based file format for making mathematical statements. That means mathematical statements are saved in files which are ultimately text files with some special syntax rules, so they can be written in any text editor.</p>
+                <p>These files can be read directly by a person, but the indended reader is a computer program designed to understand (as much as a computer can) the meaning stored in the statement and to do something with that information. Potential applications are rendering the information in a way easier for a person to read, compiling the statement and checking that it is well-posed and consistent, or even feeding the mathematical statement into some algorithm which compares or analyzes math on a large scale. There are endless possibilities to the utility of stating mathematical concepts in a way that computers can work with, and SCRML aims to make this a reality.</p>
+            </div>
+        </div>
     </body>
 </html>
 
