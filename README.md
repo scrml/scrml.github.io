@@ -1,5 +1,5 @@
 # scrml.github.io
-A quick overview of SCRML: SCRML is a markup language for stating interesting mathematics. SCRML (Self-Contained Resources Markup Language) is based on GRML (Rigorous Mathematics Language with Graphs), and GRML is described in the pdf. GRML is itself abstract mathematics and SCRML is a concrete implementation of GRML using XML.
+A quick overview of SCRML: SCRML is a markup language for stating interesting and abstract mathematics. SCRML (Self-Contained Resources Markup Language) is based on GRML (Rigorous Mathematics Language with Graphs), and GRML is described in the pdf. GRML is itself abstract mathematics and SCRML is a concrete implementation of GRML using XML.
 
 The goal of SCRML is to provide a medium for other (future) applications to communicate mathematical content. This allows the development of teaching tools, machine learning tools, mathematical meta-analyzers, etc. to be developed using one common mathematical content language. None of these projects is part of SCRML, but SCRML is intended to be the medium through which they can communicate the actual mathematics. SCRML is merely a static markup language which can handle complex mathematical concepts.
 
