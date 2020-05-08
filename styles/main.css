@@ -4,34 +4,7 @@ body {
 
 .main {
     background: rgb(245, 240, 250);
-    margin: 5%;
-    padding: 3%;
+    margin: 1%;
+    padding: 1% 3%;
     border-radius: 1em;
-}
-
-.tictactoe {
-    border-collapse: collapse;
-}
-
-.tictactoe td {
-    border: 1px solid black;
-    width: 1.2em;
-    height: 1.2em;
-    text-align: center;
-}
-
-.tictactoe tr:first-child td {
-    border-top: none;
-}
-
-.tictactoe tr:last-child td {
-    border-bottom: none;
-}
-
-.tictactoe tr td:first-child {
-    border-left: none;
-}
-
-.tictactoe tr td:last-child {
-    border-right: none;
 }
