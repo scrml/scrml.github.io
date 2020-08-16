@@ -1,0 +1,19 @@
+body {
+    background: rgb(213, 215, 225);
+}
+
+.main {
+    background: rgb(245, 240, 250);
+    margin: .5%;
+    padding: .5% 1%;
+    border-radius: 1em;
+}
+
+details.section {
+    border: 3px inset rgb(210, 215, 239);
+    border-radius: .4em;
+}
+
+details.section summary {
+    border-bottom: 1px solid rgb(210, 215, 239);
+}
