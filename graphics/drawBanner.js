@@ -1,8 +1,7 @@
 {
     let me = Scripts.drawBanner;
     
-    // load css
-    me.waitFor({gui: undefined}, function() {gui.element(document.head, "link", {rel: "stylesheet", href: "graphics/banner.css"})});
+    loadCSS("graphics/banner.css");
     
     var drawBanner = me.object;
     // Create a canvas element which drawstextand animates a random graph backdrop. Settings for drawing, such as what text is written, are applied as attributes to the canvas element so they can be manipulated with CSS.

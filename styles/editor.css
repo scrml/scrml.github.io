@@ -9,11 +9,40 @@ body {
     border-radius: 1em;
 }
 
-details.section {
+details.section, .chapter {
     border: 3px inset rgb(210, 215, 239);
     border-radius: .4em;
+    padding: .2em;
+    margin: .1em 0;
 }
 
-details.section summary {
+details[open].section summary {
     border-bottom: 1px solid rgb(210, 215, 239);
+}
+
+.detailsList > details {
+    background: rgb(160, 255, 180);
+    border: 2px solid green;
+    margin: .5% .2%;
+    padding: .5%;
+    border-radius: .3em;
+}
+
+.detailsList > [open] {
+    background: rgba(160, 255, 180, .15);
+}
+
+.sample {
+    margin: 1em 0 .5em 0;
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+}
+
+textarea {
+    width: 100%;
+}
+
+.chapterNumber {
+    margin-right: 1em;
 }

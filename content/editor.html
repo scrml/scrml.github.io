@@ -5,16 +5,21 @@
         <title>SCRML Editor</title>
         <link rel="stylesheet" type="text/css" href="../styles/main.css"/>
         <link rel="stylesheet" type="text/css" href="../styles/editor.css"/>
-        <script type = "text/javascript" src="../scripts/startEditor.js"></script>
+        <script>
+            filePrefix = "../";
+            // scripts which will be loaded
+            let scripts = {startEditor: "scripts/startEditor.js"};
+        </script>
+        <script src="../scripts/startJS.js"></script>
     </head>
     <body>
         <div class="main">
             <h1>SCRML Editor</h1>
             <details class="section">
                 <summary>How to use</summary>
-                <p>Instructions will go here</p>
-                <dialog>test popup?</dialog>
+                <p>Instructions will go here.</p>
             </details>
+            <div id="editor"/>
         </div>
     </body>
 </html>
