@@ -116,6 +116,7 @@
     background: none;
     border: none;
     display: inline-block;
+    position: relative;
 }
 
 input[type="button"][disguise] {

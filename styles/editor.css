@@ -46,3 +46,36 @@ textarea {
 .chapterNumber {
     margin-right: 1em;
 }
+
+#globalTools {
+    position: sticky;
+    top: 0;
+}
+
+#pageTools {
+    float: right;
+}
+
+.chapterNumber {
+    font-size: large;
+}
+
+#editor .gap[mode="moveHere"] {
+    background: rgb(120, 245, 145);
+}
+
+[mode="moveHere"]::before {
+    content: "⇦";
+    position: absolute;
+    top: -.15em;
+}
+
+#editor .gap[mode="dontMoveHere"] {
+    background: rgb(245, 145, 120)
+}
+
+[mode="dontMoveHere"]::before {
+    content: "❌";
+    position: absolute;
+    top: -.15em;
+}

@@ -2,16 +2,76 @@ ScriptManager.openScript(filePrefix + "scripts/gui.js", "gui");
 Scripts["gui"].script.addEventListener("managed", start);
 
 let root, pageProto = {}, chapterProto = Object.create(pageProto), statementProto, commentProto, buttons;
+let pageTools;
 
 function start() {
     editor.appendChild(testDiv);
-    root = newChapter(false, false, "book");
+    makePageTools();
+    root = newChapter(false, false, "Book");
     root.a = "root";
     root.show();
     document.getElementById("editor").appendChild(root.div);
-    newChapter(root, null, "hello");
-    newChapter(root, null, "hi");
-    newChapter(root.firstChapter, false, "sub");
+    root.newPageMakers = {
+        chapter: function(gap, name) {
+            newChapter(gap.SCRMLEditorTiein.chapter, gap.SCRMLEditorTiein.nextPage, name);
+        }
+    };
+    root.setPageMode = function setPageMode(mode) {
+        if (this.newPageMode != "moveHere" && this.newPageMode != "dontMoveHere") this.lastPageMode = this.newPageMode? this.newPageMode: mode;
+        this.newPageMode = mode;
+        this.applyToSubChapters(function() {
+            if (this.cleanupGaps) for (let f of this.cleanupGaps) {
+                f.SCRMLEditorTiein.gap.setAttribute("mode", mode);
+                f.SCRMLEditorTiein.gap.removeAttribute("disabled");
+            }
+        });
+    }
+    root.setPageMode("chapter");
+    for (let type of ["chapter", "statement", "comment"]) document.getElementById(type+"Mode").addEventListener("click", function() {root.setPageMode(type)});
+}
+
+let focusLocked = false, isFocused = undefined;
+
+function makePageTools() {
+    pageTools = gui.element("div", false, ["id", "pageTools"]);
+    pageTools.moveButton = gui.button("⇳", pageTools, toMoveMode, ["disguise", "", "bigger", ""]);
+}
+
+function pageToolsMouseoverListener(e) {
+    if (focusLocked) return;
+    e = e.target;
+    while (!e.SCRMLEditorTiein || !e.SCRMLEditorTiein.page) e = e.parentElement;
+    e.SCRMLEditorTiein.page.focus();
+}
+
+function lockFocus(page) {
+    page.focus();
+    focusLocked = true;
+}
+
+function unlockFocus() {
+    if (root.newPageMode == "moveHere") root.setPageMode(root.lastPageMode);
+    focusLocked = false;
+    isFocused = undefined;
+    if (pageTools.parentElement) pageTools.parentElement.removeChild(pageTools);
+}
+
+function toMoveMode(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (focusLocked) {
+        unlockFocus();
+        root.setPageMode(root.lastPageMode);
+        return;
+    }
+    lockFocus(isFocused);
+    root.setPageMode("moveHere");
+    isFocused.applyToSubChapters(function() {
+        if (this.cleanupGaps) for (let f of this.cleanupGaps) {
+            f.SCRMLEditorTiein.gap.setAttribute("mode", "dontMoveHere");
+            f.SCRMLEditorTiein.gap.setAttribute("disabled", "");
+        }
+    });
 }
 
 function newChapter(parent, insertBefore, name = "") {
@@ -32,17 +92,6 @@ function newChapter(parent, insertBefore, name = "") {
     return returner;
 }
 
-let isMoving;
-pageProto.toMoveMode = function toMoveMode() {
-    isMoving = this;
-    root.toAcceptMoveMode();
-}
-
-chapterProto.toAcceptMoveMove = function toAcceptMoveMode() {
-    if (!this.showCleanups || !this.isOpen || this == isMoving) return;
-    
-}
-
 chapterProto.childNameScreen = function childNameScreen(proposal) {
     if (!gui.nodeNameScreen(proposal)) return false;
     let page = this.firstPage;
@@ -55,6 +104,17 @@ chapterProto.childNameScreen = function childNameScreen(proposal) {
 
 pageProto.orphan = function orphan() {
     if (!this.parent) return;
+    if (this.parent.showCleanups && this.parent.isOpen) {
+        let array = this.parent.cleanupGaps;
+        for (let i = 0; i < array.length; ++i) if (array[i].SCRMLEditorTiein.gap == this.previousGap) {
+            array[i]();
+            array.splice(i, 1);
+            break;
+        }
+        this.nextGap.SCRMLEditorTiein.previousPage = this.previousPage;
+        if (this.previousPage) this.previousPage.nextGap = this.nextGap;
+        this.div.parentElement.removeChild(this.div);
+    }
     if (this.previousPage) this.previousPage.nextPage = this.nextPage;
     else this.parent.firstPage = this.nextPage;
     if (this.nextPage) this.nextPage.previousPage = this.previousPage;
@@ -63,21 +123,13 @@ pageProto.orphan = function orphan() {
     else this.parent.firstChapter = this.nextChapter;
     if (this.nextChapter) this.nextChapter.previousChapter = this.previousChapter;
     else this.parent.lastChapter = this.previousChapter;
-    if (this.parent.showCleanups && this.parent.isOpen) {
-        this.nextGap.SCRMLEditorTiein.previousPage = this.previousPage;
-        if (this.previousPage) this.previousPage.nextGap = this.nextGap;
-        let array = this.parent.cleanupGaps;
-        for (let i = 0; i < array.length; ++i) if (array[i].SCRMLEditorTiein.gap == this) {
-            array[i]();
-            array.splice(i, 1);
-        }
-    }
     if (this.previousChapter) this.previousChapter.manager.setVarValue("chapterNumber", this.previousChapter.chapterNumber);
     else if (this.nextChapter) this.nextChapter.manager.setVarValue("chapterNumber", this.nextChapter.chapterNumber-1);
     this.parent = this.previousPage = this.nextPage = this.previousChapter = this.nextChapter = undefined;
 }
 
 chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
+    if (newPage == beforeMe || (beforeMe && newPage.nextPage == beforeMe) || (newPage == this.lastPage && !beforeMe)) return;
     if (beforeMe && (this != beforeMe.parent)) throw Error("the kid is not my son");
     newPage.orphan();
     newPage.parent = this;
@@ -139,7 +191,7 @@ chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
         else if (newPage.previousPage) replacing = newPage.previousPage.nextGap;
         else replacing = this.cleanupGaps[0].SCRMLEditorTiein.gap;
         this.div.insertBefore(newPage.div, replacing);
-        this.cleanupGaps.push(newGap(this, newPage, "previous", gapHandlers.newChapter));
+        this.cleanupGaps.push(newGap(this, newPage, "previous", gapHandler));
         newPage.nextGap = replacing;
         replacing.SCRMLEditorTiein.previousPage = newPage;
     }
@@ -149,6 +201,7 @@ chapterProto.show = function show() {
     let me = this;
     me.showCleanups = {};
     me.div = gui.element("details", null, ["class", "chapter"]);
+    me.div.SCRMLEditorTiein = {chapter: this, page: this};
     me.showCleanups.removeDiv = function() {removeAndErase(me, "div", me.smoothly)}
     let elements = {};
     me.showCleanups.EraseElements = function() {for (let e in elements) me[e] = undefined}
@@ -159,17 +212,20 @@ chapterProto.show = function show() {
     elements.chapterNumberText = gui.text("", elements.chapterNumberSpan);
     elements.nameSpan = gui.element("span", elements.chapterHead, ["class", "name"]);
     elements.nameText = gui.text("", elements.nameSpan);
+    elements.debugText = gui.text("", elements.nameSpan);
     for (let e in elements) {me[e] = elements[e]}
     me.showCleanups.chapterNumberText = me.manager.linkProperty("fullChapterNumber", elements.chapterNumberText, "nodeValue");
     me.showCleanups.nameText = me.manager.linkProperty("name", elements.nameText, "nodeValue");
     if (me.parent) me.parent.div.appendChild(me.div);
     if (this.wasOpen) this.open(true);
+    this.chapterHead.addEventListener("mouseover", pageToolsMouseoverListener);
 }
 
 chapterProto.hide = function hide() {
     if (this.wasOpen = this.isOpen) this.close();
     doAll(this.showCleanups);
     this.showCleanups = undefined;
+    if (this == isFocused) unlockFocus();
 }
 
 chapterProto.open = function open(simulated = false) {
@@ -187,7 +243,7 @@ chapterProto.open = function open(simulated = false) {
     }
     me.cleanupGaps = [];
     me.cleanupsBeforeClosing.cleanupGaps = function() {doEach(me.cleanupGaps)}
-    me.cleanupGaps.push(newGap(me, undefined, undefined, gapHandlers.newChapter));
+    me.cleanupGaps.push(newGap(me, undefined, undefined, gapHandler));
     page = me.firstPage;
     if (page) {
         me.cleanupGaps[0].SCRMLEditorTiein.gap.SCRMLEditorTiein.nextPage = page;
@@ -195,7 +251,7 @@ chapterProto.open = function open(simulated = false) {
         me.div.insertBefore(me.cleanupGaps[0].SCRMLEditorTiein.gap, page.div);
     }
     while (page) {
-        me.cleanupGaps.push(newGap(me, page, "next", gapHandlers.newChapter));
+        me.cleanupGaps.push(newGap(me, page, "next", gapHandler));
         page = page.nextPage;
     }
 }
@@ -214,8 +270,20 @@ chapterProto.close = function close(simulated = false) {
     }
 }
 
+chapterProto.focus = function focus() {
+    if (focusLocked) return;
+    isFocused = this;
+    this.chapterHead.appendChild(pageTools);
+}
+let gapNumber = 0;
 function newGap(chapter, page, direction, onclick, text = "", divClass = "gap") {
-    let gap = gui.button(text, chapter.div, onclick, ["class", divClass, "disguise", ""], page? direction == "previous"? page.div: page.div.nextElementSibling: null);
+    let gap = gui.button(text, chapter.div, onclick, ["class", divClass, "disguise", "", "mode", root.newPageMode], page? direction == "previous"? page.div: page.div.nextElementSibling: null);
+    gap.gapNumber = gapNumber++;
+    gap.setAttribute("gapNumber", gap.gapNumber);
+    if (root.newPageMode == "moveHere" && isAncestorOf(isFocused, chapter)) {
+        gap.setAttribute("mode", "dontMoveHere");
+        gap.setAttribute("disabled", "");
+    }
     gap.SCRMLEditorTiein = {chapter: chapter};
     if (page) page[direction+"Gap"] = gap;
     let oppositeDirection = direction == "previous"? "next": "previous";
@@ -233,17 +301,23 @@ function newGap(chapter, page, direction, onclick, text = "", divClass = "gap") 
     return returner;
 }
 
-let gapHandlers = {};
-
-gapHandlers.newChapter = function newChapterGapButtonHandler(e) {
+function gapHandler(e) {
     let gap = e.target;
     while (!gap.SCRMLEditorTiein) gap = gap.parentElement;
-    gui.focusedScreenedInputReplace(gap.parentElement, gap, function(name) {
-        newChapter(gap.SCRMLEditorTiein.chapter, gap.SCRMLEditorTiein.nextPage, name);
-    }, {
-        atts: ["class", "gap", "disguise", ""],
-        screen: function(name) {return gap.SCRMLEditorTiein.chapter.childNameScreen(name)}
-    });
+    if (root.newPageMode == "moveHere") {
+        let moving = isFocused, beforeHere = gap.SCRMLEditorTiein.nextPage, chapter = gap.SCRMLEditorTiein.chapter;
+        unlockFocus();
+        root.setPageMode(root.lastPageMode);
+        chapter.insertBefore(moving, beforeHere);
+    } else gui.focusedScreenedInputReplace(
+        gap.parentElement,
+        gap,
+        function(name) {root.newPageMakers[root.newPageMode](gap, name)},
+        {
+            atts: ["class", "gap", "disguise", ""],
+            screen: function(name) {return gap.SCRMLEditorTiein.chapter.childNameScreen(name)}
+        }
+    );
 }
 
 chapterProto.computeFullChapterNumber = function computeFullChapterNumber() {
@@ -256,6 +330,15 @@ chapterProto.computeFullChapterNumber = function computeFullChapterNumber() {
 
 chapterProto.updateFullChapterNumber = function updateFullChapterNumber() {
     this.manager.setVarValue("fullChapterNumber", this.computeFullChapterNumber());
+}
+
+chapterProto.applyToSubChapters = function applyToSubChapters(func, ...args) {
+    func.apply(this, args);
+    let sub = this.firstChapter;
+    while (sub) {
+        sub.applyToSubChapters(func, args);
+        sub = sub.nextChapter;
+    }
 }
 
 function doAll(functions, ...args) {for (let f in functions) functions[f](args)}

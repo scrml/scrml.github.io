@@ -131,10 +131,10 @@ function loadCSS(location) {
 
 function emptyFunction() {}
 
-function isAncestorOf(older, younger) {
-    while (younger.parentElement) {
+function isAncestorOf(older, younger, parentCalled = "parent") {
+    while (younger) {
         if (older == younger) return true;
-        younger = younger.parentElement;
+        younger = younger[parentCalled];
     }
     return false;
 }

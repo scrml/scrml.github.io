@@ -511,7 +511,7 @@ gui.chapterSystemDefaultOptions.protoModel.newGap = function newGap(loadHere, in
 }
 gui.chapterSystemDefaultOptions.protoModel.checkFocus = function(e) {
     if (this.lockFocus) return;
-    if (this.focused) if (!isAncestorOf(this.focused.div, e.target)) this.focused.loseFocus();
+    if (this.focused) if (!isAncestorOf(this.focused.div, e.target, "parentElement")) this.focused.loseFocus();
     let element = e.target;
     while (element.parentElement) {
         if (element.chapterSystem) {
