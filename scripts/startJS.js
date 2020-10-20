@@ -145,3 +145,5 @@ function commaJoin(lines) {
     for (let line of lines) returner += line + ", ";
     return returner.substring(0, returner.length - 2);
 }
+
+function trueFunction() {return true}

@@ -125,8 +125,7 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
     input.addEventListener("input", changeWidth);
     input.setWidth = changeWidth;
 }
-
-gui.screenedInput = function screenedInput(loadHere, options = {}) {
+{
     let defaultOptions = {
         placeholder: "",
         onchange: emptyFunction,
@@ -135,32 +134,55 @@ gui.screenedInput = function screenedInput(loadHere, options = {}) {
         messageTime: 1000,
         atts: []
     };
-    let returner = gui.element("input", loadHere, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
-    returner.select();
-    returner.addEventListener("change", function() {
-        let line = returner.value;
-        if (optionValue(options, defaultOptions, "screen")(line)) optionValue(options, defaultOptions, "onchange")(line);
-        else gui.inputOutput.inputText(returner, optionValue(options, defaultOptions, "failMessage"), optionValue(options, defaultOptions, "messageTime"))
-    });
-    return returner;
+    gui.screenedInput = function screenedInput(loadHere, options = {}) {
+        let returner = gui.element("input", loadHere, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
+        returner.select();
+        let screen = optionValue(options, defaultOptions, "screen"), onchange = optionValue(options, defaultOptions, "onchange"), failMessage = optionValue(options, defaultOptions, "failMessage"), messageTime = optionValue(options, defaultOptions, "messageTime");
+        returner.addEventListener("change", function() {
+            let line = returner.value;
+            if (screen(line)) onchange(line);
+            else gui.inputOutput.inputText(returner, failMessage, messageTime)
+        });
+        if (optionValue(options, defaultOptions, "absorbClicks")) gui.absorbClicks(returner);
+        return returner;
+    }
+}
+{
+    let defaultOptions = {
+        placeholder: "",
+        onchange: emptyFunction,
+        screen: gui.nodeNameScreen,
+        failMessage: "invalid",
+        messageTime: 1000,
+        atts: [],
+        absorbClicks: false
+    };
+    gui.screenedInputReplace = function screenedInputReplace(loadHere, replaceThis, options = {}) {
+        let returner = gui.elementReplace("input", loadHere, replaceThis, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
+        returner.addEventListener("change", function() {
+            let line = returner.value;
+            if (optionValue(options, defaultOptions, "screen")(line)) {
+                loadHere.replaceChild(replaceThis, returner);
+                optionValue(options, defaultOptions, "onchange")(line);
+            } else gui.inputOutput.inputText(returner, optionValue(options, defaultOptions, "failMessage"), optionValue(options, defaultOptions, "messageTime"))
+        });
+        if (optionValue(options, defaultOptions, "absorbClicks")) gui.absorbClicks(returner);
+        return returner;
+    }
 }
 
-gui.screenedInputReplace = function screenedInputReplace(loadHere, replaceThis, options = {}) {
-    let defaultOptions = {
-        placeholder: "",
-        onchange: emptyFunction,
-        screen: gui.nodeNameScreen,
-        failMessage: "invalid",
-        messageTime: 1000,
-        atts: []
-    };
-    let returner = gui.elementReplace("input", loadHere, replaceThis, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
-    returner.addEventListener("change", function() {
-        let line = returner.value;
-        if (optionValue(options, defaultOptions, "screen")(line)) {
-            loadHere.replaceChild(replaceThis, returner);
-            optionValue(options, defaultOptions, "onchange")(line);
-        } else gui.inputOutput.inputText(returner, optionValue(options, defaultOptions, "failMessage"), optionValue(options, defaultOptions, "messageTime"))
+gui.linkedScreenedInput = function linkedScreenedInput(loadHere, manager, property, options = {}) {
+    let newOptions = Object.assign({}, options), returner = {};
+    let onchange = emptyFunction;
+    if (options.onchange) onchange = options.onchange;
+    newOptions.onchange = function(value) {
+        manager.setVarValue(property, returner.element.value);
+        onchange(value);
+    }
+    returner.element = gui.screenedInput(loadHere, newOptions);
+    returner.unlink = manager.linkProperty(property, returner.element, "value");
+    returner.element.addEventListener("blur", function() {
+        window.setTimeout(function() {try {returner.element.value = manager.vars[property].value} catch (e) {}}, 100);
     });
     return returner;
 }
@@ -237,11 +259,11 @@ gui.linkedTextShell = function linkedTextShell(type, loadHere, manager, property
     return returner;
 }
 
-gui.linkedTextShellByValue = function linkedTextShell(type, loadHere, manager, property, screen, options = {}) {
-    let returner = gui.element(type, loadHere, options.atts);
-    manager.linkProperty(property, returner, "value");
-    returner.addEventListener("click", function() {
-        gui.linkedFocusedScreenedInputReplace(loadHere, returner, manager, property, screen, options);
+gui.linkedFocusedTextShell = function linkedFocusedTextShell(type, loadHere, manager, property, screen, options = {}) {
+    let returner = {element: gui.element(type, loadHere, options.atts)};
+    returner.unlink = manager.linkProperty(property, returner.element, "value");
+    returner.element.addEventListener("click", function() {
+        gui.linkedFocusedScreenedInputReplace(loadHere, returner.element, manager, property, screen, options);
     });
     return returner;
 }
@@ -807,6 +829,15 @@ gui.popupLinkedValue = function popupLinkedValue(popup, triggerNode, manager, pr
             if (onchange) onchange(value);
         }), triggerNode)
     });
+}
+
+gui.clickAbsorber = function(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+}
+
+gui.absorbClicks = function absorbClicks(element) {
+    element.addEventListener("click", gui.clickAbsorber);
 }
 
 function optionValue(options, defaultOptions, property) {

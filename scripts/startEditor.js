@@ -80,6 +80,8 @@ function newChapter(parent, insertBefore, name = "") {
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
+    returner.manager.setVarValue("nickname", name);
+    returner.manager.linkProperty("nickname", returner);
     returner.manager.setVarValue("chapterNumber", -1);
     returner.manager.linkProperty("chapterNumber", returner);
     returner.manager.linkListener("chapterNumber", function(chapterNumber) {
@@ -194,7 +196,7 @@ chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
         this.cleanupGaps.push(newGap(this, newPage, "previous", gapHandler));
         newPage.nextGap = replacing;
         replacing.SCRMLEditorTiein.previousPage = newPage;
-    }
+    } else newPage.hide();
 }
 chapterProto.show = function show() {
     if (this.showCleanups) return;
@@ -210,12 +212,24 @@ chapterProto.show = function show() {
     elements.chapterHead.addEventListener("click", function() {if (me.isOpen) me.close(); else me.open()});
     elements.chapterNumberSpan = gui.element("span", elements.chapterHead, ["class", "chapterNumber"]);
     elements.chapterNumberText = gui.text("", elements.chapterNumberSpan);
-    elements.nameSpan = gui.element("span", elements.chapterHead, ["class", "name"]);
-    elements.nameText = gui.text("", elements.nameSpan);
-    elements.debugText = gui.text("", elements.nameSpan);
+    elements.nameSwapButton = gui.button("⥂", elements.chapterHead, function() {me.nameSwap()}, ["class", "nameSwapButton", "disguise", ""]);
+    gui.absorbClicks(elements.nameSwapButton);
+    elements.nameSpan = gui.linkedScreenedInput(elements.chapterHead, me.manager, "name", {
+        screen: me.parent? function(name) {return me.parent.childNameScreen(name)}: gui.nodeNameScreen,
+        atts: ["class", "name", "disguise", ""],
+        absorbClicks: true
+    });
+    me.showCleanups.unlinkName = elements.nameSpan.unlink;
+    elements.nameSpan = elements.nameSpan.element;
+    elements.nicknameSpan = gui.linkedScreenedInput(null, me.manager, "nickname", {
+        screen: trueFunction,
+        atts: ["class", "nickname", "disguise", ""],
+        absorbClicks: true
+    });
+    me.showCleanups.unlinkNickname = elements.nicknameSpan.unlink;
+    elements.nicknameSpan = elements.nicknameSpan.element;
     for (let e in elements) {me[e] = elements[e]}
     me.showCleanups.chapterNumberText = me.manager.linkProperty("fullChapterNumber", elements.chapterNumberText, "nodeValue");
-    me.showCleanups.nameText = me.manager.linkProperty("name", elements.nameText, "nodeValue");
     if (me.parent) me.parent.div.appendChild(me.div);
     if (this.wasOpen) this.open(true);
     this.chapterHead.addEventListener("mouseover", pageToolsMouseoverListener);
@@ -318,6 +332,16 @@ function gapHandler(e) {
             screen: function(name) {return gap.SCRMLEditorTiein.chapter.childNameScreen(name)}
         }
     );
+}
+
+chapterProto.nameSwap = function nameSwap() {
+    if (this.nameSpan.parentElement) {
+        this.chapterHead.replaceChild(this.nicknameSpan, this.nameSpan);
+        this.nameSwapButton.innerHTML = "⥄";
+    } else {
+        this.chapterHead.replaceChild(this.nameSpan, this.nicknameSpan);
+        this.nameSwapButton.innerHTML = "⥂";
+    }
 }
 
 chapterProto.computeFullChapterNumber = function computeFullChapterNumber() {
