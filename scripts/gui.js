@@ -5,8 +5,7 @@ var gui = {};
 gui.elementDoc = function elementDoc(doc, type, loadHere, atts = [], insertBefore = null) {
     let returner = doc.createElement(type);
     if (loadHere) loadHere.insertBefore(returner, insertBefore);
-    for (let i = 0; i < atts.length; i += 2) if (atts[i] == "dynamicWidth") gui.dynamizeWidth(returner);
-    else returner.setAttribute(atts[i], atts[i+1]);
+    for (let i = 0; i < atts.length; i += 2) returner.setAttribute(atts[i], atts[i+1]);
     return returner;
 }
 
@@ -59,7 +58,7 @@ gui.inputOutput.inputText = function inputText(input, message, time = 1000) {
     let text = input.value, wasAble = !input.hasAttribute("disabled");
     input.value = message;
     input.setAttribute("disabled", "");
-    let width = Math.ceil(gui.getWidth(message));
+    let width = Math.ceil(gui.getWidth(input, message));
     let style = gui.element("style", document.head);
     style.innerHTML = "[min-width" + width + "] {min-width: " + width + "px}";
     input.setAttribute("min-width" + width, "");
@@ -108,7 +107,7 @@ let testDiv = gui.element("div", document.body, ["id", "testDiv"]);
 {
     let testSpan, testText;
     
-    gui.getWidth = function getWidth(line) {
+    gui.getWidth = function getWidth(input, line) {
         if (!testSpan) {
             testSpan = gui.element("span", testDiv, ["id", "testSpan"]);
             testText = gui.text("", testSpan);
@@ -121,7 +120,7 @@ let testDiv = gui.element("div", document.body, ["id", "testDiv"]);
 }
 
 gui.dynamizeWidth = function dynamizeWidth(input) {
-    let changeWidth = function() {input.style.width = gui.getWidth(input.value) + "px"}
+    let changeWidth = function() {input.style.width = gui.getWidth(input, input.value) + "px"}
     input.addEventListener("input", changeWidth);
     input.setWidth = changeWidth;
 }
@@ -132,7 +131,9 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
         screen: gui.nodeNameScreen,
         failMessage: "invalid",
         messageTime: 1000,
-        atts: []
+        atts: [],
+        absorbClicks: false,
+        dynamizeWidth: true
     };
     gui.screenedInput = function screenedInput(loadHere, options = {}) {
         let returner = gui.element("input", loadHere, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
@@ -144,6 +145,7 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
             else gui.inputOutput.inputText(returner, failMessage, messageTime)
         });
         if (optionValue(options, defaultOptions, "absorbClicks")) gui.absorbClicks(returner);
+        if (optionValue(options, defaultOptions, "dynamizeWidth")) gui.dynamizeWidth(returner);
         return returner;
     }
 }
@@ -155,7 +157,8 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
         failMessage: "invalid",
         messageTime: 1000,
         atts: [],
-        absorbClicks: false
+        absorbClicks: false,
+        dynamizeWidth: true
     };
     gui.screenedInputReplace = function screenedInputReplace(loadHere, replaceThis, options = {}) {
         let returner = gui.elementReplace("input", loadHere, replaceThis, ["type", "text", "placeholder", optionValue(options, defaultOptions, "placeholder")].concat(optionValue(options, defaultOptions, "atts")));
@@ -167,6 +170,7 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
             } else gui.inputOutput.inputText(returner, optionValue(options, defaultOptions, "failMessage"), optionValue(options, defaultOptions, "messageTime"))
         });
         if (optionValue(options, defaultOptions, "absorbClicks")) gui.absorbClicks(returner);
+        if (optionValue(options, defaultOptions, "dynamizeWidth")) gui.dynamizeWidth(returner);
         return returner;
     }
 }
@@ -571,6 +575,7 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
     let openDuration = 400, closeDuration = 200;
     let animationend = function(e) {
         let button = e.target.parentElement.firstChild, trigger = button.nextSibling;
+        if (trigger.parentElement.SCRMLEditorTiein.lock) return;
         if (trigger.hasAttribute("opening")) {
             trigger.removeAttribute("opening");
             trigger.setAttribute("open", "");
@@ -583,18 +588,16 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
         }
     }
     let openTrigger = function(e) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
         let button = e.target.parentElement.firstChild, trigger = button.nextSibling;
+        if (trigger.parentElement.SCRMLEditorTiein.lock) return;
         if (trigger.hasAttribute("open") || trigger.hasAttribute("opening") || trigger.hasAttribute("closing")) return;
         trigger.removeAttribute("closed");
         trigger.setAttribute("opening", "");
         window.setTimeout(function() {animationend(e)}, openDuration);
     }
     let closeTrigger = function(e) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
         let button = e.target.parentElement.firstChild, trigger = button.nextSibling;
+        if (trigger.parentElement.SCRMLEditorTiein.lock) return;
         if (!trigger.hasAttribute("open")) return;
         trigger.removeAttribute("open");
         trigger.setAttribute("closing", "");
@@ -609,6 +612,9 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
         this.deleteButton.removeAttribute("flashing");
         for (att of ["open", "closing", "opening"]) this.deleteTrigger.removeAttribute(att);
         this.deleteTrigger.setAttribute("closed", "");
+        this.lock = true;
+        let me = this;
+        window.setTimeout(function() {me.lock = false}, Math.max(openDuration, closeDuration) + 1);
     }
     function hideDelete() {
         this.deleteLaunch.setAttribute("hide", "");
@@ -621,8 +627,11 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
     gui.deleteBundle = function deleteBundle(loadHere, buttonClick) {
         let returner = {};
         let deleteLaunch = returner.deleteLaunch = gui.element("div", loadHere, ["class", "missileLaunch"]);
+        deleteLaunch.SCRMLEditorTiein = {};
         let deleteButton = returner.deleteButton = gui.button("delete", deleteLaunch, buttonClick, ["class", "missileLaunchButton", "disabled", ""]);
+        gui.absorbClicks(deleteButton);
         let deleteTrigger = returner.deleteTrigger = gui.element("div", deleteLaunch, ["class", "trigger", "tabindex", "0"]);
+        gui.absorbClicks(deleteTrigger);
         deleteButton.addEventListener("blur", closeTrigger);
         deleteTrigger.addEventListener("focus", openTrigger);
         deleteTrigger.addEventListener("click", openTrigger);

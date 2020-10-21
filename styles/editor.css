@@ -43,6 +43,10 @@ textarea {
     width: 100%;
 }
 
+.chapterHead {
+    min-height: 1.5em;
+}
+
 .chapterNumber {
     margin-right: 1em;
 }
@@ -50,14 +54,11 @@ textarea {
 #globalTools {
     position: sticky;
     top: 0;
+    z-index: 5;
 }
 
 #pageTools {
     float: right;
-}
-
-.chapterNumber {
-    font-size: large;
 }
 
 #editor .gap[mode="moveHere"] {
@@ -78,4 +79,8 @@ textarea {
     content: "❌";
     position: absolute;
     top: -.15em;
+}
+
+#rootHead > #pageTools {
+    display: none;
 }

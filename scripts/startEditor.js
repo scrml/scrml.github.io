@@ -10,6 +10,8 @@ function start() {
     root = newChapter(false, false, "Book");
     root.a = "root";
     root.show();
+    root.open(true);
+    root.chapterHead.setAttribute("id", "rootHead");
     document.getElementById("editor").appendChild(root.div);
     root.newPageMakers = {
         chapter: function(gap, name) {
@@ -35,6 +37,7 @@ let focusLocked = false, isFocused = undefined;
 function makePageTools() {
     pageTools = gui.element("div", false, ["id", "pageTools"]);
     pageTools.moveButton = gui.button("⇳", pageTools, toMoveMode, ["disguise", "", "bigger", ""]);
+    pageTools.deleteBundle = gui.deleteBundle(pageTools, function() {isFocused.deletePage()});
 }
 
 function pageToolsMouseoverListener(e) {
@@ -80,7 +83,7 @@ function newChapter(parent, insertBefore, name = "") {
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
-    returner.manager.setVarValue("nickname", name);
+    returner.manager.setVarValue("nickname", "");
     returner.manager.linkProperty("nickname", returner);
     returner.manager.setVarValue("chapterNumber", -1);
     returner.manager.linkProperty("chapterNumber", returner);
@@ -134,6 +137,11 @@ chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
     if (newPage == beforeMe || (beforeMe && newPage.nextPage == beforeMe) || (newPage == this.lastPage && !beforeMe)) return;
     if (beforeMe && (this != beforeMe.parent)) throw Error("the kid is not my son");
     newPage.orphan();
+    if (!this.childNameScreen(newPage.name)) {
+        let modifier = 0;
+        while (!this.childNameScreen(newPage.name + "_" + ++modifier));
+        newPage.manager.setVarValue("name", newPage.name + "_" + modifier);
+    }
     newPage.parent = this;
     if (beforeMe) {
         if (beforeMe == this.firstPage) this.firstPage = newPage;
@@ -212,7 +220,7 @@ chapterProto.show = function show() {
     elements.chapterHead.addEventListener("click", function() {if (me.isOpen) me.close(); else me.open()});
     elements.chapterNumberSpan = gui.element("span", elements.chapterHead, ["class", "chapterNumber"]);
     elements.chapterNumberText = gui.text("", elements.chapterNumberSpan);
-    elements.nameSwapButton = gui.button("⥂", elements.chapterHead, function() {me.nameSwap()}, ["class", "nameSwapButton", "disguise", ""]);
+    elements.nameSwapButton = gui.button("⥄", elements.chapterHead, function() {me.nameSwap()}, ["class", "nameSwapButton", "disguise", ""]);
     gui.absorbClicks(elements.nameSwapButton);
     elements.nameSpan = gui.linkedScreenedInput(elements.chapterHead, me.manager, "name", {
         screen: me.parent? function(name) {return me.parent.childNameScreen(name)}: gui.nodeNameScreen,
@@ -223,7 +231,7 @@ chapterProto.show = function show() {
     elements.nameSpan = elements.nameSpan.element;
     elements.nicknameSpan = gui.linkedScreenedInput(null, me.manager, "nickname", {
         screen: trueFunction,
-        atts: ["class", "nickname", "disguise", ""],
+        atts: ["class", "nickname", "disguise", "", "placeholder", "nickname"],
         absorbClicks: true
     });
     me.showCleanups.unlinkNickname = elements.nicknameSpan.unlink;
@@ -285,9 +293,10 @@ chapterProto.close = function close(simulated = false) {
 }
 
 chapterProto.focus = function focus() {
-    if (focusLocked) return;
+    if (focusLocked || this == isFocused) return;
     isFocused = this;
     this.chapterHead.appendChild(pageTools);
+    pageTools.deleteBundle.resetBundle();
 }
 let gapNumber = 0;
 function newGap(chapter, page, direction, onclick, text = "", divClass = "gap") {
@@ -337,10 +346,10 @@ function gapHandler(e) {
 chapterProto.nameSwap = function nameSwap() {
     if (this.nameSpan.parentElement) {
         this.chapterHead.replaceChild(this.nicknameSpan, this.nameSpan);
-        this.nameSwapButton.innerHTML = "⥄";
+        this.nameSwapButton.innerHTML = "⥂";
     } else {
         this.chapterHead.replaceChild(this.nameSpan, this.nicknameSpan);
-        this.nameSwapButton.innerHTML = "⥂";
+        this.nameSwapButton.innerHTML = "⥄";
     }
 }
 
@@ -363,6 +372,11 @@ chapterProto.applyToSubChapters = function applyToSubChapters(func, ...args) {
         sub.applyToSubChapters(func, args);
         sub = sub.nextChapter;
     }
+}
+
+chapterProto.deletePage = function deletePage() {
+    while (this.firstPage) this.parent.insertBefore(this.firstPage, this);
+    this.orphan();
 }
 
 function doAll(functions, ...args) {for (let f in functions) functions[f](args)}
