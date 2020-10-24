@@ -8,7 +8,10 @@
         <script>
             filePrefix = "../";
             // scripts which will be loaded
-            let scripts = {startEditor: "scripts/startEditor.js"};
+            let scripts = {
+                storage: "scripts/storage.js",
+                startEditor: "scripts/startEditor.js"
+            };
         </script>
         <script src="../scripts/startJS.js"></script>
     </head>
@@ -21,6 +24,7 @@
                     <button id="chapterMode">Chapter</button>
                     <button id="statementMode">Statement</button>
                     <button id="commentMode">Comment</button>
+                    <button id="debugButton">for debugging</button>
                 </div>
             </div>
         </div>

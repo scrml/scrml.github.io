@@ -54,10 +54,10 @@ function loadCSS(location) {
                 linkedLists.lastUnlink = {previous: linkedLists.firstUnlink, unlink: emptyFunction};
                 linkedLists.firstUnlink.next = linkedLists.lastUnlink;
             }
-            let change = this.vars[name], unit = change.firstProperty;
+            let change = this.vars[name], unit = change.firstProperty, oldValue = change.value;
             while (unit = unit.next) unit.object[unit.propertyName] = value;
             unit = change.firstListener;
-            while (unit = unit.next) unit.listener(value);
+            while (unit = unit.next) unit.listener(value, oldValue);
         },
         deleteVar: function deleteVar(varName) {
             let unit = this.vars[varName].firstUnlink;
@@ -79,9 +79,9 @@ function loadCSS(location) {
             change.addUnit(change.lastUnlink, unlinkUnit);
             return unlinkUnit.unlink;
         },
-        linkListener: function linkListener(varName, listener, fire = false) {
+        linkListener: function linkListener(varName, listener, fireWith = undefined) {
             let change = this.vars[varName];
-            if (fire) listener(change.value);
+            if (typeof fireWith != "undefined") listener(change.value, fireWith);
             let unit = Object.create(unitProto);
             unit.listener = listener;
             change.addUnit(change.lastListener, unit);
@@ -118,6 +118,11 @@ function loadCSS(location) {
                 ++returner;
                 unit = unit.next;
             }
+            return returner;
+        },
+        numAllLinkeds: function numAllLinkeds() {
+            let returner = 0;
+            for (let name in this.vars) returner += this.numLinkeds(name);
             return returner;
         }
     };

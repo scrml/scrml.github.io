@@ -272,284 +272,6 @@ gui.linkedFocusedTextShell = function linkedFocusedTextShell(type, loadHere, man
     return returner;
 }
 
-gui.chapterSystemDefaultOptions = {
-    divAtts: ["class", "chapterSystem"],
-    chaptersAreCalled: "chapter",
-    protoModel: {},
-    chapterProtoModel: {},
-    gapProtoModel: {},
-    moveRestrictedToImmediateFamily: true
-}
-
-gui.chapterSystem = function chapterSystem(loadHere, options = {}) {
-    function getOption(options, property) {return optionValue(options, gui.chapterSystemDefaultOptions, property)};
-    let chapterSystem = Object.create(getOption(options, "protoModel"));
-    chapterSystem.manager = newVarManager();
-    chapterSystem.manager.setVarValue("chaptersAreCalled", getOption(options, "chaptersAreCalled"));
-    chapterSystem.manager.linkProperty("chaptersAreCalled", chapterSystem, "chaptersAreCalled");
-    if (options.parentChapterSystem) chapterSystem.parentChapterSystem = options.parentChapterSystem;
-    chapterSystem.chapterProtoModel = getOption(options, "chapterProtoModel");
-    chapterSystem.gapProtoModel = getOption(options, "gapProtoModel");
-    chapterSystem.lockFocus = false;
-    chapterSystem.cleanups = [];
-    chapterSystem.getOption = getOption;
-    chapterSystem.div = gui.element("div", loadHere, getOption(options, "divAtts"));
-    chapterSystem.uniqueChapterNameScreen = function uniqueChapterNameScreen(proposal) {return chapterSystem.screenForUniqueChapterName(proposal)}
-    chapterSystem.firstGap = chapterSystem.newGap(chapterSystem.div);
-    return chapterSystem;
-}
-gui.chapterSystemDefaultOptions.protoModel.toEachGap = function toEachGap(call, ...args) {
-    for (let gap of this.getGaps()) call(gap, args);
-}
-gui.chapterSystemDefaultOptions.protoModel.getGaps = function getGaps() {
-    let returner = [];
-    let gap = this.firstGap;
-    while (gap) {
-        returner.push(gap);
-        if (gap.nextChapter) gap = gap.nextChapter.nextGap;
-        else gap = false;
-    }
-    return returner;
-}
-gui.chapterSystemDefaultOptions.protoModel.toEachChapter = function toEachChapter(call, ...args) {
-    for (let chapter of this.getChapters()) call(chapter, args);
-}
-gui.chapterSystemDefaultOptions.protoModel.getChapters = function getChapters() {
-    let returner = [];
-    let chapter  = this.firstChapter;
-    while (chapter) {
-        returner.push(chapter);
-        chapter = chapter.nextChapter;
-    }
-    return returner;
-}
-gui.chapterSystemDefaultOptions.protoModel.toAcceptMoveMove = function toAcceptMoveMode(comingIn) {
-    this.toEachGap(function(gap) {
-        gap.div.replaceChild(comingIn.canMoveHere(gap)? gap.moveHereGap: gap.dontMoveHereGap, gap.gap);
-    });
-    this.toEachChapter(function(chapter) {
-        chapter.lockMetaTools();
-    });
-}
-gui.chapterSystemDefaultOptions.protoModel.leaveAcceptMoveMode = function leaveAcceptMoveMode() {
-    this.toEachGap(function(gap) {
-        for (let button of [gap.moveHereGap, gap.dontMoveHereGap]) if (button.parentElement) gap.div.replaceChild(gap.gap, button);
-    });
-    this.toEachChapter(function(chapter) {
-        chapter.unlockMetaTools();
-    });
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.lockMetaTools = function lockMetaTools() {
-    this.metaTools.removeAttribute("hoverUnhide");
-    if (this != this.chapterSystem.focused) {
-        this.metaTools.setAttribute("hide", "");
-    }
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.unlockMetaTools = function unlockMetaTools() {
-    this.metaTools.removeAttribute("hide");
-    this.metaTools.setAttribute("hoverUnhide", "");
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.toMoveMode = function toMoveMode() {
-    this.isMoving = true;
-    if (this == this.chapterSystem.focused) return;
-    this.chapterSystem.focused = this;
-    this.chapterSystem.lockFocus = true;
-    this.chapterSystem.toAcceptMoveMove(this);
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.moveTo = function moveTo(thisGap) {
-    this.isMoving = this.chapterSystem.lockFocus = false;
-    this.chapterSystem.focused = undefined;
-    this.chapterSystem.leaveAcceptMoveMode();
-    let a = thisGap.previousChapter,
-        b = thisGap.nextChapter,
-        c = this.previousChapter,
-        d = this.previousGap,
-        e = this.nextGap,
-        f = this.nextChapter;
-    if (thisGap != d && thisGap != e) {
-        if (this == this.chapterSystem.firstChapter) {
-            this.chapterSystem.firstChapter = f;
-            this.chapterSystem.firstGap = e;
-        }
-        this.previousChapter = a;
-        d.previousChapter = a;
-        this.nextChapter = b;
-        this.nextGap = thisGap;
-        thisGap.previousChapter = this;
-        e.previousChapter = c;
-        if (a) {
-            a.nextChapter = this;
-            a.nextGap = d;
-        } else {
-            this.chapterSystem.firstChapter = this;
-            this.chapterSystem.firstGap = d;
-        }
-        if (c) {
-            c.nextChapter = f;
-            c.nextGap = e;
-        }
-        if (b) b.previousChapter = this;
-        if (f) f.previousChapter = c;
-        let unit = gui.element("div", this.div.parentElement, ["class", "unit"], this.div);
-        unit.appendChild(d.div);
-        unit.appendChild(this.div);
-        let hideThese = this.chapterSystem.getGaps();
-        for (let i = 0; i < hideThese.length; ++i) hideThese[i] = hideThese[i].div;
-        let me = this;
-        gui.smoothSwap(unit, thisGap.div, {
-            hideThese: hideThese,
-            onEnd: function() {
-                unit.parentElement.insertBefore(d.div, unit);
-                unit.parentElement.replaceChild(me.div, unit);
-            }
-        });
-    }
-}
-gui.chapterSystemDefaultOptions.protoModel.doMove = function doMove(e) {
-    this.focused.moveTo(e.target.gap);
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.cancelMove = function cancelMove() {this.moveTo(this.previousGap)}
-gui.chapterSystemDefaultOptions.chapterProtoModel.canMoveHere = function canMoveHere(gap) {
-    return true;
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.openNicknames = function openNicknames() {
-    if (!this.nameHolder.parentElement) return;
-    let me = this;
-    gui.focusedScreenedInputReplace(this.nameHolder.parentElement, this.nameHolder, function(nicknames) {
-        me.setNicknames(nicknames.split(", "));
-    }, {
-        screen: function(proposition) {
-            if (proposition == "") return true;
-            let lines = proposition.split(", ");
-            for (let line of lines) if (!gui.nodeNameScreen(line)) return false;
-            return true;
-        },
-        placeholder: "nicknames"
-    }).value = commaJoin(this.nicknames);
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.setNicknames = function setNicknames(nicknames) {
-    this.nicknames = nicknames;
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.deleteChapter = function deleteChapter() {
-    if (this.isMoving) this.cancelMove();
-    gui.smoothErase(this.div);
-    this.nextGap.previousChapter = this.previousChapter;
-    this.previousGap.deleteGap();
-    if (this.previousChapter) {
-        this.previousChapter.nextChapter = this.nextChapter;
-        this.previousChapter.nextGap = this.nextGap;
-    } else {
-        this.chapterSystem.firstChapter = this.nextChapter;
-        this.chapterSystem.firstGap = this.nextGap;
-    }
-    if (this.nextChapter) this.nextChapter.previousChapter = this.previousChapter;
-    this.manager.clearAll();
-}
-gui.chapterSystemDefaultOptions.chapterProtoModel.saveToString = function saveToString() {
-    let returner = "";
-    returner += "name " + this.name;
-    for (let nickname of this.nicknames) returner += " " + nickname;
-    returner += "\n";
-}
-gui.chapterSystemDefaultOptions.protoModel.screenForUniqueChapterName = function screenForUniqueChapterName(proposal) {
-    if (!gui.nodeNameScreen(proposal)) return false;
-    if (!this.firstChapter) return true;
-    let testChapter = this.firstChapter;
-    do {if (testChapter.name == proposal) return false} while (testChapter = testChapter.nextChapter);
-    return true;
-}
-gui.chapterSystemDefaultOptions.gapProtoModel.turnIntoNewChapter = function turnIntoNewChapter(name, details = true) {
-    let chapterSystem = this.chapterSystem, returner = Object.create(chapterSystem.chapterProtoModel);
-    returner.chapterSystem = chapterSystem;
-    this.div.removeChild(this.gap);
-    if (details) {
-        returner.div = gui.elementReplace("details", this.div.parentElement, this.div, ["class", this.div.getAttribute("class")]);
-    } else {
-        returner.div = this.div;
-    }
-    returner.div.setAttribute("to1", "");
-    returner.previousChapter = this.previousChapter;
-    returner.nextChapter = this.nextChapter;
-    returner.previousGap = chapterSystem.newGap(returner.div.parentElement, returner.div);
-    returner.previousGap.nextChapter = returner;
-    returner.nextGap = chapterSystem.newGap(returner.div.parentElement, returner.div.nextElementSibling);
-    returner.nextGap.previousChapter = returner;
-    if (returner.previousChapter) {
-        returner.previousChapter.nextChapter = returner;
-        returner.previousChapter.nextGap = returner.previousGap;
-        returner.previousGap.previousChapter = returner.previousChapter;
-    } else {
-        chapterSystem.firstChapter = returner;
-        chapterSystem.firstGap = returner.previousGap;
-    }
-    if (returner.nextChapter) {
-        returner.nextChapter.previousChapter = returner;
-        returner.nextChapter.previousGap = returner.nextGap;
-        returner.nextGap.nextChapter = returner.nextChapter;
-    }
-    returner.div.chapterSystem = chapterSystem;
-    returner.div.chapter = returner;
-    returner.manager = newVarManager();
-    returner.manager.setVarValue("name", name);
-    returner.manager.linkProperty("name", returner, "name");
-    if (details) {
-        returner.nameHolder = gui.element("div", gui.element("summary", returner.div), ["plainWrapper", ""]);
-    } else returner.nameHolder = gui.element("div", returner.div, ["plainWrapper", ""]);
-    returner.nameP = gui.linkedTextShellByValue("input", returner.nameHolder, returner.manager, "name", chapterSystem.uniqueChapterNameScreen, {atts: ["disguise", "", "type", "button", "dynamicWidth", ""]});
-    returner.nicknames = [];
-    returner.nicknameButton = gui.button("…", returner.nameHolder, function() {returner.openNicknames()}, ["disguise", ""]);
-    returner.metaTools = gui.element("div", details? returner.nameHolder.parentElement: returner.nameHolder, ["class", "metaTools", "hoverUnhide", ""]);
-    returner.isMoving = false;
-    returner.moveButton = gui.button("⇳", returner.metaTools, function() {returner.toMoveMode()}, ["disguise", "", "bigger", ""]);
-    returner.deleteBundle = gui.deleteBundle(returner.metaTools, function() {returner.deleteChapter()});
-    returner.metaTools.addEventListener("mouseleave", function(e) {
-        returner.deleteBundle.closeTrigger();
-    });
-    return returner;
-}
-    
-gui.chapterSystemDefaultOptions.gapProtoModel.deleteGap = function deleteGap() {
-    gui.smoothErase(this.div);
-    if (this == this.chapterSystem.firstGap) this.chapterSystem.firstGap = this.nextChapter.nextGap;
-}
-gui.chapterSystemDefaultOptions.protoModel.newGap = function newGap(loadHere, insertBefore) {
-    let returner = Object.create(this.gapProtoModel);
-    returner.div = gui.element("div", loadHere, ["class", "chapter"], insertBefore);
-    returner.gap = gui.element("button", returner.div, ["class", "gap", "disguise", ""]);
-    returner.chapterSystem = this;
-    let me = this, cycleUnlinkListener = {};
-    returner.gap.addEventListener("focus", function() {
-        if (returner.gap.firstChild) return;
-        let input = gui.focusedScreenedInput(returner.gap, function(name) {returner.turnIntoNewChapter(name)}, {
-            screen: me.uniqueChapterNameScreen,
-            atts: ["disguise", "", "block", "", "dynamicWidth", ""],
-            whileRemovingInput: function() {cycleUnlinkListener.go()}
-        });
-        let listener = function(newCalled) {
-            input.setAttribute("placeholder", "new " + me.chaptersAreCalled + " name");
-        }
-        cycleUnlinkListener.go = me.manager.linkListener("chaptersAreCalled", listener, true);
-    });
-    returner.moveHereGap = gui.button("⇦", false, function(e) {me.doMove(e)}, ["class", "moveHereGap", "disguise", ""]);
-    returner.moveHereGap.gap = returner;
-    returner.dontMoveHereGap = gui.button("❌", false, emptyFunction, ["class", "dontMoveHereGap", "disguise", ""]);
-    return returner;
-}
-gui.chapterSystemDefaultOptions.protoModel.checkFocus = function(e) {
-    if (this.lockFocus) return;
-    if (this.focused) if (!isAncestorOf(this.focused.div, e.target, "parentElement")) this.focused.loseFocus();
-    let element = e.target;
-    while (element.parentElement) {
-        if (element.chapterSystem) {
-            if (element.chapterSystem == this) {
-                element.chapter.getFocus();
-            }
-            break;
-        }
-        element = element.parentElement;
-    }
-}
-
 gui.button = function button(text, loadHere, onclick, atts, insertBefore) {
     let returner = gui.element("button", loadHere, atts, insertBefore);
     gui.text(text, returner);
@@ -847,6 +569,47 @@ gui.clickAbsorber = function(e) {
 
 gui.absorbClicks = function absorbClicks(element) {
     element.addEventListener("click", gui.clickAbsorber);
+}
+{
+    let isSuppressed = false;
+    gui.suppressKeys = function suppressKeys() {
+        if (isSuppressed) return;
+        window.addEventListener("keydown", gui.clickAbsorber);
+        isSuppressed = true;
+    }
+
+    gui.releaseKeySuppression = function releaseKeySuppression() {
+        if (isSuppressed) {
+            isSuppressed = false;
+            window.removeEventListener("keydown", gui.clickAbsorber);
+        }
+    }
+}
+
+{
+    let div = gui.element("div", document.body, ["id", "loadingScreen", "hide", ""]), div2 = gui.element("div", div), icon = gui.element("div", div2, ["id", "loadingIcon"]);
+    gui.text("Loading...", gui.element("p", div2));
+    let msgSpan = gui.element("p", div2), msgText = gui.text("", msgSpan), isLoad = false, numLoads = 0;
+    
+    gui.setLoadingScreen = function setLoadingScreen(message = "") {
+        msgText.nodeValue = message;
+        ++numLoads;
+        if (!isLoad) {
+            isLoad = true;
+            div.removeAttribute("hide");
+            gui.suppressKeys();
+        }
+    }
+    
+    gui.closeLoadingScreen = function closeLoadingScreen() {
+        if (--numLoads == 0) {
+            isLoad = false;
+            div.setAttribute("hide", "");
+            gui.releaseKeySuppression();
+        }
+    }
+    
+    gui.absorbClicks(div);
 }
 
 function optionValue(options, defaultOptions, property) {

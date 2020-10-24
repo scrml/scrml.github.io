@@ -1,16 +1,21 @@
 ScriptManager.openScript(filePrefix + "scripts/gui.js", "gui");
 Scripts["gui"].script.addEventListener("managed", start);
 
-let root, pageProto = {}, chapterProto = Object.create(pageProto), statementProto, commentProto, buttons;
-let pageTools;
+let root, pageProto = {}, chapterProto = Object.create(pageProto), statementProto, commentProto, buttons, pageTools, numPages = 0, allPagesByNumber = [], allPagesByName = {};
 
 function start() {
+    document.getElementById("debugButton").addEventListener("click", function() {
+        console.log(allPagesByNumber);
+        console.log(allPagesByName);
+    });
+    //gui.button("clear memory", document.body, function() {window.localStorage.clear()});
+    document.getElementById("debugButton").setAttribute("hide", "");
     editor.appendChild(testDiv);
     makePageTools();
-    root = newChapter(false, false, "Book");
-    root.a = "root";
+    let savedRoot = storage.fetch("root");
+    storage.deactivated = true;
+    root = newChapter(false, false, savedRoot === null? "Book": savedRoot);
     root.show();
-    root.open(true);
     root.chapterHead.setAttribute("id", "rootHead");
     document.getElementById("editor").appendChild(root.div);
     root.newPageMakers = {
@@ -30,6 +35,12 @@ function start() {
     }
     root.setPageMode("chapter");
     for (let type of ["chapter", "statement", "comment"]) document.getElementById(type+"Mode").addEventListener("click", function() {root.setPageMode(type)});
+    storage.deactivated = false;
+    root.updateSave = function updateSave(newFullName, oldFullName) {
+        chapterProto.updateSave.apply(root, [newFullName, oldFullName]);
+        storage.store("root", newFullName);
+    }
+    if (savedRoot) buildPageFromSave(storage.fetch("root")); else root.open(true);
 }
 
 let focusLocked = false, isFocused = undefined;
@@ -80,19 +91,37 @@ function toMoveMode(e) {
 function newChapter(parent, insertBefore, name = "") {
     let returner = Object.create(chapterProto);
     returner.isChapter = true;
+    allPagesByNumber.push(returner);
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
+    returner.manager.setVarValue("pageNumber", numPages++);
+    returner.manager.linkProperty("pageNumber", returner);
     returner.manager.setVarValue("nickname", "");
     returner.manager.linkProperty("nickname", returner);
+    returner.nicknameMode = false;
     returner.manager.setVarValue("chapterNumber", -1);
     returner.manager.linkProperty("chapterNumber", returner);
     returner.manager.linkListener("chapterNumber", function(chapterNumber) {
-        returner.updateFullChapterNumber();
+        returner.updateFullChapterNumber(chapterNumber);
         if (returner.nextChapter) returner.nextChapter.manager.setVarValue("chapterNumber", chapterNumber+1);
     }, true);
     returner.manager.linkProperty("fullChapterNumber", returner);
-    returner.manager.linkListener("fullChapterNumber", function() {if (returner.firstChapter) returner.firstChapter.updateFullChapterNumber()});
+    returner.manager.linkListener("fullChapterNumber", function() {if (returner.firstChapter) returner.firstChapter.updateFullChapterNumber(1)});
+    returner.manager.setVarValue("fullName", "");
+    returner.manager.linkListener("name", function(newName) {returner.updateFullName(newName)});
+    returner.manager.linkListener("fullChapterNumber", function() {returner.updateFullName()}, true);
+    returner.manager.linkProperty("fullName", returner);
+    returner.manager.linkListener("fullName", function(newName, oldName) {
+        delete allPagesByName[oldName];
+        allPagesByName[newName] = returner;
+    }, true);
+    returner.manager.linkListener("nickname", function(nickname) {
+        returner.nickname = nickname;
+        returner.updateSave(returner.fullName, returner.fullName);
+    });
+    returner.manager.linkListener("fullName", function(newName, oldName) {returner.updateSave(newName, oldName)});
+    returner.manager.linkListener("name", function() {if (returner.parent) returner.parent.updateSave(returner.parent.fullName)});
     if (parent) parent.insertBefore(returner, insertBefore);
     return returner;
 }
@@ -136,7 +165,9 @@ pageProto.orphan = function orphan() {
 chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
     if (newPage == beforeMe || (beforeMe && newPage.nextPage == beforeMe) || (newPage == this.lastPage && !beforeMe)) return;
     if (beforeMe && (this != beforeMe.parent)) throw Error("the kid is not my son");
+    let oldParent = newPage.parent;
     newPage.orphan();
+    if (oldParent) oldParent.updateSave(oldParent.fullName);
     if (!this.childNameScreen(newPage.name)) {
         let modifier = 0;
         while (!this.childNameScreen(newPage.name + "_" + ++modifier));
@@ -205,6 +236,8 @@ chapterProto.insertBefore = function insertBefore(newPage, beforeMe) {
         newPage.nextGap = replacing;
         replacing.SCRMLEditorTiein.previousPage = newPage;
     } else newPage.hide();
+    newPage.updateFullName();
+    this.updateSave(this.fullName);
 }
 chapterProto.show = function show() {
     if (this.showCleanups) return;
@@ -217,7 +250,10 @@ chapterProto.show = function show() {
     me.showCleanups.EraseElements = function() {for (let e in elements) me[e] = undefined}
     elements.chapterHead = gui.element("summary", me.div, ["class", "chapterHead"]);
     elements.chapterHead.chapter = me;
-    elements.chapterHead.addEventListener("click", function() {if (me.isOpen) me.close(); else me.open()});
+    elements.chapterHead.addEventListener("click", function() {
+        if (me.isOpen) me.close(); else me.open();
+        me.updateSave(me.fullName);
+    });
     elements.chapterNumberSpan = gui.element("span", elements.chapterHead, ["class", "chapterNumber"]);
     elements.chapterNumberText = gui.text("", elements.chapterNumberSpan);
     elements.nameSwapButton = gui.button("⥄", elements.chapterHead, function() {me.nameSwap()}, ["class", "nameSwapButton", "disguise", ""]);
@@ -239,7 +275,11 @@ chapterProto.show = function show() {
     for (let e in elements) {me[e] = elements[e]}
     me.showCleanups.chapterNumberText = me.manager.linkProperty("fullChapterNumber", elements.chapterNumberText, "nodeValue");
     if (me.parent) me.parent.div.appendChild(me.div);
-    if (this.wasOpen) this.open(true);
+    if (me.wasOpen) me.open(true);
+    if (me.nicknameMode) {
+        me.nicknameMode = false;
+        me.nameSwap();
+    }
     this.chapterHead.addEventListener("mouseover", pageToolsMouseoverListener);
 }
 
@@ -251,6 +291,7 @@ chapterProto.hide = function hide() {
 }
 
 chapterProto.open = function open(simulated = false) {
+    this.show();
     let me = this;
     me.isOpen = me.smoothly = true;
     if (simulated) me.div.setAttribute("open", "");
@@ -290,6 +331,7 @@ chapterProto.close = function close(simulated = false) {
         page.hide();
         page = page.nextPage;
     }
+    this.updateSave(this.fullName);
 }
 
 chapterProto.focus = function focus() {
@@ -344,25 +386,39 @@ function gapHandler(e) {
 }
 
 chapterProto.nameSwap = function nameSwap() {
-    if (this.nameSpan.parentElement) {
-        this.chapterHead.replaceChild(this.nicknameSpan, this.nameSpan);
-        this.nameSwapButton.innerHTML = "⥂";
-    } else {
+    if (this.nicknameMode) {
         this.chapterHead.replaceChild(this.nameSpan, this.nicknameSpan);
         this.nameSwapButton.innerHTML = "⥄";
+    } else {
+        this.chapterHead.replaceChild(this.nicknameSpan, this.nameSpan);
+        this.nameSwapButton.innerHTML = "⥂";
     }
+    this.nicknameMode = !this.nicknameMode;
+    this.updateSave(this.fullName);
 }
 
-chapterProto.computeFullChapterNumber = function computeFullChapterNumber() {
+chapterProto.computeFullChapterNumber = function computeFullChapterNumber(chapterNumber) {
     if (this.parent) {
-        if (this.parent.parent) return this.parent.fullChapterNumber + "." + this.chapterNumber;
-        else return this.chapterNumber;
+        if (this.parent.parent) return this.parent.fullChapterNumber + "." + chapterNumber;
+        else return chapterNumber;
     }
     else return "";
 }
 
-chapterProto.updateFullChapterNumber = function updateFullChapterNumber() {
-    this.manager.setVarValue("fullChapterNumber", this.computeFullChapterNumber());
+chapterProto.updateFullChapterNumber = function updateFullChapterNumber(chapterNumber) {
+    this.manager.setVarValue("fullChapterNumber", this.computeFullChapterNumber(chapterNumber));
+}
+
+chapterProto.computeFullName = function computeFullName(name) {
+    if (typeof name == "undefined") name = this.name;
+    if (this.parent) {
+        if (this.parent.parent) return this.parent.fullChapterNumber + "." + name;
+        else return this.parent.name + "." + name;
+    } else return name;
+}
+
+chapterProto.updateFullName = function updateFullName(name) {
+    this.manager.setVarValue("fullName", this.computeFullName(name));
 }
 
 chapterProto.applyToSubChapters = function applyToSubChapters(func, ...args) {
@@ -376,7 +432,72 @@ chapterProto.applyToSubChapters = function applyToSubChapters(func, ...args) {
 
 chapterProto.deletePage = function deletePage() {
     while (this.firstPage) this.parent.insertBefore(this.firstPage, this);
+    delete allPagesByName[this.fullName];
+    storage.erase("page "+this.fullName);
+    let parent = this.parent;
     this.orphan();
+    if (allPagesByNumber[this.pageNumber+1]) allPagesByNumber[this.pageNumber+1].decrementPageNumber();
+    allPagesByNumber.pop();
+    --numPages;
+    parent.updateSave(parent.fullName);
+}
+
+chapterProto.decrementPageNumber = function decrementPageNumber() {
+    this.manager.setVarValue("pageNumber", this.pageNumber-1);
+    allPagesByNumber[this.pageNumber] = this;
+    if (allPagesByNumber[this.pageNumber+2]) allPagesByName[this.pageNumber+2].decrementPageNumber();
+}
+
+chapterProto.saveToString = function saveToString() {
+    let line = "";
+    line += this.nickname + "\n";
+    line += this.nicknameMode? "nickname ": "name ";
+    line += this.isOpen? "open\n" : "closed\n";
+    let child = this.firstPage;
+    while (child) {
+        line += child.fullName;
+        child = child.nextPage;
+        if (child) line += " ";
+    }
+    line += "\n";
+    return line;
+}
+
+function buildPageFromSave(fullName) {
+    if (!(fullName in allPagesByName)) throw Error(fullName + " is not a page");
+    let page = allPagesByName[fullName];
+    storage.deactivated = false;
+    let lines = storage.fetch("page "+fullName).split("\n");
+    storage.deactivated = true;
+    page.manager.setVarValue("nickname", lines[0]);
+    let sublines = lines[1].split(" ");
+    if (sublines[0] == "nickname" && !page.nicknameMode) {
+        if (page.showCleanups) page.nameSwap();
+        else page.nicknameMode = true;
+    }
+    if (sublines[1] == "open" && !page.isOpen) page.open(true);
+    if (lines[2] != "") {
+        let pageFullNames = lines[2].split(" ");
+        for (let pageFullName of pageFullNames) {
+            storage.deactivated = true;
+            newChapter(page, false, nameFromFullName(pageFullName));
+            buildPageFromSave(pageFullName);
+        }
+    }
+    storage.deactivated = false;
+}
+
+function nameFromFullName(line) {
+    if (line == root.name) return line;
+    if (line.substring(0, root.name.length) == root.name) return line.substring(root.name.length+1);
+    let i = 0;
+    while (!gui.nodeNameScreen(line.charAt(i))) ++i;
+    return line.substring(i);
+}
+
+chapterProto.updateSave = function updateSave(newFullName, oldFullName = newFullName) {
+    storage.erase("page "+oldFullName);
+    storage.store("page "+newFullName, this.saveToString());
 }
 
 function doAll(functions, ...args) {for (let f in functions) functions[f](args)}
