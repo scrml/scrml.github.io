@@ -1,4 +1,4 @@
-// Every script in this site defines an object and gives somefunctionality to that object. This functionality may depend on other scripts, but the scripts are loaded asynchronously. ScriptManager keeps track of which scripts are loaded and can handle requests to delay function execution until the required scripts are all loaded.
+// Every script in this site defines an object and gives some functionality to that object. This functionality may depend on other scripts, but the scripts are loaded asynchronously. ScriptManager keeps track of which scripts are loaded and can handle requests to delay function execution until the required scripts are all loaded.
 // repository of all loaded scripts
 var Scripts = {};
 // the object defined by the current script scriptManager.js

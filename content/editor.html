@@ -19,12 +19,46 @@
         <div class="main">
             <h1>SCRML Editor</h1>
             <a href="editorUserManual.html" target="_blank">User Manual</a>
-            <div id="editor">
+            <div id="editor" nameMode="nodeNameMode" pageActionMode = "newChapter">
                 <div id="globalTools">
                     <button id="chapterMode">Chapter</button>
                     <button id="statementMode">Statement</button>
                     <button id="commentMode">Comment</button>
                     <button id="debugButton">for debugging</button>
+                    <div id="chapterNumberModes" class="radioGroup">
+                        <div class="radio">
+                            <input type="radio" id="siblingNumber" name="pageNumberMode" checked=""/>
+                            <label for="siblingNumber">Sibling Numbers</label>
+                        </div>
+                        <div class="radio">
+                            <input type="radio" id="fullPageNumber" name="pageNumberMode"/>
+                            <label for="fullPageNumber">Full Page Numbers</label>
+                        </div>
+                    </div>
+                    <div id="nameNicknameFullName" class="radioGroup">
+                        <div class="radio">
+                            <input type="radio" id="nodeNameMode" name="nameNicknameFullName" checked=""/>
+                            <label for="nodeNameMode">NodeName</label>
+                        </div>
+                        <div class="radio">
+                            <input type="radio" id="nicknameMode" name="nameNicknameFullName"/>
+                            <label for="nicknameMode">Nickname</label>
+                        </div>
+                        <div class="radio">
+                            <input type="radio" id="fullNameMode" name="nameNicknameFullName"/>
+                            <label for="fullNameMode">Full Name</label>
+                        </div>
+                    </div>
+                    <div id="pageAction" class="radioGroup">
+                        <div class="radio">
+                            <input type="radio" id="newChapterMode" name="pageAction" checked=""/>
+                            <label for="newChapterMode">New Chapter</label>
+                        </div>
+                        <div class="radio">
+                            <input type="radio" id="newStatementMode" name="pageAction"/>
+                            <label for="newStatementMode">New Statement</label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

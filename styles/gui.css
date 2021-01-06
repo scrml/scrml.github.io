@@ -6,6 +6,16 @@
     opacity: 0 !important;
 }
 
+@keyFrames temporarilyInvisible {
+    0% {opacity: 0;}
+    100% {opacity: 0;}
+}
+
+[temporarilyInvisible] {
+    animation-name: temporarilyInvisible;
+    animation-duration: 1s;
+}
+
 [hoverUnhide] > * {
     visibility: hidden;
 }
@@ -86,26 +96,6 @@
     animation: missileLaunchFlashing;
     animation-duration: 3s;
     animation-iteration-count: infinite;
-}
-
-.gap, .gap[disguise] {
-    background: rgb(220, 245, 245);
-}
-
-.moveHereGap, .moveHereGap[disguise] {
-    background: rgb(120, 245, 145);
-}
-
-.dontMoveHereGap, .dontMoveHereGap[disguise] {
-    background: rgb(245, 145, 120);
-}
-
-.gap, .gap[disguise], .moveHereGap, .moveHereGap[disguise], .dontMoveHereGap, .dontMoveHereGap[disguise] {
-    min-height: 1em;
-    width: 100%;
-    text-align: left;
-    border-radius: 4px;
-    margin: .3em 0;
 }
 
 .metaTools {

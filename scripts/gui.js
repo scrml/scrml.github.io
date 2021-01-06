@@ -46,6 +46,12 @@ gui.text = function text(line, loadHere) {
     return returner;
 }
 
+gui.textShell = function textShell(line, type, loadHere, atts, insertBefore) {
+    let returner = gui.element(type, loadHere, atts, insertBefore);
+    gui.text(line, returner);
+    return returner;
+}
+
 gui.inputOutput = {};
 
 gui.inputOutput.textNode = function textNode(textNode, message, time) {
@@ -55,7 +61,8 @@ gui.inputOutput.textNode = function textNode(textNode, message, time) {
 }
 
 gui.inputOutput.inputText = function inputText(input, message, time = 1000) {
-    let text = input.value, wasAble = !input.hasAttribute("disabled");
+    let wasAble = !input.hasAttribute("disabled");
+    input.setAttribute("inputOutputRevertTo", input.value);
     input.value = message;
     input.setAttribute("disabled", "");
     let width = Math.ceil(gui.getWidth(input, message));
@@ -63,7 +70,8 @@ gui.inputOutput.inputText = function inputText(input, message, time = 1000) {
     style.innerHTML = "[min-width" + width + "] {min-width: " + width + "px}";
     input.setAttribute("min-width" + width, "");
     window.setTimeout(function() {
-        if (input.value == message) input.value = text;
+        input.value = input.getAttribute("inputOutputRevertTo");
+        input.removeAttribute("inputOutputRevertTo");
         if (wasAble) input.removeAttribute("disabled");
         document.head.removeChild(style);
         input.removeAttribute("min-width" + width);
@@ -120,7 +128,7 @@ let testDiv = gui.element("div", document.body, ["id", "testDiv"]);
 }
 
 gui.dynamizeWidth = function dynamizeWidth(input) {
-    let changeWidth = function() {input.style.width = gui.getWidth(input, input.value) + "px"}
+    let changeWidth = function() {input.style.width = Math.max(gui.getWidth(input, input.value), gui.getWidth(input, input.placeholder)) + "px"}
     input.addEventListener("input", changeWidth);
     input.setWidth = changeWidth;
 }
@@ -435,7 +443,6 @@ gui.hoverButton = function hoverButton(text, loadHere, onclick, spanAtts) {
     };
     gui.smoothInsert = function smoothInsert(element, parent, insertBefore, options = {}) {
         optionValue(options,defaultOptions,"testingPlace").appendChild(element);
-        window.setTimeout(function() {
         let box = element.getBoundingClientRect(), height = Math.round(box.height), width = Math.round(box.width), name = "smoothInsert" + width + "x" + height, duration = optionValue(options,defaultOptions,"duration");
         let div = gui.element("div", parent, ["class", name], insertBefore);
         div.appendChild(element);
@@ -446,7 +453,6 @@ gui.hoverButton = function hoverButton(text, loadHere, onclick, spanAtts) {
             document.head.removeChild(style);
             optionValue(options, defaultOptions, "onEnd")();
         }, duration*1000);
-        }, 500);
     }
 }
 
@@ -463,11 +469,11 @@ gui.smoothElement = function smoothElement(type, loadHere, atts, insertBefore, o
         hideThese: []
     };
     gui.smoothSwap = function smoothSwap(element, placeBefore, options = {}) {
-        let box = element.getBoundingClientRect(), height = Math.round(box.height), width = Math.round(box.width), x = box.x, y = box.y, box2 = placeBefore.getBoundingClientRect(), x2 = box2.x, y2 = box2.y, parent = element.parentElement, shrink = "smoothSwapShrink" + width + "x" + height, move = "smoothSwapMove" + width + "x" + height, grow = "smoothSwapGrow" + width + "x" + height, hide = "smoothSwapHide" + width + "x" + height, duration = optionValue(options,defaultOptions,"duration");
+        let box = element.getBoundingClientRect(), height = Math.round(box.height), width = Math.round(box.width), x = box.x, y = box.y, box2 = placeBefore.getBoundingClientRect(), x2 = box2.x, y2 = box2.y, oldParent = element.parentElement, newParent = placeBefore? placeBefore.parentElement: oldParent, shrink = "smoothSwapShrink" + width + "x" + height, move = "smoothSwapMove" + width + "x" + height, grow = "smoothSwapGrow" + width + "x" + height, hide = "smoothSwapHide" + width + "x" + height, duration = optionValue(options,defaultOptions,"duration");
         if (y2 > y) y2 -= height;
         let style = gui.element("style", document.head);
         style.innerHTML = "@keyframes "+shrink+" {0%, 10% {width: "+width+"px; height: "+height+"px} 90%, 100% {width: 0px; height: 0px}} @keyFrames "+grow+" {0%, 10% {width: 0px; height: 0px} 90%, 100% {width: "+width+"px; height: "+height+"px}} @keyFrames "+move+" {0%, 10% {left: "+x+"px; top: "+y+"px} 90%, 100% {left: "+x2+"px; top: "+y2+"px}} @keyframes "+hide+" {0% {filter: opacity(100%)} 10%, 90% {filter: opacity(0%)} 100%: {filter: opacity(100%)}} ."+shrink+" {animation-name: "+shrink+"; animation-duration: "+duration+"s} ."+grow+" {animation-name: "+grow+"; animation-duration: "+duration+"s} ."+move+" {animation-name: "+move+"; animation-duration: "+duration+"s; position: fixed; height: "+height+"px; width: "+width+"px} ."+hide+" {animation-name: "+hide+"; animation-duration: "+duration+"s}";
-        let shrinkDiv = gui.element("div", parent, ["class", shrink], element), moveDiv = gui.element("div", shrinkDiv, ["class", move]), growDiv = gui.element("div", parent, ["class", grow], placeBefore);
+        let shrinkDiv = gui.element("div", oldParent, ["class", shrink], element), moveDiv = gui.element("div", shrinkDiv, ["class", move]), growDiv = gui.element("div", newParent, ["class", grow], placeBefore);
         let hideThese = optionValue(options, defaultOptions, "hideThese");
         for (let hideMe of hideThese) {
             let div = gui.element("div", hideMe.parentElement, ["class", hide], hideMe);
@@ -476,10 +482,10 @@ gui.smoothElement = function smoothElement(type, loadHere, atts, insertBefore, o
         moveDiv.appendChild(element);
         window.setTimeout(function() {
             for (let hideMe of hideThese) hideMe.parentElement.parentElement.replaceChild(hideMe, hideMe.parentElement);
-            parent.insertBefore(element, placeBefore);
+            newParent.insertBefore(element, placeBefore);
             document.head.removeChild(style);
-            parent.removeChild(shrinkDiv);
-            parent.removeChild(growDiv);
+            oldParent.removeChild(shrinkDiv);
+            newParent.removeChild(growDiv);
             optionValue(options, defaultOptions, "onEnd")();
         }, duration*1000);
     }
@@ -562,38 +568,52 @@ gui.popupLinkedValue = function popupLinkedValue(popup, triggerNode, manager, pr
     });
 }
 
-gui.clickAbsorber = function(e) {
+gui.eventShielder = function(e) {
+    e.stopPropagation();
+}
+
+gui.shieldClicks = function shieldClicks(element) {
+    element.addEventListener("click", gui.eventShielder);
+}
+
+gui.eventAbsorber = function(e) {
     e.preventDefault();
     e.stopImmediatePropagation();
 }
 
 gui.absorbClicks = function absorbClicks(element) {
-    element.addEventListener("click", gui.clickAbsorber);
+    element.addEventListener("click", gui.eventAbsorber);
 }
+
+gui.visibilityTrackerProtoModel = {};
+
+gui.newVisibilityTracker = function newVisibilityTracker(protoModel = visibilityTrackerProtoModel) {
+    
+}
+
 {
     let isSuppressed = false;
     gui.suppressKeys = function suppressKeys() {
         if (isSuppressed) return;
-        window.addEventListener("keydown", gui.clickAbsorber);
+        window.addEventListener("keydown", gui.eventAbsorber);
         isSuppressed = true;
     }
 
     gui.releaseKeySuppression = function releaseKeySuppression() {
         if (isSuppressed) {
             isSuppressed = false;
-            window.removeEventListener("keydown", gui.clickAbsorber);
+            window.removeEventListener("keydown", gui.eventAbsorber);
         }
     }
 }
 
 {
-    let div = gui.element("div", document.body, ["id", "loadingScreen", "hide", ""]), div2 = gui.element("div", div), icon = gui.element("div", div2, ["id", "loadingIcon"]);
+    let div = gui.element("div", document.body, ["id", "loadingScreen", "hide", "", "temporarilyInvisible", ""]), div2 = gui.element("div", div), icon = gui.element("div", div2, ["id", "loadingIcon"]);
     gui.text("Loading...", gui.element("p", div2));
-    let msgSpan = gui.element("p", div2), msgText = gui.text("", msgSpan), isLoad = false, numLoads = 0;
+    let msgSpan = gui.element("p", div2), msgText = gui.text("loading screen is hidden", msgSpan), isLoad = false;
     
     gui.setLoadingScreen = function setLoadingScreen(message = "") {
         msgText.nodeValue = message;
-        ++numLoads;
         if (!isLoad) {
             isLoad = true;
             div.removeAttribute("hide");
@@ -602,11 +622,10 @@ gui.absorbClicks = function absorbClicks(element) {
     }
     
     gui.closeLoadingScreen = function closeLoadingScreen() {
-        if (--numLoads == 0) {
-            isLoad = false;
-            div.setAttribute("hide", "");
-            gui.releaseKeySuppression();
-        }
+        isLoad = false;
+        div.setAttribute("hide", "");
+        gui.releaseKeySuppression();
+        msgText.nodeValue = "loading screen is hidden";
     }
     
     gui.absorbClicks(div);

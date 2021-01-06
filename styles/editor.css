@@ -47,7 +47,7 @@ textarea {
     min-height: 1.5em;
 }
 
-.chapterNumber {
+.siblingNumber, .fullPageNumber {
     margin-right: 1em;
 }
 
@@ -55,32 +55,95 @@ textarea {
     position: sticky;
     top: 0;
     z-index: 5;
+    background: rgb(240, 240, 240);
+    border-radius: 8px;
+    border: 1px solid rgb(190, 180, 190);
+    padding: .3em;
+}
+
+.chapter {
+    background: rgb(245, 240, 245);
+}
+
+#editor[pageNumberMode="siblingNumber"] .fullPageNumber, #editor[pageNumberMode="fullPageNumber"] .siblingNumber {
+    display: none;
+}
+
+#editor[nameMode="nodeNameMode"] .fullName, #editor[nameMode="nodeNameMode"] .nickname, #editor[nameMode="nicknameMode"] .fullName, #editor[nameMode="nicknameMode"] .name, #editor[nameMode="fullNameMode"] .name, #editor[nameMode="fullNameMode"] .nickname {
+    display: none;
+}
+
+#editor[nameMode="fullNameMode"] .siblingNumber, #editor[nameMode="fullNameMode"] .fullPageNumber {
+    display: none;
+}
+
+#editor[nameMode="fullNameMode"] #chapterNumberModes {
+    visibility: hidden;
+}
+
+#editor[pageAction="newChapterMode"] .newStatementIn, #editor[pageAction="newStatementMode"] .newChapterIn {
+    display: none;
 }
 
 #pageTools {
     float: right;
 }
 
-#editor .gap[mode="moveHere"] {
+#editor[moveMode] .chapter {
+    background: rgb(225, 220, 230);
+    border: 3px inset rgb(170, 190, 180);
+}
+
+#editor[moveMode] .chapter[movingPage] {
+    background: rgb(245, 240, 250);
+    border-style: outset;
+}
+
+#editor[moveMode] .newStatementIn, #editor[moveMode] .newChapterIn {
+    display: none;
+}
+
+[pageNumber="0"] > .pageHead #pageTools, [pageNumber="0"] > .pageHead .siblingNumber, [pageNumber="0"] > .pageHead .fullPageNumber {
+    display: none;
+}
+
+.pageGap {
+    min-height: 1em;
+    width: 100%;
+    text-align: left;
+    border-radius: 4px;
+    margin: .3em 0;
+    background: rgb(220, 245, 245);
+}
+
+.pageGap[moveHere] {
     background: rgb(120, 245, 145);
 }
 
-[mode="moveHere"]::before {
+.pageGap[moveHere]::before {
     content: "⇦";
     position: absolute;
     top: -.15em;
 }
 
-#editor .gap[mode="dontMoveHere"] {
-    background: rgb(245, 145, 120)
+.pageGap[dontMoveHere] {
+    background: rgb(245, 145, 120);
 }
 
-[mode="dontMoveHere"]::before {
+.pageGap[dontMoveHere]::before {
     content: "❌";
     position: absolute;
     top: -.15em;
 }
 
-#rootHead > #pageTools {
+.pageGap:not([moveHere], [dontMoveHere]) > *:not(:hover, :focus) {
+    opacity: 15%;
+}
+
+.pageGap[disabled] > * {
     display: none;
+}
+
+.radioGroup {
+    display: inline-block;
 }
