@@ -61,8 +61,10 @@ function newPage(pageNumber) {
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
     let page = pages[pageNumber] = {pageNumber: pageNumber, pageType: "page"};
     page.div = gui.element("details", null, ["class", "page", "pageNumber", pageNumber]);
-    page.pageHead = gui.element("summary", page.div, ["class", "pageHead"]);
+    page.div.addEventListener("toggle", openDetailsFromEvent);
     page.div.addEventListener("mouseenter", pageFocusInFromEvent);
+    page.pageHead = gui.element("summary", page.div, ["class", "pageHead"]);
+    page.pageHead.addEventListener("mouseenter", pageFocusInFromEvent);
     page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingNumber"]);
     page.siblingNumberText = gui.text("", page.siblingNumberSpan);
     page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullPageNumber"]);
@@ -87,8 +89,8 @@ function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
     newPageGap(page);
 }
 
-function newPageGap(page, insertBefore = null, insert = true) {
-    let returner = gui.element("div", insert? page.div: null, ["class", "pageGap"], insertBefore? insertBefore.div: null);
+function newPageGap(page, insertBefore = null) {
+    let returner = gui.element("div", page? page.div: null, ["class", "pageGap"], insertBefore? insertBefore.div: null);
     returner.addEventListener("focusin", pageGapFocus);
     let newChapterIn = gui.element("input", returner, ["class", "newChapterIn", "placeholder", "new chapter", "disguise", ""]);
     newChapterIn.addEventListener("blur", clearPageGap);
@@ -96,6 +98,10 @@ function newPageGap(page, insertBefore = null, insert = true) {
     let newStatementIn = gui.element("input", returner, ["class", "newStatementIn", "placeholder", "new statement", "disguise", ""]);
     newStatementIn.addEventListener("blur", clearPageGap);
     newStatementIn.addEventListener("change", newStatementInChanged);
+    gui.text("❌", gui.element("button", returner, ["class", "dontMoveHere", "disabled", ""]));
+    let moveHereButton = gui.element("button", returner, ["class", "moveHere"]);
+    gui.text("⇦", moveHereButton);
+    moveHereButton.addEventListener("click", doMove);
     return returner;
 }
 
@@ -115,6 +121,16 @@ function clearPageGap(event) {
         child.blur();
         child.value = "";
     }
+}
+
+function getGapParentNumber(gap) {
+    while (!gap.hasAttribute("pageNumber")) gap = gap.parentElement;
+    return gap.getAttribute("pageNumber");
+}
+
+function getGapNextPageNumber(gap) {
+    if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("pageNumber");
+    else return null;
 }
 
 function newChapterInChanged(event) {
@@ -141,14 +157,25 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
             } else {
                 let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]);
                 if (page.div.parentElement) {
-                    gui.smoothErase(page.div.previousSibling);
-                    let deleteMe = gui.element("div", newParent.div, ["hide", ""], insertBefore? insertBefore.div: null);
-                    gui.smoothSwap(page.div, deleteMe, {onEnd: function() {
-                        deleteMe.parentElement.removeChild(deleteMe);
-                        console.log("hello");
+                    // existing page (actual move)
+                    let gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), pageSpot = gui.element("div", newParent.div, [], gapSpot);
+                    let newGap = newPageGap();
+                    if (pageSpot.getBoundingClientRect().y > page.div.getBoundingClientRect().y) {
+                        // moving down
+                        gui.smoothErase(page.div.nextElementSibling);
+                    } else {
+                        // moving up
+                        gui.smoothErase(page.div.previousElementSibling);
+                    }
+                    gui.smoothInsert(newGap, newParent.div, gapSpot, {onEnd: function() {
+                        newParent.div.removeChild(gapSpot);
+                    }});
+                    gui.smoothSwap(page.div, pageSpot, {onEnd: function() {
+                        newParent.div.removeChild(pageSpot);
                     }});
                 } else {
-                    let deleteMe2 = gui.element("div", newParent.div, ["hide", ""], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, ["hide", ""], deleteMe2);
+                    // new page (birth "move")
+                    let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
                     gui.smoothInsert(page.div, newParent.div, deleteMe1, {onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)}});
                     gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)}});
                 }
@@ -192,6 +219,18 @@ workerFunctions.save = function save(pages) {
     //console.log("saving " + pages);
 }
 
+workerFunctions.setNickname = function setNickname(pageNumber, nickname) {
+    let page = getPage(pageNumber);
+    if (page.nicknameSpan.hasAttribute("inputOutputRevertTo")) page.nicknameSpan.setAttribute("inputOutputRevertTo", nickname);
+    else page.nicknameSpan.value = nickname;
+}
+
+workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
+    getPage(pageNumber).div.setAttribute("canAcceptMove", accept);
+}
+
+workerFunctions.moveModeOff = moveModeOff;
+
 function getPageNumberFromEvent(e) {
     let element = e.target;
     while (!element.hasAttribute("pageNumber")) element = element.parentElement;
@@ -202,10 +241,7 @@ function getPageNumberFromEvent(e) {
 
 let focusLocked = false, isFocused;
 
-function pageFocusInFromEvent(e) {
-    pageFocusIn(getPage(getPageNumberFromEvent(e)));
-    gui.eventAbsorber(e);
-}
+function pageFocusInFromEvent(e) {pageFocusIn(getPage(getPageNumberFromEvent(e)))}
 function pageFocusIn(page) {
     if (!lockedPageFocus) page.pageHead.appendChild(pageTools);
 }
@@ -229,28 +265,42 @@ function deletePage(pageNumber) {
     console.log(getPage(pageNumber));
 }
 
-workerFunctions.setNickname = function setNickname(pageNumber, nickname) {
-    let page = getPage(pageNumber);
-    if (page.nicknameSpan.hasAttribute("inputOutputRevertTo")) page.nicknameSpan.setAttribute("inputOutputRevertTo", nickname);
-    else page.nicknameSpan.value = nickname;
+function openDetailsFromEvent(e) {openDetails(getPageNumberFromEvent(e))}
+function openDetails(pageNumber) {
+    post("openDetails", pageNumber, getPage(pageNumber).div.hasAttribute("open"));
 }
 
 function makePageTools() {
     pageTools = gui.element("div", false, ["id", "pageTools"]);
-    pageTools.moveButton = gui.button("⇳", pageTools, toMoveMode, ["disguise", "", "bigger", ""]);
+    pageTools.moveButton = gui.button("⇳", pageTools, toggleMoveMode, ["disguise", "", "bigger", ""]);
     gui.shieldClicks(pageTools.moveButton);
     pageTools.deleteBundle = gui.deleteBundle(pageTools, function() {console.log("deleting");/*isFocused.deletePage()*/});
 }
 
-function toMoveMode(e) {
-    let page = getPage(getPageNumberFromEvent(e));
-    if (lockedPageFocus) {
-        lockedPageFocus = false;
-        editor.removeAttribute("moveMode");
-        page.div.removeAttribute("movingPage");
-    } else {
-        lockedPageFocus = true;
-        editor.setAttribute("moveMode", "");
-        page.div.setAttribute("movingPage", "");
-    }
+function toggleMoveMode(e) {
+    if (editor.hasAttribute("moveMode")) moveModeOff();
+    else moveModeOn(getPageNumberFromEvent(e));
+}
+
+function moveModeOn(pageNumber) {
+    let page = getPage(pageNumber);
+    if (editor.hasAttribute("moveMode")) throw Error("already in move mode");
+    lockedPageFocus = true;
+    editor.setAttribute("moveMode", "");
+    page.div.setAttribute("movingPage", "");
+    post("startMoveModeChecks", page.pageNumber);
+}
+
+function moveModeOff() {
+    if (!editor.hasAttribute("moveMode")) throw Error("cannot turn move mode off if not in move mode");
+    lockedPageFocus = false;
+    editor.removeAttribute("moveMode");
+    document.querySelector("[movingPage]").removeAttribute("movingPage");
+    for (let page of document.querySelectorAll("[canAcceptMove]")) page.removeAttribute("canAcceptMove");
+    post("endMoveMode");
+}
+
+function doMove(e) {
+    let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingPage]").getAttribute("pageNumber"));
+    post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
 }

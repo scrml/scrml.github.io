@@ -51,6 +51,12 @@ textarea {
     margin-right: 1em;
 }
 
+.show {
+    background: green;
+    height: 1ex;
+    margin: .3ex;
+}
+
 #globalTools {
     position: sticky;
     top: 0;
@@ -116,32 +122,39 @@ textarea {
     background: rgb(220, 245, 245);
 }
 
-.pageGap[moveHere] {
-    background: rgb(120, 245, 145);
-}
-
-.pageGap[moveHere]::before {
-    content: "⇦";
-    position: absolute;
-    top: -.15em;
-}
-
-.pageGap[dontMoveHere] {
-    background: rgb(245, 145, 120);
-}
-
-.pageGap[dontMoveHere]::before {
-    content: "❌";
-    position: absolute;
-    top: -.15em;
-}
-
-.pageGap:not([moveHere], [dontMoveHere]) > *:not(:hover, :focus) {
+#editor:not([moveMode]) .pageGap > *:not(:hover, :focus) {
     opacity: 15%;
 }
 
-.pageGap[disabled] > * {
+.pageGap input {
+    width: 100%;
+}
+
+#editor[moveMode] .pageGap {
+    background: rgb(187, 145, 210);
+}
+
+#editor[moveMode] .chapter:not([canAcceptMove]) > .pageGap::before {
+    content: "checking... please wait";
+}
+
+.moveHere, .dontMoveHere {
     display: none;
+    width: 100%;
+    top: -.15em;
+    text-align: left;
+}
+
+.pageGap .moveHere {
+    background: rgb(120, 245, 145);
+}
+
+.pageGap .dontMoveHere {
+    background: rgb(245, 145, 120);
+}
+
+.chapter[canAcceptMove="true"] > .pageGap .moveHere, .chapter[canAcceptMove="false"] > .pageGap .dontMoveHere {
+    display: block;
 }
 
 .radioGroup {

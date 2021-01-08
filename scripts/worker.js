@@ -11,7 +11,7 @@ onmessage = function onmessage(e) {
 
 function fetched(pageNumber, dataName, ...data) {postMessage(["fetched", pageNumber, dataName, ...data])}
 
-let functions = {}, pages = [], pageProto = {}, chapterProto = Object.create(pageProto);
+let functions = {}, pages = [], pageProto = {}, chapterProto = Object.create(pageProto), movingPage = false;
 
 functions.log = console.log;
 
@@ -61,10 +61,13 @@ function newChapter(parentNumber, insertBeforeNumber, pageNumber, name, protoMod
 }
 
 function movePage(pageNumber, parentNumber, insertBeforeNumber) {
-    fetched(pageNumber, "parent", parentNumber, insertBeforeNumber);
+    if (pageNumber == insertBeforeNumber) return;
     let page = pages[pageNumber], newParent = pages[parentNumber], insertBefore = pages[insertBeforeNumber];
+    if (insertBefore && page.nextPage == insertBefore) return;
+    fetched(pageNumber, "parent", parentNumber, insertBeforeNumber);
     if (page.parent) {
         let oldParent = page.parent, sn = page.siblingNumber, prev = page.previousPage, next = page.nextPage;
+        page.previousPage = page.nextPage = undefined;
         if (prev) prev.nextPage = next;
         if (next) next.previousPage = prev;
         oldParent.childPages.splice(sn-1, 1);
@@ -167,24 +170,61 @@ functions.newPageNameCheck = function newPageNameCheck(parentNumber, line) {
     pageTickets.addTicket(parentNumber, "newPageNameCheck", line);
 }
 
-chapterProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
+functions.openDetails = function openDetails(pageNumber, open) {
+    pages[pageNumber].openDetails(open);
+}
+
+functions.startMoveModeChecks = function startMoveModeChecks(pageNumber) {
+    movingPage = pages[pageNumber];
+    for (let page of pages) if (page.isOpen && page.isChapter) postMessage(["canAcceptMove", page.pageNumber, page.canAcceptMove(pages[pageNumber])]);
+}
+
+functions.endMoveMode = function endMoveMode() {
+    movingPage = false;
+}
+
+functions.move = function move(movingPageNumber, parentNumber, insertBeforeNumber) {
+    movePage(movingPageNumber, parentNumber, insertBeforeNumber);
+    postMessage(["moveModeOff"]);
+}
+
+pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
     if (this.parent) {
         if (this.parent.parent) return this.parent.fullPageNumber + "." + siblingNumber;
         else return siblingNumber;
     } else return "";
 }
 
-chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
+pageProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
     this.manager.setVarValue("fullPageNumber", this.computeFullPageNumber(siblingNumber));
 }
 
-chapterProto.computeFullName = function computeFullName() {
+pageProto.computeFullName = function computeFullName() {
     if (this.parent) return this.parent.fullName + "." + this.name;
     else return this.name;
 }
 
-chapterProto.updateFullName = function updateFullName() {
+pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
+}
+
+pageProto.openDetails = function openDetails(open) {
+    this.isOpen = open;
+    if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
+}
+
+chapterProto.isAncestorOf = function isAncestorOf(page) {
+    while (page) {
+        if (this == page) return true;
+        page = page.parent;
+    }
+    return false;
+}
+
+chapterProto.canAcceptMove = function canAcceptMove(page) {
+    if (page.isChapter && page.isAncestorOf(this)) return false;
+    for (let child of this.childPages) if (page != child && child.name == page.name) return false;
+    return true;
 }
 
 {
