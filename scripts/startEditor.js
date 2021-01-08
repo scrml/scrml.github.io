@@ -160,7 +160,7 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                     // existing page (actual move)
                     let gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), pageSpot = gui.element("div", newParent.div, [], gapSpot);
                     let newGap = newPageGap();
-                    if (pageSpot.getBoundingClientRect().y > page.div.getBoundingClientRect().y) {
+                    if (pageSpot.getBoundingClientRect().y < page.div.getBoundingClientRect().y) {
                         // moving down
                         gui.smoothErase(page.div.nextElementSibling);
                     } else {

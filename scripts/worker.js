@@ -81,7 +81,7 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
             page.previousPage = insertBefore.previousPage;
             if (page.previousPage) page.previousPage.nextPage = page;
             insertBefore.previousPage = page;
-            newParent.childPages.splice(page.siblingNumber-1, 0, page);
+            newParent.childPages.splice(insertBefore.siblingNumber-1, 0, page);
             page.manager.setVarValue("siblingNumber", insertBefore.siblingNumber);
         } else {
             let prev = newParent.childPages[newParent.childPages.length - 1];
