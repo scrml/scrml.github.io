@@ -7,6 +7,7 @@ body {
     margin: .5%;
     padding: .5% 1%;
     border-radius: 1em;
+    overflow: hidden;
 }
 
 details.section, .chapter {
@@ -51,7 +52,7 @@ textarea {
     margin-right: 1em;
 }
 
-.show {
+[show] {
     background: green;
     height: 1ex;
     margin: .3ex;
@@ -93,6 +94,7 @@ textarea {
 
 #pageTools {
     float: right;
+    position: relative;
 }
 
 #editor[moveMode] .chapter {
@@ -114,7 +116,7 @@ textarea {
 }
 
 .pageGap {
-    min-height: 1em;
+    height: 1.3em;
     width: 100%;
     text-align: left;
     border-radius: 4px;
@@ -134,8 +136,12 @@ textarea {
     background: rgb(187, 145, 210);
 }
 
-#editor[moveMode] .chapter:not([canAcceptMove]) > .pageGap::before {
+#editor[moveMode] .chapter:not([canAcceptMove]) .pageGap::before {
     content: "checking... please wait";
+}
+
+#editor[moveMode] .chapter[canAcceptMove] .pageGap::before {
+    content: none;
 }
 
 .moveHere, .dontMoveHere {

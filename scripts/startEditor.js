@@ -146,6 +146,8 @@ function newStatementInChanged(event) {
 
 workerFunctions.pseudoPost = post;
 
+let duration = .3, newPageHeight;
+
 workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
     let page = getPage(pageNumber);
     switch (dataName) {
@@ -154,30 +156,49 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                 // this case is only for adding the root page (page 0) to the editor
                 if (pageNumber != 0) throw Error("only page 0 can be the root, not page " + pageNumber);
                 editor.appendChild(page.div);
+                newPageHeight = page.div.getBoundingClientRect().height;
             } else {
-                let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]);
+                let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]), templateGapBBox = newParent.div.firstChild.nextElementSibling.getBoundingClientRect();
                 if (page.div.parentElement) {
                     // existing page (actual move)
-                    let gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), pageSpot = gui.element("div", newParent.div, [], gapSpot);
-                    let newGap = newPageGap();
-                    if (pageSpot.getBoundingClientRect().y < page.div.getBoundingClientRect().y) {
+                    let gapSpot, pageSpot, newGap = newPageGap();
+                    if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
                         // moving down
-                        gui.smoothErase(page.div.nextElementSibling);
+                        gui.smoothErase(page.div.previousElementSibling, {duration: duration});
+                        gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
+                        pageSpot = gui.element("div", newParent.div, [], gapSpot);
                     } else {
                         // moving up
-                        gui.smoothErase(page.div.previousElementSibling);
+                        gui.smoothErase(page.div.nextElementSibling, {duration: duration});
+                        pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
+                        gapSpot = gui.element("div", newParent.div, [], pageSpot);
                     }
-                    gui.smoothInsert(newGap, newParent.div, gapSpot, {onEnd: function() {
-                        newParent.div.removeChild(gapSpot);
-                    }});
-                    gui.smoothSwap(page.div, pageSpot, {onEnd: function() {
-                        newParent.div.removeChild(pageSpot);
-                    }});
+                    gui.smoothInsert(newGap, newParent.div, gapSpot, {
+                        onEnd: function() {newParent.div.removeChild(gapSpot)},
+                        width: templateGapBBox.width,
+                        height: templateGapBBox.height,
+                        duration: duration
+                    });
+                    gui.smoothSwap(page.div, pageSpot, {
+                        onEnd: function() {newParent.div.removeChild(pageSpot)},
+                        width: templateGapBBox.width,
+                        duration: duration
+                    });
                 } else {
                     // new page (birth "move")
                     let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
-                    gui.smoothInsert(page.div, newParent.div, deleteMe1, {onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)}});
-                    gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)}});
+                    gui.smoothInsert(page.div, newParent.div, deleteMe1, {
+                        onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
+                        width: templateGapBBox.width,
+                        height: newPageHeight,
+                        duration: duration
+                    });
+                    gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
+                        onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
+                        width: templateGapBBox.width,
+                        height: templateGapBBox.height,
+                        duration: duration
+                    });
                 }
             }
         break; /*set name*/ case "name": // data is [name]
