@@ -6,6 +6,10 @@
     opacity: 0 !important;
 }
 
+[wrap] {
+    border: 2px solid red !important;
+}
+
 @keyFrames temporarilyInvisible {
     0% {opacity: 0;}
     100% {opacity: 0;}
@@ -237,7 +241,7 @@ input.infoInSummary {
 }
 
 #loadingScreen {
-    position: absolute;
+    position: fixed;
     display: flex;
     top: 0;
     left: 0;

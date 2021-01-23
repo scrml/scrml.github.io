@@ -21,7 +21,7 @@ details[open].section summary {
     border-bottom: 1px solid rgb(210, 215, 239);
 }
 
-.detailsList > details {
+.detailslist > details {
     background: rgb(160, 255, 180);
     border: 2px solid green;
     margin: .5% .2%;
@@ -29,7 +29,7 @@ details[open].section summary {
     border-radius: .3em;
 }
 
-.detailsList > [open] {
+.detailslist > [open] {
     background: rgba(160, 255, 180, .15);
 }
 
@@ -44,11 +44,11 @@ textarea {
     width: 100%;
 }
 
-.chapterHead {
+.chapterhead {
     min-height: 1.5em;
 }
 
-.siblingNumber, .fullPageNumber {
+.siblingnumber, .fullpagenumber {
     margin-right: 1em;
 }
 
@@ -58,7 +58,7 @@ textarea {
     margin: .3ex;
 }
 
-#globalTools {
+#globaltools {
     position: sticky;
     top: 0;
     z-index: 5;
@@ -72,50 +72,50 @@ textarea {
     background: rgb(245, 240, 245);
 }
 
-#editor[pageNumberMode="siblingNumber"] .fullPageNumber, #editor[pageNumberMode="fullPageNumber"] .siblingNumber {
+#editor[pagenumbermode="siblingnumber"] .fullpagenumber, #editor[pagenumbermode="fullpagenumber"] .siblingnumber {
     display: none;
 }
 
-#editor[nameMode="nodeNameMode"] .fullName, #editor[nameMode="nodeNameMode"] .nickname, #editor[nameMode="nicknameMode"] .fullName, #editor[nameMode="nicknameMode"] .name, #editor[nameMode="fullNameMode"] .name, #editor[nameMode="fullNameMode"] .nickname {
+#editor[namemode="nodenamemode"] .fullname, #editor[namemode="nodenamemode"] .nickname, #editor[namemode="nicknamemode"] .fullname, #editor[namemode="nicknamemode"] .name, #editor[namemode="fullnamemode"] .name, #editor[namemode="fullnamemode"] .nickname {
     display: none;
 }
 
-#editor[nameMode="fullNameMode"] .siblingNumber, #editor[nameMode="fullNameMode"] .fullPageNumber {
+#editor[namemode="fullnamemode"] .siblingnumber, #editor[namemode="fullnamemode"] .fullpagenumber {
     display: none;
 }
 
-#editor[nameMode="fullNameMode"] #chapterNumberModes {
+#editor[namemode="fullnamemode"] #chapternumbermodes {
     visibility: hidden;
 }
 
-#editor[pageAction="newChapterMode"] .newStatementIn, #editor[pageAction="newStatementMode"] .newChapterIn {
+#editor[pageaction="newchaptermode"] .newstatementin, #editor[pageaction="newchaptermode"] .newcommentin, #editor[pageaction="newstatementmode"] .newchapterin, #editor[pageaction="newstatementmode"] .newcommentin, #editor[pageaction="newcommentmode"] .newchapterin, #editor[pageaction="newcommentmode"] .newstatementin {
     display: none;
 }
 
-#pageTools {
+#pagetools {
     float: right;
     position: relative;
 }
 
-#editor[moveMode] .chapter {
+#editor[movemode] .chapter {
     background: rgb(225, 220, 230);
     border: 3px inset rgb(170, 190, 180);
 }
 
-#editor[moveMode] .chapter[movingPage] {
+#editor[movemode] .chapter[movingpage] {
     background: rgb(245, 240, 250);
     border-style: outset;
 }
 
-#editor[moveMode] .newStatementIn, #editor[moveMode] .newChapterIn {
+#editor[movemode] .newstatementin, #editor[movemode] .newchapterin, #editor[movemode] .newcommentin {
     display: none;
 }
 
-[pageNumber="0"] > .pageHead #pageTools, [pageNumber="0"] > .pageHead .siblingNumber, [pageNumber="0"] > .pageHead .fullPageNumber {
+[pagenumber="0"] > .pagehead #pagetools, [pagenumber="0"] > .pagehead .siblingnumber, [pagenumber="0"] > .pagehead .fullpagenumber {
     display: none;
 }
 
-.pageGap {
+.pagegap {
     height: 1.3em;
     width: 100%;
     text-align: left;
@@ -124,45 +124,45 @@ textarea {
     background: rgb(220, 245, 245);
 }
 
-#editor:not([moveMode]) .pageGap > *:not(:hover, :focus) {
+#editor:not([movemode]) .pagegap > *:not(:hover, :focus) {
     opacity: 15%;
 }
 
-.pageGap input {
+.pagegap input {
     width: 100%;
 }
 
-#editor[moveMode] .pageGap {
+#editor[movemode] .pagegap {
     background: rgb(187, 145, 210);
 }
 
-#editor[moveMode] .chapter:not([canAcceptMove]) .pageGap::before {
+#editor[movemode] .chapter:not([canacceptmove]) .pagegap::before {
     content: "checking... please wait";
 }
 
-#editor[moveMode] .chapter[canAcceptMove] .pageGap::before {
+#editor[movemode] .chapter[canacceptmove] .pagegap::before {
     content: none;
 }
 
-.moveHere, .dontMoveHere {
+.movehere, .dontmovehere {
     display: none;
     width: 100%;
     top: -.15em;
     text-align: left;
 }
 
-.pageGap .moveHere {
+.pagegap .movehere {
     background: rgb(120, 245, 145);
 }
 
-.pageGap .dontMoveHere {
+.pagegap .dontmovehere {
     background: rgb(245, 145, 120);
 }
 
-.chapter[canAcceptMove="true"] > .pageGap .moveHere, .chapter[canAcceptMove="false"] > .pageGap .dontMoveHere {
+.chapter[canacceptmove="true"] > .pagegap .movehere, .chapter[canacceptmove="false"] > .pagegap .dontmovehere {
     display: block;
 }
 
-.radioGroup {
+.radiogroup {
     display: inline-block;
 }

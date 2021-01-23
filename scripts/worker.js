@@ -21,7 +21,7 @@ functions.printAll = function() {
 
 function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = pageProto) {
     let returner = Object.create(protoModel);
-    if (pageNumber != pages.length) throw Error("mismatch in number of pages when creating new page");
+    if (pageNumber != pages.length) throw Error("mismatch in number of pages when creating new page, trying to add page " + pageNumber + " but length is " + pages.length);
     pages[pageNumber] = returner;
     returner.pageNumber = pageNumber;
     returner.manager = newVarManager();
@@ -64,6 +64,7 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
     if (pageNumber == insertBeforeNumber) return;
     let page = pages[pageNumber], newParent = pages[parentNumber], insertBefore = pages[insertBeforeNumber];
     if (insertBefore && page.nextPage == insertBefore) return;
+    else if (page.parent && page.parent.pageNumber == parentNumber && insertBefore == null && !page.nextPage) return;
     fetched(pageNumber, "parent", parentNumber, insertBeforeNumber);
     if (page.parent) {
         let oldParent = page.parent, sn = page.siblingNumber, prev = page.previousPage, next = page.nextPage;
@@ -185,8 +186,11 @@ functions.endMoveMode = function endMoveMode() {
 
 functions.move = function move(movingPageNumber, parentNumber, insertBeforeNumber) {
     movePage(movingPageNumber, parentNumber, insertBeforeNumber);
-    postMessage(["moveModeOff"]);
 }
+
+functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
+
+functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
     if (this.parent) {
@@ -213,6 +217,10 @@ pageProto.openDetails = function openDetails(open) {
     if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
 }
 
+pageProto.saveToString = function saveToString() {
+    return this.name + "\n" + this.nickname;
+}
+
 chapterProto.isAncestorOf = function isAncestorOf(page) {
     while (page) {
         if (this == page) return true;
@@ -225,6 +233,13 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
     if (page.isChapter && page.isAncestorOf(this)) return false;
     for (let child of this.childPages) if (page != child && child.name == page.name) return false;
     return true;
+}
+
+chapterProto.saveToString = function saveToString() {
+    let line = "chapter\n" + pageProto.saveToString.call(this) + "\n";
+    for (let child of this.childPages) line += child.pageNumber + " ";
+    if (this.childPages.length > 0) line = line.substring(0, line.length - 1);
+    return line;
 }
 
 {
@@ -389,11 +404,13 @@ pageTickets.closeProcess = function closeProcess() {
         this.items = {};
         postMessage(["save", this.saveThese()]);
         postMessage(["closeLoadingScreen"]);
+        postMessage(["smoothMode", true]);
     }
 }
 
 pageTickets.saveThese = function saveThese() {
-    let returner = Object.keys(this.saveTheseObject);
+    let returner = [];
+    for (let pageNumber in this.saveTheseObject) returner.push({pageNumber: pageNumber, line: pages[pageNumber].saveToString()});
     this.saveTheseObject = {};
     return returner;
 }

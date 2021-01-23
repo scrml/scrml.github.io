@@ -418,9 +418,15 @@ gui.hoverButton = function hoverButton(text, loadHere, onclick, spanAtts) {
 {
     let defaultOptions = {
         duration: .5,
-        onEnd: emptyFunction
+        onEnd: emptyFunction,
+        doSmoothly: true
     };
     gui.smoothErase = function smoothErase(element, options = {}) {
+        if (!optionValue(options, defaultOptions, "doSmoothly")) {
+            element.parentElement.removeChild(element);
+            optionValue(options, defaultOptions, "onEnd")();
+            return;
+        }
         if (options.width) options.width = Math.round(options.width);
         if (options.height) options.height = Math.round(options.height);
         let box = element.getBoundingClientRect(),
@@ -446,9 +452,15 @@ gui.hoverButton = function hoverButton(text, loadHere, onclick, spanAtts) {
     let defaultOptions = {
         duration: .5,
         testingPlace: testDiv,
-        onEnd: emptyFunction
+        onEnd: emptyFunction,
+        doSmoothly: true
     };
     gui.smoothInsert = function smoothInsert(element, parent, insertBefore = null, options = {}) {
+        if (!optionValue(options, defaultOptions, "doSmoothly")) {
+            parent.insertBefore(element, insertBefore);
+            optionValue(options, defaultOptions, "onEnd")();
+            return;
+        }
         if (options.width) options.width = Math.round(options.width);
         if (options.height) options.height = Math.round(options.height);
         optionValue(options,defaultOptions,"testingPlace").appendChild(element);
@@ -478,9 +490,15 @@ gui.smoothElement = function smoothElement(type, loadHere, atts, insertBefore, o
 {
     let defaultOptions = {
         duration: .5,
-        onEnd: emptyFunction
+        onEnd: emptyFunction,
+        doSmoothly: doSmoothly
     };
     gui.smoothSwap = function smoothSwap(element, placeBefore, options = {}) {
+        if (!optionValue(options, defaultOptions, "doSmoothly")) {
+            placeBefore.parentElement.insertBefore(element, placeBefore);
+            optionValue(options, defaultOptions, "onEnd")();
+            return;
+        }
         if (options.width) options.width = Math.round(options.width);
         if (options.height) options.height = Math.round(options.height);
         let box = element.getBoundingClientRect(),

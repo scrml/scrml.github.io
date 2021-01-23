@@ -1,0 +1,56 @@
+<body>
+<div xmlns="http://www.w3.org/1999/xhtml" id="editor" namemode="nodeNameMode" pageactionmode="newChapter" pagenumbermode="siblingNumber" pageaction="newChapterMode">
+    <div id="globalTools">
+        <button id="debugButton">for debugging</button>
+        <div id="chapterNumberModes" class="radioGroup">
+            <div class="radio">
+                <input type="radio" id="siblingNumber" name="pageNumberMode" checked="checked" />
+                <label for="siblingNumber">Short Chapter Numbers</label>
+            </div>
+            <div class="radio">
+                <input type="radio" id="fullPageNumber" name="pageNumberMode" />
+                <label for="fullPageNumber">Full Chapter Numbers</label>
+            </div>
+        </div>
+        <div id="nameNicknameFullName" class="radioGroup">
+            <div class="radio">
+                <input type="radio" id="nodeNameMode" name="nameNicknameFullName" checked="checked" />
+                <label for="nodeNameMode">NodeName</label>
+            </div>
+            <div class="radio">
+                <input type="radio" id="nicknameMode" name="nameNicknameFullName" />
+                <label for="nicknameMode">Nickname</label>
+            </div>
+            <div class="radio">
+                <input type="radio" id="fullNameMode" name="nameNicknameFullName" />
+                <label for="fullNameMode">Full Name</label>
+            </div>
+        </div>
+        <div id="pageAction" class="radioGroup">
+            <div class="radio">
+                <input type="radio" id="newChapterMode" name="pageAction" checked="checked" />
+                <label for="newChapterMode">New Chapter</label>
+            </div>
+            <div class="radio">
+                <input type="radio" id="newStatementMode" name="pageAction" />
+                <label for="newStatementMode">New Statement</label>
+            </div>
+        </div>
+    </div>
+    <div id="testDiv"></div>
+    <details class="chapter" pagenumber="0">
+        <summary class="pageHead">
+            <span class="siblingNumber">0</span>
+            <span class="fullPageNumber"></span>
+            <input type="text" placeholder="page name" class="name" disguise="" />
+            <input type="text" placeholder="nickname for Book" class="nickname" disguise="" />
+            <span class="fullName">Book</span>
+        </summary>
+        <div class="pageGap">
+            <input class="newChapterIn" placeholder="new chapter" disguise="" />
+            <input class="newStatementIn" placeholder="new statement" disguise="" />
+            <button class="dontMoveHere" disabled="disabled">❌</button>
+            <button class="moveHere">⇦</button>
+        </div>
+    </details>
+</div>

@@ -3,20 +3,50 @@ ScriptManager.openScript(filePrefix + "scripts/gui.js", "gui");
 Scripts.gui.script.addEventListener("managed", start);
 
 // DOM elements
-let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodeNameMode"), nicknameModeButton = document.getElementById("nicknameMode");
-//document.getElementById("debugButton").setAttribute("hide", "");
-document.getElementById("debugButton").addEventListener("click", function() {
-    post("printAll");
-});
+let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode");
+document.getElementById("debugbutton").setAttribute("hide", "");
+/*document.getElementById("debugbutton").addEventListener("click", function() {
+    let codeOut = document.getElementById("codeout");
+    let processor = new XSLTProcessor();
+    let req = new XMLHttpRequest();
+    req.open("GET", filePrefix + "xslt/save.xslt");
+    req.onload = function() {
+        processor.importStylesheet(req.responseXML);
+        let altered = processor.transformToFragment(pages[0].div, document);
+        while (codeOut.firstChild) codeOut.removeChild(codeOut.firstChild);
+        let root = gui.element("SCRMLBook");
+        root.appendChild(altered);
+        codeOut.innerText = nodeToString(root);
+    }
+    req.send();
+});*/
 
+function nodeToString(node, indent = "", tab = "  ", newLine = "\r\n") {
+    if (node.nodeType == 3) return node.nodeValue;
+    if (node.nodeType == 9) return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + nodeToString(node.firstChild, indent, tab, newLine);
+    let line = newLine;
+    line += indent+"<"+node.nodeName;
+    for (let i = 0; i < node.attributes.length; ++i) line += " "+node.attributes[i].name+"=\""+node.attributes[i].value+"\"";
+    line += node.childNodes.length == 0? "/>": ">";
+    if (node.childNodes.length > 0) {
+        let isText = node.childNodes.length == 1;
+        if (isText) isText = node.firstChild.nodeType == 3;
+        if (isText) line += node.firstChild.nodeValue + "</"+node.nodeName+">";
+        else {
+            for (let i = 0; i < node.childNodes.length; ++i) line += nodeToString(node.childNodes[i], indent + tab, tab, newLine);
+            line += newLine+indent+"</"+node.nodeName+">";
+        }
+    }
+    return line;
+}
 // viewing modes
 {
-    let pageNumberListener = function(e) {editor.setAttribute("pageNumberMode", e.target.getAttribute("id"))}
-    for (let pageNumberMode of ["siblingNumber", "fullPageNumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
-    let nameModeListener = function(e) {editor.setAttribute("nameMode", e.target.getAttribute("id"))}
-    for (let nameMode of ["nodeNameMode", "nicknameMode", "fullNameMode"]) document.getElementById(nameMode).addEventListener("change", nameModeListener);
-    let pageActionListener = function(e) {editor.setAttribute("pageAction", e.target.getAttribute("id"))}
-    for (let pageAction of ["newChapterMode", "newStatementMode"]) document.getElementById(pageAction).addEventListener("change", pageActionListener);
+    let pageNumberListener = function(e) {editor.setAttribute("pagenumbermode", e.target.getAttribute("id"))}
+    for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
+    let nameModeListener = function(e) {editor.setAttribute("namemode", e.target.getAttribute("id"))}
+    for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) document.getElementById(nameMode).addEventListener("change", nameModeListener);
+    let pageActionListener = function(e) {editor.setAttribute("pageaction", e.target.getAttribute("id"))}
+    for (let pageAction of ["newchaptermode", "newstatementmode", "newcommentmode"]) document.getElementById(pageAction).addEventListener("change", pageActionListener);
 }
 
 // variables used in this script
@@ -29,6 +59,7 @@ function getPage(pageNumber) {
 }
 
 function start() {
+    document.getElementById("debugbutton").click();
     // set up loading screen
     workerFunctions.setLoadingScreen = gui.setLoadingScreen;
     workerFunctions.closeLoadingScreen = gui.closeLoadingScreen;
@@ -37,21 +68,52 @@ function start() {
     makePageTools();
     
     // first set the modes to agree with what buttons are pressed, in case the button presses were cached by the browser
-    for (let pageNumberMode of ["siblingNumber", "fullPageNumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pageNumberMode", pageNumberMode);
-    for (let nameMode of ["nodeNameMode", "nicknameMode", "fullNameMode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("nameMode", nameMode);
-    for (let pageAction of ["newChapterMode", "newStatementMode"]) if (document.getElementById(pageAction).checked) editor.setAttribute("pageAction", pageAction);
+    for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
+    for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
+    for (let pageAction of ["newchaptermode", "newstatementmode", "newcommentmode"]) if (document.getElementById(pageAction).checked) editor.setAttribute("pageaction", pageAction);
     
     // start worker
     worker = new Worker("../scripts/worker.js");
     worker.onmessage = function onmessage(e) {
-        //console.log("received message");console.log(e.data);
         workerFunctions[e.data.shift()](...e.data);
     }
     
-    // make root chapter
-    newChapter();
+    // make root chapter / saved pages
+    if (!Storage.getItem("0")) Storage.setItem("0", "chapter\nBook\n\n");
+    loadPages();
 }
 
+function loadPages() {
+    post("openPageProcess");
+    doSmoothly = false;
+    let page = 0, line;
+    while (line = Storage.getItem(page)) loadPage(page++);
+    post("closePageProcess");
+    for (let i = 0; i < page; ++i) if (pageLoadingInformation[i]) post("move", i, pageLoadingInformation[i].parent, pageLoadingInformation[i].insertBefore);
+}
+
+let pageLoadingInformation = [];
+
+function loadPage(pageNumber) {
+    if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists")
+    let lines = Storage.getItem(pageNumber).split("\n");
+    switch (lines[0]) {
+        case "chapter":
+            if (pageNumber != newChapter(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
+            post("setNickname", pageNumber, lines[2]);
+            if (lines[3].length > 0) {
+                let children = lines[3].split(" ");
+                let index = children.indexOf("");
+                if (index >= 0) children.splice(index, 1);
+                for (let i = 0; i < children.length; ++i) pageLoadingInformation[children[i]] = {parent: pageNumber, insertBefore: i+1==children.length? null: children[i+1]};
+            }
+        break; case "statement":
+            
+        break; case "comment":
+            
+        break; default: throw Error("do not recognize page type " + lines[0]);
+    }
+}
 function post(functionName, ...args) {
     worker.postMessage([functionName, ...args]);
 }
@@ -60,14 +122,14 @@ function post(functionName, ...args) {
 function newPage(pageNumber) {
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
     let page = pages[pageNumber] = {pageNumber: pageNumber, pageType: "page"};
-    page.div = gui.element("details", null, ["class", "page", "pageNumber", pageNumber]);
+    page.div = gui.element("details", null, ["class", "page", "pagenumber", pageNumber, "open", ""]);
     page.div.addEventListener("toggle", openDetailsFromEvent);
     page.div.addEventListener("mouseenter", pageFocusInFromEvent);
-    page.pageHead = gui.element("summary", page.div, ["class", "pageHead"]);
+    page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
     page.pageHead.addEventListener("mouseenter", pageFocusInFromEvent);
-    page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingNumber"]);
+    page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
     page.siblingNumberText = gui.text("", page.siblingNumberSpan);
-    page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullPageNumber"]);
+    page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullpagenumber"]);
     page.fullPageNumberText = gui.text("", page.fullPageNumberSpan);
     page.nameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "page name", "class", "name", "disguise", ""]);
     page.nameSpan.addEventListener("change", nameProcessorFromEvent);
@@ -76,7 +138,7 @@ function newPage(pageNumber) {
     page.nicknameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "nickname", "class", "nickname", "disguise", ""]);
     page.nicknameSpan.addEventListener("change", nameProcessorFromEvent);
     gui.absorbClicks(page.nicknameSpan);
-    page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullName"]);
+    page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
     page.fullNameText = gui.text("", page.fullNameSpan);
 }
 
@@ -84,39 +146,44 @@ function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
     let pageNumber = pages.length;
     newPage(pageNumber);
     let page = getPage(pageNumber);
+    page.pageType = "chapter";
     page.div.setAttribute("class", "chapter");
     post("newChapter", parentNumber, insertBefore, pageNumber, name);
     newPageGap(page);
+    return pageNumber;
 }
 
 function newPageGap(page, insertBefore = null) {
-    let returner = gui.element("div", page? page.div: null, ["class", "pageGap"], insertBefore? insertBefore.div: null);
+    let returner = gui.element("div", page? page.div: null, ["class", "pagegap"], insertBefore? insertBefore.div: null);
     returner.addEventListener("focusin", pageGapFocus);
-    let newChapterIn = gui.element("input", returner, ["class", "newChapterIn", "placeholder", "new chapter", "disguise", ""]);
+    let newChapterIn = gui.element("input", returner, ["class", "newchapterin", "placeholder", "new chapter", "disguise", ""]);
     newChapterIn.addEventListener("blur", clearPageGap);
     newChapterIn.addEventListener("change", newChapterInChanged);
-    let newStatementIn = gui.element("input", returner, ["class", "newStatementIn", "placeholder", "new statement", "disguise", ""]);
+    let newStatementIn = gui.element("input", returner, ["class", "newstatementin", "placeholder", "new statement", "disguise", ""]);
     newStatementIn.addEventListener("blur", clearPageGap);
     newStatementIn.addEventListener("change", newStatementInChanged);
-    gui.text("❌", gui.element("button", returner, ["class", "dontMoveHere", "disabled", ""]));
-    let moveHereButton = gui.element("button", returner, ["class", "moveHere"]);
+    let newCommentIn = gui.element("input", returner, ["class", "newcommentin", "placeholder", "new comment", "disguise", ""]);
+    newCommentIn.addEventListener("blur", clearPageGap);
+    newCommentIn.addEventListener("change", newCommentInChanged);
+    gui.text("❌", gui.element("button", returner, ["class", "dontmovehere", "disabled", ""]));
+    let moveHereButton = gui.element("button", returner, ["class", "movehere"]);
     gui.text("⇦", moveHereButton);
     moveHereButton.addEventListener("click", doMove);
     return returner;
 }
 
-function getPageGapFronEvent(event) {
+function getPageGapFromEvent(event) {
     let gap = event.target;
-    while (gap.getAttribute("class") != "pageGap") gap = gap.parentElement;
+    while (gap.getAttribute("class") != "pagegap") gap = gap.parentElement;
     return gap;
 }
 
 function pageGapFocus(event) {
-    focusedPageGap = getPageGapFronEvent(event);
+    focusedPageGap = getPageGapFromEvent(event);
 }
 
 function clearPageGap(event) {
-    let gap = getPageGapFronEvent(event);
+    let gap = getPageGapFromEvent(event);
     for (let child of gap.querySelectorAll(".newChapterIn, .newStatementIn")) {
         child.blur();
         child.value = "";
@@ -124,29 +191,33 @@ function clearPageGap(event) {
 }
 
 function getGapParentNumber(gap) {
-    while (!gap.hasAttribute("pageNumber")) gap = gap.parentElement;
-    return gap.getAttribute("pageNumber");
+    while (!gap.hasAttribute("pagenumber")) gap = gap.parentElement;
+    return gap.getAttribute("pagenumber");
 }
 
 function getGapNextPageNumber(gap) {
-    if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("pageNumber");
+    if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("pagenumber");
     else return null;
 }
 
 function newChapterInChanged(event) {
-    let gap = getPageGapFronEvent(event), newChapterIn = gap.querySelector(".newChapterIn"), line = newChapterIn.value;
+    let gap = getPageGapFromEvent(event), newChapterIn = gap.querySelector(".newchapterin"), line = newChapterIn.value;
     if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newChapterIn, "invalid nodeName");
     clearPageGap({target: gap});
-    post("newPageNameCheck", gap.parentElement.getAttribute("pageNumber"), line);
+    post("newPageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
 }
 
 function newStatementInChanged(event) {
     console.log("not ready yet");
 }
 
+function newCommentInChanged(event) {
+    console.log("not ready yet");
+}
+
 workerFunctions.pseudoPost = post;
 
-let duration = .3, newPageHeight;
+let duration = .3, newPageHeight, doSmoothly = true;
 
 workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
     let page = getPage(pageNumber);
@@ -164,12 +235,12 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                     let gapSpot, pageSpot, newGap = newPageGap();
                     if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
                         // moving down
-                        gui.smoothErase(page.div.previousElementSibling, {duration: duration});
+                        gui.smoothErase(page.div.previousElementSibling, {duration: duration, doSmoothly: doSmoothly});
                         gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
                         pageSpot = gui.element("div", newParent.div, [], gapSpot);
                     } else {
                         // moving up
-                        gui.smoothErase(page.div.nextElementSibling, {duration: duration});
+                        gui.smoothErase(page.div.nextElementSibling, {duration: duration, doSmoothly: doSmoothly});
                         pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
                         gapSpot = gui.element("div", newParent.div, [], pageSpot);
                     }
@@ -177,36 +248,44 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                         onEnd: function() {newParent.div.removeChild(gapSpot)},
                         width: templateGapBBox.width,
                         height: templateGapBBox.height,
-                        duration: duration
+                        duration: duration,
+                        doSmoothly: doSmoothly
                     });
                     gui.smoothSwap(page.div, pageSpot, {
                         onEnd: function() {newParent.div.removeChild(pageSpot)},
                         width: templateGapBBox.width,
-                        duration: duration
+                        duration: duration,
+                        doSmoothly: doSmoothly
                     });
                 } else {
-                    // new page (birth "move")
+                    // new page (birth move)
                     let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
                     gui.smoothInsert(page.div, newParent.div, deleteMe1, {
                         onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
                         width: templateGapBBox.width,
                         height: newPageHeight,
-                        duration: duration
+                        duration: duration,
+                        doSmoothly: doSmoothly
                     });
                     gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
                         onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
                         width: templateGapBBox.width,
                         height: templateGapBBox.height,
-                        duration: duration
+                        duration: duration,
+                        doSmoothly: doSmoothly
                     });
                 }
             }
+            if (editor.hasAttribute("movemode")) moveModeOff();
         break; /*set name*/ case "name": // data is [name]
-            if (page.nameSpan.hasAttribute("inputOutputRevertTo")) page.nameSpan.setAttribute("inputOutputRevertTo", data[0]);
+            if (page.nameSpan.hasAttribute("inputoutputrevertto")) page.nameSpan.setAttribute("inputoutputrevertto", data[0]);
             else page.nameSpan.value = data[0];
             page.nicknameSpan.setAttribute("placeholder", "nickname for " + data[0]);
+            page.nameSpan.setAttribute("value", data[0]);
         break; /*set nickname*/ case "nickname": // data is [nickname]
-            workerFunctions.setNickname(pageNumber, data[0]);
+            if (page.nicknameSpan.hasAttribute("inputoutputrevertto")) page.nicknameSpan.setAttribute("inputoutputrevertto", data[0]);
+            else page.nicknameSpan.value = data[0];
+            page.nicknameSpan.setAttribute("value", data[0]);
         break; /*set pageNumber*/ case "siblingNumber": // data is [siblingNumber]
             page.siblingNumberText.nodeValue = data[0];
         break; /*set fullPageNumber*/ case "fullPageNumber": // data is [fullPageNumber]
@@ -226,36 +305,34 @@ workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
 }
 
 workerFunctions.newPageNameCheck = function newPageNameCheck(parentNumber, line, result) {
-    if (parentNumber != focusedPageGap.parentElement.getAttribute("pageNumber")) throw Error("mismatch in parent during check for new page");
+    if (parentNumber != focusedPageGap.parentElement.getAttribute("pagenumber")) throw Error("mismatch in parent during check for new page");
     let newChapterIn = focusedPageGap.querySelector(".newChapterIn");
     if (result) {
-        newChapter(parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pageNumber"): null, line);
+        newChapter(parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
     } else {
         newChapterIn.value = line;
         gui.inputOutput.inputText(newChapterIn, "naming conflict");
     }
 }
 
-workerFunctions.save = function save(pages) {
-    //console.log("saving " + pages);
+workerFunctions.smoothMode = function smoothMode(smoothMode) {
+    doSmoothly = smoothMode;
 }
 
-workerFunctions.setNickname = function setNickname(pageNumber, nickname) {
-    let page = getPage(pageNumber);
-    if (page.nicknameSpan.hasAttribute("inputOutputRevertTo")) page.nicknameSpan.setAttribute("inputOutputRevertTo", nickname);
-    else page.nicknameSpan.value = nickname;
+workerFunctions.save = function save(saves) {
+    for (let save of saves) Storage.setItem(save.pageNumber, save.line);
 }
 
 workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
-    getPage(pageNumber).div.setAttribute("canAcceptMove", accept);
+    getPage(pageNumber).div.setAttribute("canacceptmove", accept);
 }
 
 workerFunctions.moveModeOff = moveModeOff;
 
 function getPageNumberFromEvent(e) {
     let element = e.target;
-    while (!element.hasAttribute("pageNumber")) element = element.parentElement;
-    let pageNumber = element.getAttribute("pageNumber");
+    while (!element.hasAttribute("pagenumber")) element = element.parentElement;
+    let pageNumber = element.getAttribute("pagenumber");
     activePage = pageNumber;
     return pageNumber;
 }
@@ -292,36 +369,79 @@ function openDetails(pageNumber) {
 }
 
 function makePageTools() {
-    pageTools = gui.element("div", false, ["id", "pageTools"]);
+    pageTools = gui.element("div", false, ["id", "pagetools"]);
     pageTools.moveButton = gui.button("⇳", pageTools, toggleMoveMode, ["disguise", "", "bigger", ""]);
     gui.shieldClicks(pageTools.moveButton);
     pageTools.deleteBundle = gui.deleteBundle(pageTools, function() {console.log("deleting");/*isFocused.deletePage()*/});
 }
 
 function toggleMoveMode(e) {
-    if (editor.hasAttribute("moveMode")) moveModeOff();
+    if (editor.hasAttribute("movemode")) moveModeOff();
     else moveModeOn(getPageNumberFromEvent(e));
 }
 
 function moveModeOn(pageNumber) {
     let page = getPage(pageNumber);
-    if (editor.hasAttribute("moveMode")) throw Error("already in move mode");
+    if (editor.hasAttribute("movemode")) throw Error("already in move mode");
     lockedPageFocus = true;
-    editor.setAttribute("moveMode", "");
+    editor.setAttribute("movemode", "");
     page.div.setAttribute("movingPage", "");
     post("startMoveModeChecks", page.pageNumber);
 }
 
 function moveModeOff() {
-    if (!editor.hasAttribute("moveMode")) throw Error("cannot turn move mode off if not in move mode");
+    if (!editor.hasAttribute("movemode")) throw Error("cannot turn move mode off if not in move mode");
     lockedPageFocus = false;
-    editor.removeAttribute("moveMode");
-    document.querySelector("[movingPage]").removeAttribute("movingPage");
-    for (let page of document.querySelectorAll("[canAcceptMove]")) page.removeAttribute("canAcceptMove");
+    editor.removeAttribute("movemode");
+    document.querySelector("[movingpage]").removeAttribute("movingPage");
+    for (let page of document.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
     post("endMoveMode");
 }
 
 function doMove(e) {
-    let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingPage]").getAttribute("pageNumber"));
+    let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingpage]").getAttribute("pagenumber"));
     post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
+}
+
+let Storage = {};
+
+Storage.alert = function() {
+    document.body.innerHTML = "<p>Error: Window localStorage is unavailable, please make it available to use this editor.</p><p>This will likely involve some settings in your browser.</p>";
+}
+
+Storage.setItem = function setItem(name, value) {
+    if ((typeof name == "undefined") || (typeof value == "undefined")) throw Error("saving an undefined");
+    try {
+        return window.localStorage.setItem(name, value);
+    } catch (e) {
+        Storage.alert();
+    }
+}
+
+Storage.getItem = function getItem(name) {
+    if (typeof name == "undefined") throw Error("getting an undefined");
+    try {
+        return window.localStorage.getItem(name);
+    } catch (e) {
+        Storage.alert();
+    }
+}
+
+Storage.removeItem = function removeItem(name) {
+    if (typeof name == "undefined") throw Error("removing an undefined");
+    try {
+        return window.localStorage.removeItem(name);
+    } catch (e) {
+        Storage.alert();
+    }
+}
+
+Storage.moveItem = function moveItem(oldName, newName) {
+    if (oldName == newName) return;
+    Storage.setItem(newName, Storage.getItem(oldName));
+    Storage.removeItem(oldName);
+}
+
+Storage.deleteAll = function deleteAll() {
+    window.localStorage.clear();
 }
