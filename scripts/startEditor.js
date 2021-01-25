@@ -101,8 +101,10 @@ function loadPage(pageNumber) {
         case "chapter":
             if (pageNumber != newChapter(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
             post("setNickname", pageNumber, lines[2]);
-            if (lines[3].length > 0) {
-                let children = lines[3].split(" ");
+            let open = lines[3];
+            if (open == "o") getPage(pageNumber).div.setAttribute("open", "");
+            if (lines[4].length > 0) {
+                let children = lines[4].split(" ");
                 let index = children.indexOf("");
                 if (index >= 0) children.splice(index, 1);
                 for (let i = 0; i < children.length; ++i) pageLoadingInformation[children[i]] = {parent: pageNumber, insertBefore: i+1==children.length? null: children[i+1]};
@@ -122,7 +124,7 @@ function post(functionName, ...args) {
 function newPage(pageNumber) {
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
     let page = pages[pageNumber] = {pageNumber: pageNumber, pageType: "page"};
-    page.div = gui.element("details", null, ["class", "page", "pagenumber", pageNumber, "open", ""]);
+    page.div = gui.element("details", null, ["class", "page", "pagenumber", pageNumber]);
     page.div.addEventListener("toggle", openDetailsFromEvent);
     page.div.addEventListener("mouseenter", pageFocusInFromEvent);
     page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
@@ -308,7 +310,8 @@ workerFunctions.newPageNameCheck = function newPageNameCheck(parentNumber, line,
     if (parentNumber != focusedPageGap.parentElement.getAttribute("pagenumber")) throw Error("mismatch in parent during check for new page");
     let newChapterIn = focusedPageGap.querySelector(".newChapterIn");
     if (result) {
-        newChapter(parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
+        let pageNumber = newChapter(parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
+        post("openDetails", pageNumber, true);
     } else {
         newChapterIn.value = line;
         gui.inputOutput.inputText(newChapterIn, "naming conflict");
@@ -364,8 +367,8 @@ function deletePage(pageNumber) {
 }
 
 function openDetailsFromEvent(e) {openDetails(getPageNumberFromEvent(e))}
-function openDetails(pageNumber) {
-    post("openDetails", pageNumber, getPage(pageNumber).div.hasAttribute("open"));
+function openDetails(pageNumber, open = getPage(pageNumber).div.hasAttribute("open")) {
+    post("openDetails", pageNumber, open);
 }
 
 function makePageTools() {

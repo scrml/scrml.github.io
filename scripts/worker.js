@@ -214,11 +214,12 @@ pageProto.updateFullName = function updateFullName() {
 
 pageProto.openDetails = function openDetails(open) {
     this.isOpen = open;
+    pageTickets.saveTheseObject[this.pageNumber] = undefined;
     if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
 }
 
 pageProto.saveToString = function saveToString() {
-    return this.name + "\n" + this.nickname;
+    return this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
 }
 
 chapterProto.isAncestorOf = function isAncestorOf(page) {
