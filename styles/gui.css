@@ -28,18 +28,18 @@
     visibility: visible;
 }
 
-.missileLaunch {
+.missilelaunch {
     position: relative;
     display: inline;
     margin: 10px;
 }
 
-.missileLaunch button.missileLaunchButton {
+.missilelaunch button.missilelaunchbutton {
     border: 4px outset darkred;
     display: inline;
 }
 
-@keyframes missileLaunchTrigger {
+@keyframes missilelaunchtrigger {
     0% {outline: 4px darkred outset;}
     100% {
         transform: translateY(-67%) rotateY(10deg) rotateX(120deg);
@@ -47,7 +47,7 @@
     }
 }
 
-.missileLaunch .trigger {
+.missilelaunch .trigger {
     position: absolute;
     top: 0;
     left: 0;
@@ -57,28 +57,33 @@
     outline: 4px darkred outset;
 }
 
-.missileLaunch .trigger[opening] {
-    animation-name: missileLaunchTrigger;
+.disabler .missilelaunch .trigger {
+    background-color: rgba(160, 160, 130, .5);
+    outline-color: rgb(100, 100, 100);
+}
+
+.missilelaunch .trigger[opening] {
+    animation-name: missilelaunchtrigger;
     animation-duration: .4s;
     animation-fill-mode: forwards;
 }
 
-.missileLaunch .trigger[closing] {
-    animation-name: missileLaunchTrigger;
+.missilelaunch .trigger[closing] {
+    animation-name: missilelaunchtrigger;
     animation-duration: .2s;
     animation-direction: reverse;
     animation-fill-mode: backwards;
 }
 
-.missileLaunch .trigger[open] {
+.missilelaunch .trigger[open] {
     transform: translateY(-67%) rotateY(10deg) rotateX(120deg);
     outline: 4px darkred inset;
 }
 
-.missileLaunch .trigger[closed] {
+.missilelaunch .trigger[closed] {
 }
 
-@keyframes missileLaunchFlashing {
+@keyframes missilelaunchflashing {
     0% {
         background-color: rgb(245, 245, 245);
     }
@@ -96,8 +101,8 @@
     }
 }
 
-.missileLaunch [flashing] {
-    animation: missileLaunchFlashing;
+.missilelaunch [flashing] {
+    animation: missilelaunchflashing;
     animation-duration: 3s;
     animation-iteration-count: infinite;
 }

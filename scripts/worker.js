@@ -49,6 +49,8 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
     returner.manager.linkProperty("fullName", returner);
     returner.manager.linkListener("fullName", function(fullName) {pageTickets.addTicket(returner.pageNumber, "fullName", fullName)});
     movePage(pageNumber, parentNumber, insertBeforeNumber);
+    returner.manager.setVarValue("isInUse", false);
+    returner.manager.linkListener("isInUse", function(inUse) {pageTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
     pageTickets.addTicket(pageNumber, "save");
     return returner;
 }
@@ -72,6 +74,7 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
         if (prev) prev.nextPage = next;
         if (next) next.previousPage = prev;
         oldParent.childPages.splice(sn-1, 1);
+        if (oldParent.childPages.length == 0) oldParent.manager.setVarValue("isInUse", false);
         if (next) next.manager.setVarValue("siblingNumber", next.siblingNumber - 1);
         pageTickets.addTicket(oldParent.pageNumber, "save");
     }
@@ -91,6 +94,7 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
             if (prev) prev.nextPage = page;
             page.manager.setVarValue("siblingNumber", newParent.childPages.length);
         }
+        if (!newParent.isInUse) newParent.manager.setVarValue("isInUse", true);
         pageTickets.addTicket(parentNumber, "save");
     } else {
         if (pageNumber != 0) throw Error("only page 0 can not have a parent");
@@ -161,10 +165,8 @@ functions.fetchAll = function fetchAll(pageNumber) {
     functions.fetchName(pageNumber);
     functions.fetchNickname(pageNumber);
     functions.fetchFullName(pageNumber);
-    if (pages[pageNumber].isChapter) {
-        functions.fetchPageNumber(pageNumber);
-        functions.fetchFullPageNumber(pageNumber);
-    }
+    functions.fetchPageNumber(pageNumber);
+    functions.fetchFullPageNumber(pageNumber);
 }
 
 functions.newPageNameCheck = function newPageNameCheck(parentNumber, line) {
@@ -191,6 +193,10 @@ functions.move = function move(movingPageNumber, parentNumber, insertBeforeNumbe
 functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
+
+functions.skipPageSpot = function skipPageSpot() {
+    pages.push("skipped");
+}
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
     if (this.parent) {
@@ -417,15 +423,15 @@ pageTickets.saveThese = function saveThese() {
 }
 
 pageTickets.addTicketFunction("name", function(pageNumber, name) {
-    postMessage(["fetched", pageNumber, "name", name]);
+    fetched(pageNumber, "name", name);
 });
 
 pageTickets.addTicketFunction("nickname", function(pageNumber, nickname) {
-    postMessage(["fetched", pageNumber, "nickname", nickname])
+    fetched(pageNumber, "nickname", nickname);
 });
 
 pageTickets.addTicketFunction("fullName", function(pageNumber, fullName) {
-    postMessage(["fetched", pageNumber, "fullName", fullName]);
+    fetched(pageNumber, "fullName", fullName);
 });
 
 pageTickets.addTicketFunction("newPageNameCheck", function(parentNumber, line) {
@@ -434,13 +440,17 @@ pageTickets.addTicketFunction("newPageNameCheck", function(parentNumber, line) {
 });
 
 pageTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
-    postMessage(["fetched", pageNumber, "siblingNumber", siblingNumber]);
+    fetched(pageNumber, "siblingNumber", siblingNumber);
 });
 
 pageTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
-    postMessage(["fetched", pageNumber, "fullPageNumber", fullPageNumber]);
+    fetched(pageNumber, "fullPageNumber", fullPageNumber);
 });
 
 pageTickets.addTicketFunction("save", function(pageNumber) {
     pageTickets.saveTheseObject[pageNumber] = undefined;
 });
+
+pageTickets.addTicketFunction("isInUse", function(pageNumber, inUse) {
+    fetched(pageNumber, "isInUse", inUse);
+})

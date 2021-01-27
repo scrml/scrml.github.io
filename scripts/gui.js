@@ -304,7 +304,7 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
 {
     let openDuration = 400, closeDuration = 200;
     let animationend = function(e) {
-        let button = e.target.parentElement.firstChild, trigger = button.nextSibling;
+        let button = e.target.parentElement.firstChild, trigger = button.nextElementSibling;
         if (trigger.parentElement.SCRMLEditorTiein.lock) return;
         if (trigger.hasAttribute("opening")) {
             trigger.removeAttribute("opening");
@@ -318,7 +318,7 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
         }
     }
     let openTrigger = function(e) {
-        let button = e.target.parentElement.firstChild, trigger = button.nextSibling;
+        let button = e.target.parentElement.firstChild, trigger = button.nextElementSibling;
         if (trigger.parentElement.SCRMLEditorTiein.lock) return;
         if (trigger.hasAttribute("open") || trigger.hasAttribute("opening") || trigger.hasAttribute("closing")) return;
         trigger.removeAttribute("closed");
@@ -356,27 +356,41 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
     
     gui.deleteBundle = function deleteBundle(loadHere, buttonClick) {
         let returner = {};
-        let deleteLaunch = returner.deleteLaunch = gui.element("div", loadHere, ["class", "missileLaunch"]);
+        let deleteLaunch = returner.deleteLaunch = gui.element("div", loadHere, ["class", "missilelaunch"]);
         deleteLaunch.SCRMLEditorTiein = {};
-        let deleteButton = returner.deleteButton = gui.button("delete", deleteLaunch, buttonClick, ["class", "missileLaunchButton", "disabled", ""]);
+        let deleteButton = returner.deleteButton = gui.button("delete", deleteLaunch, buttonClick, ["class", "missilelaunchbutton", "disabled", ""]);
         gui.absorbClicks(deleteButton);
         let deleteTrigger = returner.deleteTrigger = gui.element("div", deleteLaunch, ["class", "trigger", "tabindex", "0"]);
-        gui.absorbClicks(deleteTrigger);
         deleteButton.addEventListener("blur", closeTrigger);
         deleteTrigger.addEventListener("focus", openTrigger);
         deleteTrigger.addEventListener("click", openTrigger);
+        gui.blockEvents(deleteTrigger);
         returner.resetBundle = resetBundle;
         returner.hideDelete = hideDelete;
         returner.showDelete = showDelete;
         let pseudo = {
-            stopImmediatePropagation: emptyFunction,
-            preventDefault: emptyFunction,
             target: deleteTrigger
         };
         returner.openTrigger = function () {openTrigger(pseudo)}
         returner.closeTrigger = function() {closeTrigger(pseudo)}
         return returner;
     }
+}
+
+gui.disablerStylesToCopy = {
+    float: undefined,
+    display: undefined,
+    visibility: undefined
+}
+
+gui.disable = function disable(element, copyTheseStyles = gui.disablerStylesToCopy) {
+    let disabler = gui.element("div", null, ["class", "disabler"]);
+    let styles = getComputedStyle(element);
+    for (let style in copyTheseStyles) disabler.style[style] = styles.getPropertyValue(style);
+    element.parentElement.replaceChild(disabler, element);
+    disabler.appendChild(element);
+    gui.blockEvents(disabler);
+    return function() {disabler.parentElement.replaceChild(element, disabler)};
 }
 
 gui.linkedOption = function linkedOption(loadHere, manager, textProp, valueProp, atts) {
@@ -627,13 +641,16 @@ gui.eventAbsorber = function(e) {
 }
 
 gui.absorbClicks = function absorbClicks(element) {
-    element.addEventListener("click", gui.eventAbsorber);
+    element.addEventListener("click", gui.eventAbsorber, true);
 }
 
-gui.visibilityTrackerProtoModel = {};
+gui.blockTheseEvents = {
+    focus: undefined,
+    click: undefined
+}
 
-gui.newVisibilityTracker = function newVisibilityTracker(protoModel = visibilityTrackerProtoModel) {
-    
+gui.blockEvents = function blockEvents(element, events = gui.blockTheseEvents) {
+    for (let type in events) element.addEventListener(type, gui.eventAbsorber, true);
 }
 
 {
