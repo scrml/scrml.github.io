@@ -90,7 +90,9 @@ let pageLoadingInformation = [];
 
 function loadPage(pageNumber) {
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
-    let lines = Storage.getItem(pageNumber).split("\n");
+    let line = Storage.getItem(pageNumber);
+    if (line == "skipped") return skipPageSpot();
+    let lines = line.split("\n");
     switch (lines[0]) {
         case "chapter":
             if (pageNumber != newChapter(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
@@ -339,7 +341,7 @@ workerFunctions.smoothMode = function smoothMode(smoothMode) {
 }
 
 workerFunctions.save = function save(saves) {
-    //for (let save of saves) Storage.setItem(save.pageNumber, save.line);
+    for (let save of saves) Storage.setItem(save.pageNumber, save.line);
 }
 
 workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
@@ -388,8 +390,11 @@ function openDetails(pageNumber, open = getPage(pageNumber).div.hasAttribute("op
 }
 
 function deletePage(page) {
-    console.log("deleting");
-    console.log(page);
+    page.div.parentElement.removeChild(page.div.nextElementSibling);
+    page.div.parentElement.removeChild(page.div);
+    pages[page.pageNumber] = "skipped";
+    Storage.setItem(page.pageNumber, "skipped");
+    post("deletePage", page.pageNumber);
 }
 
 function makePageTools() {

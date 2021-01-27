@@ -198,6 +198,16 @@ functions.skipPageSpot = function skipPageSpot() {
     pages.push("skipped");
 }
 
+functions.deletePage = function deletePage(pageNumber) {
+    let page = pages[pageNumber];
+    if (page.isInUse) throw Error("page " + pageNumber + " is still in use");
+    pages[page] = "skipped";
+    let prev = page.previousPage, next = page.nextPage;
+    if (prev) prev.nextPage = next;
+    if (next) next.previousPage = prev;
+    page.parent.childPages.splice(page.siblingNumber, 1);
+}
+
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
     if (this.parent) {
         if (this.parent.parent) return this.parent.fullPageNumber + "." + siblingNumber;
@@ -228,12 +238,19 @@ pageProto.saveToString = function saveToString() {
     return this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
 }
 
+chapterProto.childPages = [];
+
 chapterProto.isAncestorOf = function isAncestorOf(page) {
     while (page) {
         if (this == page) return true;
         page = page.parent;
     }
     return false;
+}
+
+chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
+    pageProto.updateFullPageNumber.call(this, siblingNumber);
+    for (let child of this.childPages) child.updateFullPageNumber(child.siblingNumber);
 }
 
 chapterProto.canAcceptMove = function canAcceptMove(page) {
