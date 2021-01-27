@@ -29,9 +29,11 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
     returner.manager.linkProperty("name", returner);
     returner.manager.linkListener("name", function(newName) {pageTickets.addTicket(returner.pageNumber, "name", newName)}, true);
     returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
+    returner.manager.linkListener("name", function() {returner.preSave()});
     returner.manager.setVarValue("nickname", "");
     returner.manager.linkProperty("nickname", returner);
     returner.manager.linkListener("nickname", function(newNickname) {pageTickets.addTicket(returner.pageNumber, "nickname", newNickname)}, true);
+    returner.manager.linkListener("nickname", function() {returner.preSave()});
     returner.manager.setVarValue("siblingNumber", 0);
     returner.manager.linkProperty("siblingNumber", returner);
     returner.manager.linkListener("siblingNumber", function(siblingNumber) {
@@ -51,6 +53,7 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
     movePage(pageNumber, parentNumber, insertBeforeNumber);
     returner.manager.setVarValue("isInUse", false);
     returner.manager.linkListener("isInUse", function(inUse) {pageTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
+    returner.manager.linkListener("isInUse", function() {returner.preSave()});
     pageTickets.addTicket(pageNumber, "save");
     return returner;
 }
@@ -201,11 +204,16 @@ functions.skipPageSpot = function skipPageSpot() {
 functions.deletePage = function deletePage(pageNumber) {
     let page = pages[pageNumber];
     if (page.isInUse) throw Error("page " + pageNumber + " is still in use");
-    pages[page] = "skipped";
+    page.preSave();
+    pages[pageNumber] = "skipped";
     let prev = page.previousPage, next = page.nextPage;
-    if (prev) prev.nextPage = next;
+    if (prev) {
+        prev.nextPage = next;
+        prev.manager.setVarValue("siblingNumber", prev.siblingNumber);
+    } else if (next) next.manager.setVarValue("siblingNumber", page.siblingNumber);
     if (next) next.previousPage = prev;
-    page.parent.childPages.splice(page.siblingNumber, 1);
+    page.parent.childPages.splice(page.siblingNumber - 1, 1);
+    page.parent.preSave();
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
@@ -237,6 +245,8 @@ pageProto.openDetails = function openDetails(open) {
 pageProto.saveToString = function saveToString() {
     return this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
 }
+
+pageProto.preSave = function preSave() {pageTickets.saveTheseObject[this.pageNumber] = undefined}
 
 chapterProto.childPages = [];
 
@@ -369,7 +379,7 @@ chapterProto.saveToString = function saveToString() {
         }
     };
 
-    function newVarManager() {
+    function newVarManager(protoModel = varManagerProtoModel) {
         let returner = Object.create(varManagerProtoModel);
         returner.vars = {};
         return returner;
@@ -434,7 +444,7 @@ pageTickets.closeProcess = function closeProcess() {
 
 pageTickets.saveThese = function saveThese() {
     let returner = [];
-    for (let pageNumber in this.saveTheseObject) returner.push({pageNumber: pageNumber, line: pages[pageNumber].saveToString()});
+    for (let pageNumber in this.saveTheseObject) returner.push({pageNumber: pageNumber, line: pages[pageNumber] == "skipped"? "skipped": pages[pageNumber].saveToString()});
     this.saveTheseObject = {};
     return returner;
 }

@@ -88,9 +88,13 @@ function loadPages() {
 
 let pageLoadingInformation = [];
 
+let printSaves = false;
+if (printSaves) document.getElementById("codeout").innerHTML = "<hr>";
+
 function loadPage(pageNumber) {
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
     let line = Storage.getItem(pageNumber);
+    if (printSaves) document.getElementById("codeout").innerHTML += (line == "skipped"? pageNumber + " skipped": line) + "<hr>";
     if (line == "skipped") return skipPageSpot();
     let lines = line.split("\n");
     switch (lines[0]) {
@@ -235,15 +239,6 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                 let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]), templateGapBBox = newParent.div.firstChild.nextElementSibling.getBoundingClientRect();
                 if (page.div.parentElement) {
                     // existing page (actual move)
-                    /*if (page.div.previousElementSibling.getAttribute("class") != "pagegap" || page.div.nextElementSibling.getAttribute("class") != "pagegap") {
-                        console.log("failing");
-                        console.log(pageNumber);
-                        console.log(page.div.previousElementSibling);
-                        console.log(page.div.nextElementSibling);
-                        console.log(page.div.parentElement);
-                        console.log(page.div);
-                        throw Error("page not surrounded by gaps");
-                    }*/
                     let gapSpot, pageSpot, newGap = newPageGap();
                     if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
                         // moving down
