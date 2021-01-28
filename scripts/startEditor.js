@@ -6,8 +6,7 @@ Scripts.gui.script.addEventListener("managed", start);
 let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode");
 //document.getElementById("debugbutton").setAttribute("hide", "");
 document.getElementById("debugbutton").addEventListener("click", function() {
-    Storage.deleteAll();
-    window.location.reload();
+    removeSkippedPages();
 });
 
 function nodeToString(node, indent = "", tab = "  ", newLine = "\r\n") {
@@ -145,7 +144,7 @@ function newPage(pageNumber) {
     gui.absorbClicks(page.nicknameSpan);
     page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
     page.fullNameText = gui.text("", page.fullNameSpan);
-    gui.text(pageNumber, page.pageHead);
+    page.pageNumberOut = gui.text(pageNumber, page.pageHead);
 }
 
 function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
@@ -392,6 +391,19 @@ function deletePage(page) {
     post("deletePage", page.pageNumber);
 }
 
+function removeSkippedPages() {
+    let newPages = pages.filter(function(page) {return page != "skipped"});
+    let i = 0;
+    while (i < newPages.length) {
+        newPages[i].pageNumber = i;
+        newPages[i].div.setAttribute("pagenumber", i);
+        newPages[i].pageNumberOut.nodeValue = i;
+        ++i;
+    }
+    while (i < pages.length) Storage.removeItem(i++);
+    post("removeSkippedPages");
+}
+
 function makePageTools() {
     pageTools = gui.element("div", false, ["id", "pagetools"]);
     pageTools.moveButton = gui.button("⇳", pageTools, toggleMoveMode, ["disguise", "", "bigger", ""]);
@@ -410,7 +422,7 @@ function moveModeOn(pageNumber) {
     lockedPageFocus = true;
     editor.setAttribute("movemode", "");
     page.div.setAttribute("movingPage", "");
-    post("startMoveModeChecks", page.pageNumber);
+    post("startMoveModeChecks", pageNumber);
 }
 
 function moveModeOff() {

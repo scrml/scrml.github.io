@@ -54,7 +54,7 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
     returner.manager.setVarValue("isInUse", false);
     returner.manager.linkListener("isInUse", function(inUse) {pageTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
     returner.manager.linkListener("isInUse", function() {returner.preSave()});
-    pageTickets.addTicket(pageNumber, "save");
+    returner.preSave();
     return returner;
 }
 
@@ -214,6 +214,22 @@ functions.deletePage = function deletePage(pageNumber) {
     if (next) next.previousPage = prev;
     page.parent.childPages.splice(page.siblingNumber - 1, 1);
     page.parent.preSave();
+}
+
+functions.removeSkippedPages = function removeSkippedPages() {
+    let newPages = pages.filter(function(page) {return page != "skipped"});
+    let i = 0;
+    while (i < newPages.length) newPages[i].setPageNumber(i++);
+    pages.splice(0, pages.length, ...newPages);
+    functions.saveAll();
+}
+
+functions.saveAll = function saveAll() {
+    for (let page of pages) page.preSave();
+}
+
+pageProto.setPageNumber = function setPageNumber(newPageNumber) {
+    this.pageNumber = newPageNumber;
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
