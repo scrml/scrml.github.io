@@ -11,7 +11,7 @@ onmessage = function onmessage(e) {
 
 function fetched(pageNumber, dataName, ...data) {postMessage(["fetched", pageNumber, dataName, ...data])}
 
-let functions = {}, pages = [], pageProto = {}, chapterProto = Object.create(pageProto), movingPage = false;
+let functions = {}, pages = [], pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false;
 
 functions.log = console.log;
 
@@ -60,8 +60,24 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
 
 function newChapter(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = chapterProto) {
     let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
-    returner.isChapter = true;
+    returner.pageType = "chapter";
     returner.childPages = [];
+    return returner;
+}
+
+function newStatement(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = statementProto) {
+    let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
+    returner.pageType = "statement";
+    return returner;
+}
+
+function newComment(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = commentProto) {
+    let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
+    returner.pageType = "comment";
+    returner.manager.setVarValue("tex", "");
+    returner.manager.linkProperty("tex", returner);
+    returner.manager.linkListener("tex", function(tex) {fetched(returner.pageNumber, "tex", tex)});
+    returner.manager.linkListener("tex", function() {returner.preSave()});
     return returner;
 }
 
@@ -105,9 +121,9 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
     }
 }
 
-functions.newChapter = function(parent, insertBefore, pageNumber, name, show) {
-    let chapter = newChapter(parent, insertBefore, pageNumber, name, show);
-}
+functions.newChapter = newChapter;
+functions.newStatement = newStatement;
+functions.newComment = newComment;
 
 functions.resetName = function resetName(pageNumber) {
     fetched(pageNumber, "name", pages[pageNumber].name);
@@ -180,9 +196,13 @@ functions.openDetails = function openDetails(pageNumber, open) {
     pages[pageNumber].openDetails(open);
 }
 
+functions.setTex = function setTex(pageNumber, tex) {
+    pages[pageNumber].manager.setVarValue("tex", tex);
+}
+
 functions.startMoveModeChecks = function startMoveModeChecks(pageNumber) {
     movingPage = pages[pageNumber];
-    for (let page of pages) if (page.isOpen && page.isChapter) postMessage(["canAcceptMove", page.pageNumber, page.canAcceptMove(pages[pageNumber])]);
+    for (let page of pages) if (page.isOpen && page.pageType == "chapter") postMessage(["canAcceptMove", page.pageNumber, page.canAcceptMove(pages[pageNumber])]);
 }
 
 functions.endMoveMode = function endMoveMode() {
@@ -218,6 +238,7 @@ functions.deletePage = function deletePage(pageNumber) {
 
 functions.removeSkippedPages = function removeSkippedPages() {
     let newPages = pages.filter(function(page) {return page != "skipped"});
+    if (newPages.length == pages.length) throw Error("should only call worker's removeSkippedPages if there are skipped pages to remove, did not find any");
     let i = 0;
     while (i < newPages.length) newPages[i].setPageNumber(i++);
     pages.splice(0, pages.length, ...newPages);
@@ -258,10 +279,6 @@ pageProto.openDetails = function openDetails(open) {
     if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
 }
 
-pageProto.saveToString = function saveToString() {
-    return this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
-}
-
 pageProto.preSave = function preSave() {pageTickets.saveTheseObject[this.pageNumber] = undefined}
 
 chapterProto.childPages = [];
@@ -280,15 +297,29 @@ chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber)
 }
 
 chapterProto.canAcceptMove = function canAcceptMove(page) {
-    if (page.isChapter && page.isAncestorOf(this)) return false;
+    if (page.pageType == "chapter" && page.isAncestorOf(this)) return false;
     for (let child of this.childPages) if (page != child && child.name == page.name) return false;
     return true;
 }
 
+pageProto.saveToString = function saveToString() {
+    return this.pageType + "\n" + this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
+}
+
 chapterProto.saveToString = function saveToString() {
-    let line = "chapter\n" + pageProto.saveToString.call(this) + "\n";
+    let line = pageProto.saveToString.call(this) + "\n";
     for (let child of this.childPages) line += child.pageNumber + " ";
     if (this.childPages.length > 0) line = line.substring(0, line.length - 1);
+    return line;
+}
+
+statementProto.saveToString = function saveToString() {
+    let line = pageProto.saveToString.call(this);
+    return line;
+}
+
+commentProto.saveToString = function saveToString() {
+    let line = pageProto.saveToString.call(this);
     return line;
 }
 
@@ -460,7 +491,15 @@ pageTickets.closeProcess = function closeProcess() {
 
 pageTickets.saveThese = function saveThese() {
     let returner = [];
-    for (let pageNumber in this.saveTheseObject) returner.push({pageNumber: pageNumber, line: pages[pageNumber] == "skipped"? "skipped": pages[pageNumber].saveToString()});
+    for (let pageNumber in this.saveTheseObject) {
+        let save = {pageNumber: pageNumber};
+        if (pages[pageNumber] == "skipped") save.line = "skipped";
+        else save.line = pages[pageNumber].saveToString();
+        if (pages[pageNumber].pageType == "comment") {
+            save.commentTex = pages[pageNumber].tex;
+        }
+        returner.push(save);
+    }
     this.saveTheseObject = {};
     return returner;
 }

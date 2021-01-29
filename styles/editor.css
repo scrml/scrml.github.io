@@ -10,7 +10,7 @@ body {
     overflow: hidden;
 }
 
-details.section, .chapter {
+details.section, .chapter, .statement, .comment {
     border: 3px inset rgb(210, 215, 239);
     border-radius: .4em;
     padding: .2em;
@@ -72,6 +72,14 @@ textarea {
     background: rgb(245, 240, 245);
 }
 
+.statement {
+    background: rgb(245, 245, 240);
+}
+
+.comment {
+    background: rgb(240, 245, 245);
+}
+
 #editor[pagenumbermode="siblingnumber"] .fullpagenumber, #editor[pagenumbermode="fullpagenumber"] .siblingnumber {
     display: none;
 }
@@ -88,16 +96,12 @@ textarea {
     visibility: hidden;
 }
 
-#editor[pageaction="newchaptermode"] .newstatementin, #editor[pageaction="newchaptermode"] .newcommentin, #editor[pageaction="newstatementmode"] .newchapterin, #editor[pageaction="newstatementmode"] .newcommentin, #editor[pageaction="newcommentmode"] .newchapterin, #editor[pageaction="newcommentmode"] .newstatementin {
-    display: none;
-}
-
 #pagetools {
     float: right;
     position: relative;
 }
 
-#editor[movemode] .chapter {
+#editor[movemode] .chapter, #editor[movemode] .statement, #editor[movemode] .comment {
     background: rgb(225, 220, 230);
     border: 3px inset rgb(170, 190, 180);
 }
@@ -107,7 +111,7 @@ textarea {
     border-style: outset;
 }
 
-#editor[movemode] .newstatementin, #editor[movemode] .newchapterin, #editor[movemode] .newcommentin {
+#editor[movemode] .newpagein {
     display: none;
 }
 
@@ -161,6 +165,18 @@ textarea {
 
 .chapter[canacceptmove="true"] > .pagegap .movehere, .chapter[canacceptmove="false"] > .pagegap .dontmovehere {
     display: block;
+}
+
+.comment[texin="true"] > .texout, .comment[texin="false"] > .texin {
+    display: none;
+}
+
+.texout {
+    min-height: 1em;
+    background: rgb(230, 245, 245);
+    border: 1px solid lightgray;
+    border-radius: .2em;
+    padding: .2em;
 }
 
 .radiogroup {

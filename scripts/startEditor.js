@@ -27,14 +27,19 @@ function nodeToString(node, indent = "", tab = "  ", newLine = "\r\n") {
     }
     return line;
 }
+
 // viewing modes
+let pageMode;
 {
     let pageNumberListener = function(e) {editor.setAttribute("pagenumbermode", e.target.getAttribute("id"))}
     for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
     let nameModeListener = function(e) {editor.setAttribute("namemode", e.target.getAttribute("id"))}
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) document.getElementById(nameMode).addEventListener("change", nameModeListener);
-    let pageActionListener = function(e) {editor.setAttribute("pageaction", e.target.getAttribute("id"))}
-    for (let pageAction of ["newchaptermode", "newstatementmode", "newcommentmode"]) document.getElementById(pageAction).addEventListener("change", pageActionListener);
+    for (let pageAction of ["chapter", "statement", "comment"]) document.getElementById("new"+pageAction+"mode").addEventListener("change", function() {
+        editor.setAttribute("pageaction", "new"+pageAction+"mode");
+        pageMode = pageAction;
+        for (let gap of document.querySelectorAll(".newpagein")) gap.setAttribute("placeholder", "new " + pageAction);
+    });
 }
 
 // variables used in this script
@@ -46,10 +51,35 @@ function getPage(pageNumber) {
     return pages[pageNumber];
 }
 
+let timerProto = {};
+
+timerProto.restart = function restart() {
+    window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(this.callback, this.timeout);
+}
+
+function newTimer(callback, timeout) {
+    let returner = Object.create(timerProto);
+    returner.callback = callback;
+    returner.timeout = timeout;
+    return returner;
+}
+
 function start() {
-    // set up loading screen
-    workerFunctions.setLoadingScreen = gui.setLoadingScreen;
-    workerFunctions.closeLoadingScreen = gui.closeLoadingScreen;
+    // set up loading screen/inactivity timer
+    let activityTimer = newTimer(removeSkippedPages, 10000);
+    
+    workerFunctions.setLoadingScreen = function() {
+        gui.setLoadingScreen();
+    }
+    
+    workerFunctions.closeLoadingScreen = function() {
+        gui.closeLoadingScreen();
+        activityTimer.restart();
+    }
+    // import MathJax
+    //gui.element("script", document.head, ["src", "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML", "defer", ""]);
+    gui.element("script", document.head, ["type", "text/javascript", "id", "MathJax-script", "src", "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"]);
     
     editor.appendChild(testDiv);
     makePageTools();
@@ -57,7 +87,10 @@ function start() {
     // first set the modes to agree with what buttons are pressed, in case the button presses were cached by the browser
     for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
-    for (let pageAction of ["newchaptermode", "newstatementmode", "newcommentmode"]) if (document.getElementById(pageAction).checked) editor.setAttribute("pageaction", pageAction);
+    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
+        editor.setAttribute("pageaction", "new"+pageAction+"mode");
+        pageMode = pageAction;
+    }
     
     // start worker
     worker = new Worker("../scripts/worker.js");
@@ -74,7 +107,12 @@ function loadPages() {
     post("openPageProcess");
     doSmoothly = false;
     let page = 0, line;
-    while (line = Storage.getItem(page)) loadPage(page++);
+    let codeout = document.getElementById("codeout");
+    codeout.innerHTML = "<hr>";
+    while (line = Storage.getItem(page)) {
+        codeout.innerHTML += line + "<hr>";
+        loadPage(page++);
+    }
     for (let info of pageLoadingInformation) if (info) post("move", info.page, info.parent);
     /*function doIt(pageNumber) {
         //console.log("doing " + pageNumber);
@@ -99,9 +137,6 @@ function loadPage(pageNumber) {
     switch (lines[0]) {
         case "chapter":
             if (pageNumber != newChapter(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
-            post("setNickname", pageNumber, lines[2]);
-            let open = lines[3];
-            if (open == "o") getPage(pageNumber).div.setAttribute("open", "");
             if (lines[4].length > 0) {
                 let preChildren = lines[4].split(" "), children = [];
                 for (let child of preChildren) if (child != "") children.push(child);
@@ -112,11 +147,14 @@ function loadPage(pageNumber) {
                 });
             }
         break; case "statement":
-            
+            if (pageNumber != newStatement(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
         break; case "comment":
-            
+            if (pageNumber != newComment(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
+            post("setTex", pageNumber, Storage.getItem("tex " + pageNumber));
         break; default: throw Error("do not recognize page type " + lines[0]);
     }
+    post("setNickname", pageNumber, lines[2]);
+    if (lines[3] == "o") getPage(pageNumber).div.setAttribute("open", "");
 }
 function post(functionName, ...args) {
     worker.postMessage([functionName, ...args]);
@@ -144,7 +182,7 @@ function newPage(pageNumber) {
     gui.absorbClicks(page.nicknameSpan);
     page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
     page.fullNameText = gui.text("", page.fullNameSpan);
-    page.pageNumberOut = gui.text(pageNumber, page.pageHead);
+    //page.pageNumberOut = gui.text(pageNumber, page.pageHead);
 }
 
 function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
@@ -159,18 +197,40 @@ function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
     return pageNumber;
 }
 
+function newStatement(parentNumber = null, insertBefore = null, name = "Book") {
+    let pageNumber = pages.length;
+    newPage(pageNumber);
+    let page = getPage(pageNumber);
+    page.name = name;
+    page.pageType = "statement";
+    page.div.setAttribute("class", "statement");
+    post("newStatement", parentNumber, insertBefore, pageNumber, name);
+    return pageNumber;
+}
+
+function newComment(parentNumber = null, insertBefore = null, name = "Book") {
+    let pageNumber = pages.length;
+    newPage(pageNumber);
+    let page = getPage(pageNumber);
+    page.name = name;
+    page.pageType = "comment";
+    page.div.setAttribute("class", "comment");
+    page.div.setAttribute("texin", "false");
+    post("newComment", parentNumber, insertBefore, pageNumber, name);
+    page.texIn = gui.element("textarea", page.div, ["class", "texin"]);
+    page.texIn.addEventListener("blur", texOutFromEvent);
+    page.texIn.addEventListener("keypress", shiftEnterTexHandler);
+    page.texOut = gui.element("p", page.div, ["class", "texout"]);
+    page.texOut.addEventListener("click", texInFromEvent);
+    return pageNumber;
+}
+
 function newPageGap(page, insertBefore = null) {
     let returner = gui.element("div", page? page.div: null, ["class", "pagegap"], insertBefore? insertBefore.div: null);
     returner.addEventListener("focusin", pageGapFocus);
-    let newChapterIn = gui.element("input", returner, ["class", "newchapterin", "placeholder", "new chapter", "disguise", ""]);
-    newChapterIn.addEventListener("blur", clearPageGap);
-    newChapterIn.addEventListener("change", newChapterInChanged);
-    let newStatementIn = gui.element("input", returner, ["class", "newstatementin", "placeholder", "new statement", "disguise", ""]);
-    newStatementIn.addEventListener("blur", clearPageGap);
-    newStatementIn.addEventListener("change", newStatementInChanged);
-    let newCommentIn = gui.element("input", returner, ["class", "newcommentin", "placeholder", "new comment", "disguise", ""]);
-    newCommentIn.addEventListener("blur", clearPageGap);
-    newCommentIn.addEventListener("change", newCommentInChanged);
+    let newPageIn = gui.element("input", returner, ["class", "newpagein", "placeholder", "new "+pageMode, "disguise", ""]);
+    newPageIn.addEventListener("blur", clearPageGap);
+    newPageIn.addEventListener("change", newPageInChanged);
     gui.text("❌", gui.element("button", returner, ["class", "dontmovehere", "disabled", ""]));
     let moveHereButton = gui.element("button", returner, ["class", "movehere"]);
     gui.text("⇦", moveHereButton);
@@ -190,7 +250,7 @@ function pageGapFocus(event) {
 
 function clearPageGap(event) {
     let gap = getPageGapFromEvent(event);
-    for (let child of gap.querySelectorAll(".newChapterIn, .newStatementIn")) {
+    for (let child of gap.querySelectorAll(".newpagein")) {
         child.blur();
         child.value = "";
     }
@@ -206,19 +266,11 @@ function getGapNextPageNumber(gap) {
     else return null;
 }
 
-function newChapterInChanged(event) {
-    let gap = getPageGapFromEvent(event), newChapterIn = gap.querySelector(".newchapterin"), line = newChapterIn.value;
-    if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newChapterIn, "invalid nodeName");
+function newPageInChanged(event) {
+    let gap = getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
+    if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newPageIn, "invalid nodeName");
     clearPageGap({target: gap});
     post("newPageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
-}
-
-function newStatementInChanged(event) {
-    console.log("not ready yet");
-}
-
-function newCommentInChanged(event) {
-    console.log("not ready yet");
 }
 
 workerFunctions.pseudoPost = post;
@@ -303,6 +355,13 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                 deleteBundleReset();
                 deleteBundleReset = data[0]? gui.disable(pageTools.deleteBundle.deleteLaunch): emptyFunction;
             }
+        break; /*set comment's tex*/ case "tex": // data is [tex]
+            page.texIn.value = data[0];
+            //page.texOut.innerHTML = texAttToInnerHTML(data[0]);
+            typeset(function() {
+                page.texOut.innerHTML = texAttToInnerHTML(data[0]);
+                return [page.texOut];
+            });
         break; default: console.log("do not recognize fetched type " + dataName);
     }
 }
@@ -317,16 +376,21 @@ workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
 
 workerFunctions.newPageNameCheck = function newPageNameCheck(parentNumber, line, result) {
     if (parentNumber != focusedPageGap.parentElement.getAttribute("pagenumber")) throw Error("mismatch in parent during check for new page");
-    let newChapterIn = focusedPageGap.querySelector(".newchapterin");
+    let newPageIn = focusedPageGap.querySelector(".newpagein");
     if (result) {
-        let pageNumber = newChapter(parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
+        let constructors = {
+            chapter: newChapter,
+            statement: newStatement,
+            comment: newComment
+        };
+        let pageNumber = constructors[pageMode](parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
         getPage(pageNumber).div.setAttribute("open", "");
         post("openDetails", pageNumber, true);
-        newChapterIn.value = "";
-        newChapterIn.blur();
+        newPageIn.value = "";
+        newPageIn.blur();
     } else {
-        newChapterIn.value = line;
-        gui.inputOutput.inputText(newChapterIn, "naming conflict");
+        newPageIn.value = line;
+        gui.inputOutput.inputText(newPageIn, "naming conflict");
     }
 }
 
@@ -335,7 +399,10 @@ workerFunctions.smoothMode = function smoothMode(smoothMode) {
 }
 
 workerFunctions.save = function save(saves) {
-    for (let save of saves) Storage.setItem(save.pageNumber, save.line);
+    for (let save of saves) {
+        Storage.setItem(save.pageNumber, save.line);
+        if ("commentTex" in save) Storage.setItem("tex " + save.pageNumber, save.commentTex); 
+    }
 }
 
 workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
@@ -383,24 +450,44 @@ function openDetails(pageNumber, open = getPage(pageNumber).div.hasAttribute("op
     post("openDetails", pageNumber, open);
 }
 
+function texOutFromEvent(e) {texOut(getPageNumberFromEvent(e))}
+function texOut(pageNumber) {
+    let page = getPage(pageNumber);
+    page.div.setAttribute("texin", "false");
+    post("setTex", pageNumber, page.texIn.value);
+}
+function shiftEnterTexHandler(e) {if (e.key == "Enter" && e.shiftKey) texOutFromEvent(e)}
+function texInFromEvent(e) {texIn(getPageNumberFromEvent(e))}
+function texIn(pageNumber) {
+    let page = getPage(pageNumber);
+    page.div.setAttribute("texin", "true");
+    page.texIn.focus();
+}
+
 function deletePage(page) {
     page.div.parentElement.removeChild(page.div.nextElementSibling);
     page.div.parentElement.removeChild(page.div);
     pages[page.pageNumber] = "skipped";
     Storage.setItem(page.pageNumber, "skipped");
+    Storage.removeItem("tex " + page.pageNumber);
     post("deletePage", page.pageNumber);
 }
 
 function removeSkippedPages() {
     let newPages = pages.filter(function(page) {return page != "skipped"});
+    if (newPages.length == pages.length) return;
     let i = 0;
     while (i < newPages.length) {
         newPages[i].pageNumber = i;
         newPages[i].div.setAttribute("pagenumber", i);
-        newPages[i].pageNumberOut.nodeValue = i;
+        //newPages[i].pageNumberOut.nodeValue = i;
         ++i;
     }
-    while (i < pages.length) Storage.removeItem(i++);
+    while (i < pages.length) {
+        Storage.removeItem(i);
+        Storage.removeItem("tex " + i);
+        ++i;
+    }
     post("removeSkippedPages");
 }
 
@@ -486,4 +573,29 @@ Storage.moveItem = function moveItem(oldName, newName) {
 
 Storage.deleteAll = function deleteAll() {
     window.localStorage.clear();
+}
+
+//MathJax section
+// configuration
+var MathJax = {
+    tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+    }
+}
+
+//function refreshMathJax() {try {MathJax.Hub.Queue(["Typeset", MathJax.Hub])} catch (e) {}}
+function typeset(code) {
+    try {
+        MathJax.startup.promise = MathJax.startup.promise
+            .then(() => MathJax.typesetPromise(code()))
+            .catch((err) => console.log('Typeset failed: ' + err.message));
+        return MathJax.startup.promise;
+    } catch (e) {
+        code();
+    }
+}
+
+// processing of TeX in a node attribute to make it ready to display as the innerHTML of something
+function texAttToInnerHTML(line) {
+    return line.replaceAll(/\n/g, "<br>");
 }
