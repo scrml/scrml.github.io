@@ -9,6 +9,8 @@ document.getElementById("debugbutton").addEventListener("click", function() {
     removeSkippedPages();
 });
 
+let duration = .3, newPageHeight, doSmoothly = true;
+
 function nodeToString(node, indent = "", tab = "  ", newLine = "\r\n") {
     if (node.nodeType == 3) return node.nodeValue;
     if (node.nodeType == 9) return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + nodeToString(node.firstChild, indent, tab, newLine);
@@ -274,8 +276,6 @@ function newPageInChanged(event) {
 }
 
 workerFunctions.pseudoPost = post;
-
-let duration = .3, newPageHeight, doSmoothly = true;
 
 workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
     let page = getPage(pageNumber);
