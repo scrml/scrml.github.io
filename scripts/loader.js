@@ -1,4 +1,3 @@
-//git stuff elena
 //var loaderLog = emptyFunction;
 var loaderLog = console.log;
 
