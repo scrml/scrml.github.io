@@ -5,13 +5,20 @@
         <title>SCRML</title>
         <link rel="stylesheet" type="text/css" href="styles/main.css"/>
         <script>
+            // for script loading from startJS
             let filePrefix = "";
-            // scripts which will be loaded
-            let scripts = {
-                PageSetup: "scripts/pageSetup.js",
+            let scriptLocations = {
+                generalFunctions: "scripts/generalFunctions.js",
                 gui: "scripts/gui.js",
-                drawBanner: "graphics/drawBanner.js"
-            };
+                drawBanner: "graphics/drawBanner.js",
+                PageSetup: "scripts/pageSetup.js"
+            }
+            let scripts = {
+                generalFunctions: [],
+                gui: ["generalFunctions"],
+                drawBanner: ["generalFunctions"],
+                PageSetup: ["drawBanner"]
+            }
         </script>
         <script src="scripts/startJS.js"></script>
     </head>

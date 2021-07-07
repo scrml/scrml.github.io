@@ -1,6 +1,11 @@
 // load required scripts
-ScriptManager.openScript(filePrefix + "scripts/gui.js", "gui");
-Scripts.gui.script.addEventListener("managed", start);
+scriptLoader.addItem("gui", {js: {generalFunctions: undefined}}, {js: filePrefix+"scripts/gui.js"});
+scriptLoader.addEphemeralListener(function() {
+    scriptLoader.items.gui.addEphemeralListener("js", function() {
+        //gui.ensureAllModules(start)
+        gui.ensureModule("animations");
+    });
+});
 
 // DOM elements
 let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode");
@@ -68,6 +73,8 @@ function newTimer(callback, timeout) {
 }
 
 function start() {
+    console.log("starting");
+    if (1>0) return;
     // set up loading screen/inactivity timer
     let activityTimer = newTimer(removeSkippedPages, 10000);
     

@@ -6,12 +6,20 @@
         <link rel="stylesheet" type="text/css" href="../styles/main.css"/>
         <link rel="stylesheet" type="text/css" href="../styles/editor.css"/>
         <script>
-            filePrefix = "../";
-            // scripts which will be loaded
-            let scripts = {
+            // for script loading from startJS
+            let filePrefix = "../";
+            let scriptLocations = {
+                generalFunctions: "scripts/generalFunctions.js",
                 storage: "scripts/storage.js",
+                varManager: "scripts/varManager.js",
                 startEditor: "scripts/startEditor.js"
-            };
+            }
+            let scripts = {
+                generalFunctions: [],
+                storage: [],
+                varManager: [],
+                startEditor: ["generalFunctions", "storage"]
+            }
         </script>
         <script src="../scripts/startJS.js"></script>
     </head>

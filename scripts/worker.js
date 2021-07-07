@@ -238,6 +238,7 @@ functions.deletePage = function deletePage(pageNumber) {
 
 functions.removeSkippedPages = function removeSkippedPages() {
     let newPages = pages.filter(function(page) {return page != "skipped"});
+    // check this part interval? after deleting page it throws this error
     if (newPages.length == pages.length) throw Error("should only call worker's removeSkippedPages if there are skipped pages to remove, did not find any");
     let i = 0;
     while (i < newPages.length) newPages[i].setPageNumber(i++);
