@@ -3,7 +3,7 @@ var scriptLoader;
 {
     let loaderScript = document.createElement("script");
     loaderScript.setAttribute("src", filePrefix + "scripts/loader.js");
-    loaderScript.onload = function() {
+    loaderScript.addEventListener("load", function() {
         scriptLoader = Loader.newLoader();
         Loader.tiers.js(scriptLoader);
         
@@ -18,7 +18,7 @@ var scriptLoader;
             scriptLoader.addItem(name, dependencies, {js: filePrefix+scriptLocations[name]});
         }
         for (let script in scripts) addScript(script);
-    };
+    });
     document.head.appendChild(loaderScript);
 }
 
