@@ -21,7 +21,14 @@ gui.blockTheseEvents = {
 }
 
 gui.blockEvents = function blockEvents(element, events = gui.blockTheseEvents) {
-    for (let type in events) element.addEventListener(type, gui.eventAbsorber, true);
+    let unblocks = [];
+    for (let type in events) {
+        element.addEventListener(type, gui.eventAbsorber, true);
+        unblocks.push(type);
+    }
+    return function unblockEvents() {
+        for (let type of unblocks) element.removeEventListener(type, gui.eventAbsorber, true);
+    }
 }
 
 gui.disablerStylesToCopy = {

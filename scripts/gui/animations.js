@@ -10,7 +10,7 @@ gui.moduleDependency("animations", ["textWidth"], function() {
         onEnd: emptyFunction,
         doSmoothly: true
     }
-    gui.defaultOptions.smoothSwap = {
+    gui.defaultOptions.smoothMove = {
         duration: .5,
         onEnd: emptyFunction,
         doSmoothly: true
@@ -20,7 +20,7 @@ gui.moduleDependency("animations", ["textWidth"], function() {
 gui.smoothErase = function smoothErase(element, options = {}) {
     let option = optionFetcher(gui.defaultOptions.smoothErase, options);
     if (!option("doSmoothly")) {
-        element.parentElement.removeChild(element);
+        gui.orphan(element);
         option("onEnd")();
         return;
     }
@@ -40,7 +40,7 @@ gui.smoothErase = function smoothErase(element, options = {}) {
     window.setTimeout(function() {
         div.parentElement.removeChild(div);
         document.head.removeChild(style);
-        option(defaultOptions, "onEnd")();
+        option("onEnd")();
     }, duration*1000);
 }
 
@@ -76,8 +76,8 @@ gui.smoothElement = function smoothElement(type, loadHere, atts, insertBefore, o
     return returner;
 }
 
-gui.smoothSwap = function smoothSwap(element, placeBefore, options = {}) {
-    let option = optionFetcher(gui.defaultOptions.smoothSwap);
+gui.smoothMove = function smoothMove(element, placeBefore, options = {}) {
+    let option = optionFetcher(gui.defaultOptions.smoothMove, options);
     if (!option("doSmoothly")) {
         placeBefore.parentElement.insertBefore(element, placeBefore);
         option("onEnd")();
@@ -95,9 +95,9 @@ gui.smoothSwap = function smoothSwap(element, placeBefore, options = {}) {
         y2 = placeBeforeBox.y,
         oldParent = element.parentElement,
         newParent = placeBefore.parentElement,
-        shrink = "smoothSwapShrink" + width + "x" + height,
-        move = "smoothSwapMove" + width + "x" + height,
-        grow = "smoothSwapGrow" + width + "x" + height,
+        shrink = "smoothMoveShrink" + width + "x" + height,
+        move = "smoothMoveMove" + width + "x" + height,
+        grow = "smoothMoveGrow" + width + "x" + height,
         duration = option("duration");
     let style = gui.element("style", document.head);
     style.innerHTML = "@keyframes "+shrink+" {0% {width: "+width+"px; height: "+height+"px} 100% {width: 0px; height: 0px}}"

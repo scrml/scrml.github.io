@@ -1,30 +1,40 @@
-gui.moduleDependency("loadingScreen", ["disabler"], function() {
-    gui.absorbClicks(gui.loadingScreenParts.div1);
-});
+loadCSS("styles/gui/loadingScreen.css");
 
+gui.moduleDependency("loadingScreen", ["disabler"]);
 
-gui.loadingScreenParts = {
-    div1: gui.element("div", document.body, ["id", "loadingScreen", "hide", "", "temporarilyInvisible", ""]),
-    isLoad: false
-}
-gui.loadingScreenParts.div2 = gui.element("div", gui.loadingScreenParts.div1);
-gui.loadingScreenParts.icon = gui.element("div", gui.loadingScreenParts.div2, ["id", "loadingIcon"]);
-gui.loadingScreenParts.msgSpan = gui.element("p", gui.loadingScreenParts.div2);
-gui.loadingScreenParts.msgText = gui.text("loading screen is hidden", gui.loadingScreenParts.msgSpan);
-gui.text("Loading...", gui.element("p", gui.loadingScreenParts.div2));
+gui.loadingScreenProto = {};
 
-gui.setLoadingScreen = function setLoadingScreen(message = "") {
-    gui.loadingScreenParts.msgText.nodeValue = message;
-    if (!gui.loadingScreenParts.isLoad) {
-        gui.loadingScreenParts.isLoad = true;
-        gui.loadingScreenParts.div1.removeAttribute("hide");
-        gui.suppressKeys();
+gui.loadingScreenProto.openLoadingScreen = function openLoadingScreen(message = "") {
+    this.msgText.nodeValue = message;
+    if (!this.isOpen) {
+        this.isOpen = true;
+        this.screen.removeAttribute("hide");
+        this.screen.setAttribute("temporarilyinvisible", "");
+        this.unblock = gui.blockEvents(this.div);
     }
 }
 
-gui.closeLoadingScreen = function closeLoadingScreen() {
-    gui.loadingScreenParts.isLoad = false;
-    gui.loadingScreenParts.div1.setAttribute("hide", "");
-    gui.releaseKeySuppression();
-    gui.loadingScreenParts.msgText.nodeValue = "loading screen is hidden";
+gui.loadingScreenProto.closeLoadingScreen = function closeLoadingScreen() {
+    this.msgText.nodeValue = "loading screen is hidden";
+    this.isOpen = false;
+    this.screen.setAttribute("hide", "");
+    this.screen.removeAttribute("temporarilyinvisible");
+    this.unblock();
+    this.unblock = emptyFunction;
+}
+
+gui.loadingScreen = function loadingScreen(coverMe = document.body, insertAbove = coverMe !== document.body) {
+    let returner = Object.create(gui.loadingScreenProto);
+    returner.div = gui.element("div", null, ["class", "loadingscreencover"]);
+    if (insertAbove) gui.insertAbove(coverMe, returner.div);
+    else gui.insertBeneath(coverMe, returner.div);
+    returner.screen = gui.element("div", returner.div, ["class", "loadingscreen", "hide", ""], returner.div.firstChild);
+    returner.screenContents = gui.element("div", returner.screen);
+    returner.isOpen = false;
+    returner.unblock = emptyFunction;
+    returner.icon = gui.element("div", returner.screenContents, ["class", "loadingicon"]);
+    gui.text("Loading...", gui.element("p", returner.screenContents));
+    returner.msgSpan = gui.element("p", returner.screenContents);
+    returner.msgText = gui.text("loading screen is hidden", returner.msgSpan);
+    return returner;
 }

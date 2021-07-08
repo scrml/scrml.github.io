@@ -1,5 +1,7 @@
 // load required scripts
-scriptLoader.addItem("gui", {js: {generalFunctions: undefined}}, {js: filePrefix+"scripts/gui.js"});
+scriptLoader.ensureJS("gui", ["generalFunctions"]);
+scriptLoader.ensureJS("xml", ["gui"]);
+scriptLoader.ensureJS("jax");
 scriptLoader.addEphemeralListener(function() {
     scriptLoader.items.gui.addEphemeralListener("js", function() {
         gui.ensureAllModules(start);
@@ -7,35 +9,22 @@ scriptLoader.addEphemeralListener(function() {
 });
 
 // DOM elements
-let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode");
-//document.getElementById("debugbutton").setAttribute("hide", "");
-document.getElementById("debugbutton").addEventListener("click", function() {
-    removeSkippedPages();
-});
+let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
 
-let duration = .3, newPageHeight, doSmoothly = true;
-
-function nodeToString(node, indent = "", tab = "  ", newLine = "\r\n") {
-    if (node.nodeType == 3) return node.nodeValue;
-    if (node.nodeType == 9) return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + nodeToString(node.firstChild, indent, tab, newLine);
-    let line = newLine;
-    line += indent+"<"+node.nodeName;
-    for (let i = 0; i < node.attributes.length; ++i) line += " "+node.attributes[i].name+"=\""+node.attributes[i].value+"\"";
-    line += node.childNodes.length == 0? "/>": ">";
-    if (node.childNodes.length > 0) {
-        let isText = node.childNodes.length == 1;
-        if (isText) isText = node.firstChild.nodeType == 3;
-        if (isText) line += node.firstChild.nodeValue + "</"+node.nodeName+">";
-        else {
-            for (let i = 0; i < node.childNodes.length; ++i) line += nodeToString(node.childNodes[i], indent + tab, tab, newLine);
-            line += newLine+indent+"</"+node.nodeName+">";
-        }
-    }
-    return line;
+function setDebugAction(action) {
+    debugButton.setAttribute("title", action.toString());
+    debugButton.onclick = action;
 }
 
-// viewing modes
-let pageMode;
+setDebugAction(function() {
+    localStorage.clear();
+    window.location.reload();
+});
+
+// configuration parameters
+let doSmoothly, smoothDuration = .3, newPageHeight, pageMode;
+
+// page display mode section
 {
     let pageNumberListener = function(e) {editor.setAttribute("pagenumbermode", e.target.getAttribute("id"))}
     for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
@@ -48,49 +37,36 @@ let pageMode;
     });
 }
 
-// variables used in this script
-let root, pageTools, pages = [], worker,  workerFunctions = {log: console.log}, focusedPageGap, lockedPageFocus = false;
+// editor parts
+let root, pageTools, pages = [], worker,  workerFunctions = {log: console.log}, focusedPageGap, lockedPageFocus = false, loadingScreen;
 
-// check for page then fetch
+// check for page then fetch, use this to access pages instead of directly getting them from pages array
 function getPage(pageNumber) {
     if (!pages[pageNumber]) throw Error("cannot find page " + pageNumber);
     return pages[pageNumber];
 }
 
-let timerProto = {};
-
-timerProto.restart = function restart() {
-    window.clearTimeout(this.timer);
-    this.timer = window.setTimeout(this.callback, this.timeout);
-}
-
-function newTimer(callback, timeout) {
-    let returner = Object.create(timerProto);
-    returner.callback = callback;
-    returner.timeout = timeout;
-    return returner;
-}
-
 function start() {
-    // set up loading screen/inactivity timer
-    let activityTimer = newTimer(removeSkippedPages, 10000);
+    // Loading screen setup: loading screen message is updated any time the worker does anything. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
     
-    workerFunctions.setLoadingScreen = function() {
-        gui.setLoadingScreen();
+    let activityTimer = newTimer(onInactivity, 3000);
+    
+    loadingScreen = gui.loadingScreen(editor);
+    
+    workerFunctions.setLoadingScreen = function(message) {
+        loadingScreen.openLoadingScreen(message);
+        activityTimer.restart();
     }
     
     workerFunctions.closeLoadingScreen = function() {
-        gui.closeLoadingScreen();
+        loadingScreen.closeLoadingScreen();
         activityTimer.restart();
     }
-    // import MathJax
-    //gui.element("script", document.head, ["src", "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML", "defer", ""]);
-    gui.element("script", document.head, ["type", "text/javascript", "id", "MathJax-script", "src", "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"]);
     
     editor.appendChild(testDiv);
     makePageTools();
     
-    // first set the modes to agree with what buttons are pressed, in case the button presses were cached by the browser
+    // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
     for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
     for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
@@ -99,13 +75,15 @@ function start() {
     }
     
     // start worker
-    worker = new Worker("../scripts/worker.js");
+    worker = new Worker(filePrefix+"scripts/worker.js");
+    
+    // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
         workerFunctions[e.data.shift()](...e.data);
     }
     
-    // make root chapter / saved pages
-    if (!Storage.getItem("0")) Storage.setItem("0", "chapter\nBook\n\no\n");
+    // make root chapter/saved pages
+    if (!storage.fetch("0")) storage.store("0", "chapter\nBook\n\no\n");
     loadPages();
 }
 
@@ -115,7 +93,7 @@ function loadPages() {
     let page = 0, line;
     let codeout = document.getElementById("codeout");
     codeout.innerHTML = "<hr>";
-    while (line = Storage.getItem(page)) {
+    while (line = storage.fetch(page)) {
         codeout.innerHTML += line + "<hr>";
         loadPage(page++);
     }
@@ -135,8 +113,9 @@ let printSaves = false;
 if (printSaves) document.getElementById("codeout").innerHTML = "<hr>";
 
 function loadPage(pageNumber) {
+    doSmoothly = false;
     if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
-    let line = Storage.getItem(pageNumber);
+    let line = storage.fetch(pageNumber);
     if (printSaves) document.getElementById("codeout").innerHTML += (line == "skipped"? pageNumber + " skipped": line) + "<hr>";
     if (line == "skipped") return skipPageSpot();
     let lines = line.split("\n");
@@ -156,7 +135,7 @@ function loadPage(pageNumber) {
             if (pageNumber != newStatement(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
         break; case "comment":
             if (pageNumber != newComment(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
-            post("setTex", pageNumber, Storage.getItem("tex " + pageNumber));
+            post("setTex", pageNumber, storage.fetch("tex " + pageNumber));
         break; default: throw Error("do not recognize page type " + lines[0]);
     }
     post("setNickname", pageNumber, lines[2]);
@@ -297,12 +276,12 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                     let gapSpot, pageSpot, newGap = newPageGap();
                     if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
                         // moving down
-                        gui.smoothErase(page.div.previousElementSibling, {duration: duration, doSmoothly: doSmoothly});
+                        gui.smoothErase(page.div.previousElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
                         gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
                         pageSpot = gui.element("div", newParent.div, [], gapSpot);
                     } else {
                         // moving up
-                        gui.smoothErase(page.div.nextElementSibling, {duration: duration, doSmoothly: doSmoothly});
+                        gui.smoothErase(page.div.nextElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
                         pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
                         gapSpot = gui.element("div", newParent.div, [], pageSpot);
                     }
@@ -310,13 +289,13 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                         onEnd: function() {newParent.div.removeChild(gapSpot)},
                         width: templateGapBBox.width,
                         height: templateGapBBox.height,
-                        duration: duration,
+                        duration: smoothDuration,
                         doSmoothly: doSmoothly
                     });
-                    gui.smoothSwap(page.div, pageSpot, {
+                    gui.smoothMove(page.div, pageSpot, {
                         onEnd: function() {newParent.div.removeChild(pageSpot)},
                         width: templateGapBBox.width,
-                        duration: duration,
+                        duration: smoothDuration,
                         doSmoothly: doSmoothly
                     });
                 } else {
@@ -326,14 +305,14 @@ workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
                         onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
                         width: templateGapBBox.width,
                         height: newPageHeight,
-                        duration: duration,
+                        duration: smoothDuration,
                         doSmoothly: doSmoothly
                     });
                     gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
                         onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
                         width: templateGapBBox.width,
                         height: templateGapBBox.height,
-                        duration: duration,
+                        duration: smoothDuration,
                         doSmoothly: doSmoothly
                     });
                 }
@@ -404,8 +383,8 @@ workerFunctions.smoothMode = function smoothMode(smoothMode) {
 
 workerFunctions.save = function save(saves) {
     for (let save of saves) {
-        Storage.setItem(save.pageNumber, save.line);
-        if ("commentTex" in save) Storage.setItem("tex " + save.pageNumber, save.commentTex); 
+        storage.store(save.pageNumber, save.line);
+        if ("commentTex" in save) storage.store("tex " + save.pageNumber, save.commentTex); 
     }
 }
 
@@ -472,9 +451,13 @@ function deletePage(page) {
     page.div.parentElement.removeChild(page.div.nextElementSibling);
     page.div.parentElement.removeChild(page.div);
     pages[page.pageNumber] = "skipped";
-    Storage.setItem(page.pageNumber, "skipped");
-    Storage.removeItem("tex " + page.pageNumber);
+    storage.store(page.pageNumber, "skipped");
+    storage.erase("tex " + page.pageNumber);
     post("deletePage", page.pageNumber);
+}
+
+function onInactivity() {
+    removeSkippedPages();
 }
 
 function removeSkippedPages() {
@@ -488,8 +471,8 @@ function removeSkippedPages() {
         ++i;
     }
     while (i < pages.length) {
-        Storage.removeItem(i);
-        Storage.removeItem("tex " + i);
+        storage.erase(i);
+        storage.erase("tex " + i);
         ++i;
     }
     post("removeSkippedPages");
@@ -534,69 +517,6 @@ function doMove(e) {
 function skipPageSpot() {
     pages.push("skipped");
     post("skipPageSpot");
-}
-
-let Storage = {};
-
-Storage.alert = function() {
-    document.body.innerHTML = "<p>Error: Window localStorage is unavailable, please make it available to use this editor.</p><p>This will likely involve some settings in your browser.</p>";
-}
-
-Storage.setItem = function setItem(name, value) {
-    if ((typeof name == "undefined") || (typeof value == "undefined")) throw Error("saving an undefined");
-    try {
-        return window.localStorage.setItem(name, value);
-    } catch (e) {
-        Storage.alert();
-    }
-}
-
-Storage.getItem = function getItem(name) {
-    if (typeof name == "undefined") throw Error("getting an undefined");
-    try {
-        return window.localStorage.getItem(name);
-    } catch (e) {
-        Storage.alert();
-    }
-}
-
-Storage.removeItem = function removeItem(name) {
-    if (typeof name == "undefined") throw Error("removing an undefined");
-    try {
-        return window.localStorage.removeItem(name);
-    } catch (e) {
-        Storage.alert();
-    }
-}
-
-Storage.moveItem = function moveItem(oldName, newName) {
-    if (oldName == newName) return;
-    Storage.setItem(newName, Storage.getItem(oldName));
-    Storage.removeItem(oldName);
-}
-
-Storage.deleteAll = function deleteAll() {
-    window.localStorage.clear();
-}
-
-//MathJax section
-// configuration
-var MathJax = {
-    tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']]
-    }
-}
-
-//function refreshMathJax() {try {MathJax.Hub.Queue(["Typeset", MathJax.Hub])} catch (e) {}}
-function typeset(code) {
-    try {
-        MathJax.startup.promise = MathJax.startup.promise
-            .then(() => MathJax.typesetPromise(code()))
-            .catch((err) => console.log('Typeset failed: ' + err.message));
-        return MathJax.startup.promise;
-    } catch (e) {
-        code();
-    }
 }
 
 // processing of TeX in a node attribute to make it ready to display as the innerHTML of something

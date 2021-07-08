@@ -13,7 +13,7 @@ storage.fetch = function fetch(name) {
 storage.store = function store(name, value) {
     if (storage.deactivated) return;
     storage.logAction("storing " + name);
-    storage.logAction(console.log(value));
+    storage.logAction(value);
     try {
         window.localStorage.setItem(name, value);
     } catch (e) {}

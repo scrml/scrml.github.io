@@ -1,0 +1,51 @@
+.loadingscreen {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 100, 255, .4);
+    z-index: 10000;
+}
+
+.loadingicon {
+    width: 10em;
+    height: 10em;
+    border-radius: 10em;
+    border: 1em solid;
+    text-align: center;
+    animation: loadingIconAnimation;
+    animation-duration: 6s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+}
+
+@keyframes loadingIconAnimation {
+    0% {
+        transform: rotate(360deg);
+        border-top-color: rgb(0, 0, 0);
+        border-bottom-color: rgb(255, 255, 255);
+        border-right-color: rgb(0, 0, 255);
+        border-left-color: rgb(0, 0, 255);
+    }
+    50% {
+        border-top-color: rgb(255, 255, 0);
+        border-bottom-color: rgb(255, 0, 255);
+        border-right-color: rgb(255, 255, 255);
+        border-left-color: rgb(255, 255, 255);
+    }
+    100% {
+        transform: rotate(0deg);
+        border-top-color: rgb(0, 0, 0);
+        border-bottom-color: rgb(255, 255, 255);
+        border-right-color: rgb(0, 0, 255);
+        border-left-color: rgb(0, 0, 255);
+    }
+}
+
+.loadingscreen > * {
+    margin: auto;
+    text-align: center;
+}

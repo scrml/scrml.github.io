@@ -46,15 +46,40 @@ gui.textShell = function textShell(line, type, loadHere, atts, insertBefore) {
 }
 
 gui.orphan = function orphan(element) {
-    try {
-        element.parentNode.removeChild(element);
-    } catch (e) {}
+    if (element.parentElement) element.parentElement.removeChild(element);
 }
 
-gui.replace = function swap(oldElement, newElement) {
-    try {
-        oldElement.parentNode.replaceChild(newElement, oldElement);
-    } catch (e) {}
+gui.replace = function replace(newElement, oldElement) {
+    if (oldElement.parentNode) oldElement.parentNode.replaceChild(newElement, oldElement);
+    else gui.orphan(newElement);
+}
+
+gui.swap = function swap(a, b) {
+    let ap = a.parentElement, an = a.nextSibling, bp = b.parentElement, bn = b.nextSibling;
+    if (ap) ap.insertBefore(b, an); else gui.orphan(b);
+    if (bp) bp.insertBefore(a, bn); else gui.orphan(a);
+}
+
+gui.filicide = function filicide(element) {
+    while (element.firstChild) element.removeChild(element.firstChild);
+}
+
+gui.removeLayer = function removeLayer(element) {
+    if (!element.parentNode) return gui.filicide(element);
+    while (element.lastChild) element.parentNode.insertBefore(element.lastChild, element);
+    gui.orphan(element);
+}
+
+gui.insertBeneath = function insertBeneath(parent, layer) {
+    if (isAncestorOf(parent, layer)) gui.removeLayer(layer);
+    else if (isAncestorOf(layer, parent)) gui.removeLayer(parent);
+    while (parent.firstChild) layer.appendChild(parent.firstChild);
+    parent.appendChild(layer);
+}
+
+gui.insertAbove = function insertAbove(child, layer) {
+    gui.replace(layer, child);
+    layer.appendChild(child);
 }
 
 gui.ensureModule = function ensureModule(name, location = filePrefix+"scripts/gui/"+name+".js", dependencies = {}) {

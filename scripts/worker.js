@@ -486,7 +486,6 @@ pageTickets.closeProcess = function closeProcess() {
         this.items = {};
         postMessage(["save", this.saveThese()]);
         postMessage(["closeLoadingScreen"]);
-        postMessage(["smoothMode", true]);
     }
 }
 

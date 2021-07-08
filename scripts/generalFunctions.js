@@ -28,4 +28,18 @@ function optionFetcher(defaultOptions, options = {}) {
     }
 }
 
+let timerProto = {};
+
+timerProto.restart = function restart() {
+    window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(this.callback, this.timeout);
+}
+
+function newTimer(callback, timeout) {
+    let returner = Object.create(timerProto);
+    returner.callback = callback;
+    returner.timeout = timeout;
+    return returner;
+}
+
 function trueFunction() {return true}

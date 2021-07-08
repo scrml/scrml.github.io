@@ -250,13 +250,16 @@ Loader.tiers = {}
         if (item.isComplete.js || item.isProcessing.js || !item.isReady.js) throw Error("cannot process item " + item.name);
         item.isProcessing.js = true;
         let script = document.createElement("script");
-        script.setAttribute("defer", "");
-        script.setAttribute("async", "");
         script.setAttribute("src", item.data.js);
         document.head.appendChild(script);
         script.addEventListener("load", function() {item.loader.markComplete(item, item.loader.jsTier)});
     }
     Loader.tiers.js = function addJSTier(loader) {
         loader.jsTier = loader.newTier(tierName, processor);
+        loader.ensureJS = function ensureJS(name, dependencies = [], location = filePrefix+"scripts/"+name+".js") {
+            let d = {};
+            for (let x of dependencies) d[x] = undefined;
+            loader.addItem(name, {js: d}, {js: location});
+        }
     }
 }
