@@ -1,4 +1,4 @@
-let loaderLog = console.log;
+let loaderLog = emptyFunction;
 
 var Loader = {}
 

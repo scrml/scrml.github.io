@@ -1,6 +1,6 @@
 loadCSS("styles/gui.css");
 
-let guiLog = console.log;
+let guiLog = emptyFunction;
 
 var gui = {
     defaultOptions: {},
