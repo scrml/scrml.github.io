@@ -1,6 +1,4 @@
-gui.ensureModule("disabler");
-
-scriptLoader.items["gui/disabler"].addListener("js", function() {
+gui.moduleDependency("loadingScreen", ["disabler"], function() {
     gui.absorbClicks(gui.loadingScreenParts.div1);
 });
 

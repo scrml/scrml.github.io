@@ -1,6 +1,4 @@
-gui.ensureModules(["screens", "messages", "disabler", "textWidth"]);
-
-scriptLoader.items["gui/screens"].addListener("js", function() {
+gui.moduleDependency("inputs", ["screens", "messages", "disabler", "textWidth"], function() {
     gui.defaultOptions.screenedInput = {
         placeholder: "",
         onchange: emptyFunction,

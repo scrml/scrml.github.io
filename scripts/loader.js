@@ -1,5 +1,4 @@
-//var loaderLog = emptyFunction;
-var loaderLog = console.log;
+let loaderLog = console.log;
 
 var Loader = {}
 
@@ -16,11 +15,12 @@ Loader.newLoader = function newLoader(protoModel = Loader.protoModel) {
     returner.onTier = -1;
     returner.tiersByName = {};
     returner.items = {};
-    returner.listOfItemsToAdd = {};
     returner.listeners = [];
     returner.ephemeralListeners = [];
     returner.isComplete = true;
     returner.isHung = false;
+    returner.isMidProcess = false;
+    returner.cueExtraProcess = false;
     return returner;
 }
 
@@ -77,54 +77,36 @@ Loader.tierProto.markComplete = function markComplete() {
 Loader.itemProto = {}
 
 Loader.protoModel.addItem = function addItem(name, dependsOn = {}, data = {}, protoModel = Loader.itemProto) {
-    loaderLog("preadding " + name);
-    this.listOfItemsToAdd[name] = {
-        name: name,
-        dependsOn: dependsOn,
-        data: data,
-        protoModel: protoModel
-    }
-    if (this.onTier === -1) this.flushItemsList();
-    else loaderLog("on tier " + this.tiers[this.onTier].name);
-}
-
-Loader.protoModel.flushItemsList = function flushItemsList() {
-    loaderLog("flushing");
-    for (let name in this.listOfItemsToAdd) {
-        let info = this.listOfItemsToAdd[name];
-        if (this.items[name]) continue;
-        loaderLog("adding item " + info.name);
-        let item = Object.create(info.protoModel);
-        this.items[name] = item;
-        item.loader = this;
-        item.name = name;
-        item.data = info.data;
-        item.isComplete = {};
-        item.dependsOn = info.dependsOn;
-        item.isReady = {};
-        item.isProcessing = {};
-        item.dependedOnBy = {};
-        item.listeners = {};
-        item.ephemeralListeners = {};
-        for (let tier of this.tiers) {
-            tier.isComplete = false;
-            item.isComplete[tier.name] = false;
-            item.isProcessing[tier.name] = false;
-            item.isReady[tier.name] = true;
-            item.dependedOnBy[tier.name] = {};
-            item.listeners[tier.name] = [];
-            item.ephemeralListeners[tier.name] = [];
-            if (tier.name in info.dependsOn) {
-                for (let subName in info.dependsOn[tier.name]) {
-                    let sub = this.items[subName];
-                    sub.dependedOnBy[tier.name][info.name] = undefined;
-                    if (!sub.isComplete[tier.name]) item.isReady[tier.name] = false;
-                }
+    if (this.items[name]) return this.setDependencies(name, dependsOn);
+    loaderLog("adding item " + name);
+    let item = Object.create(protoModel);
+    this.items[name] = item;
+    item.loader = this;
+    item.name = name;
+    item.data = data;
+    item.isComplete = {};
+    item.dependsOn = dependsOn;
+    item.isReady = {};
+    item.isProcessing = {};
+    item.dependedOnBy = {};
+    item.listeners = {};
+    item.ephemeralListeners = {};
+    for (let tier of this.tiers) {
+        tier.isComplete = false;
+        item.isComplete[tier.name] = false;
+        item.isProcessing[tier.name] = false;
+        item.isReady[tier.name] = true;
+        item.dependedOnBy[tier.name] = {};
+        item.listeners[tier.name] = [];
+        item.ephemeralListeners[tier.name] = [];
+        if (tier.name in dependsOn) {
+            for (let subName in dependsOn[tier.name]) {
+                let sub = this.items[subName];
+                sub.dependedOnBy[tier.name][name] = undefined;
+                if (!sub.isComplete[tier.name]) item.isReady[tier.name] = false;
             }
         }
     }
-    this.listOfItemsToAdd = {};
-    this.onTier = -1;
     this.process();
 }
 
@@ -138,49 +120,55 @@ Loader.itemProto.addEphemeralListener = function addEphemeralListener(tierName, 
     else this.ephemeralListeners[tierName].push(listener);
 }
 
-Loader.protoModel.markProcessComplete = function markProcessComplete(myCall) {
-    loaderLog("checking process call " + myCall + " is complete");
-    if (this.listOfItemsToAdd.length > 0) return this.flushItemsList();
-    let allComplete = true;
-    for (let item in this.items) for (let tier in this.items[item].isComplete) allComplete = allComplete && this.items[item].isComplete[tier];
-    if (!allComplete) {
-        loaderLog("call " + myCall + " not actually complete");
-        if (this.isHung) this.process();
-        else loaderLog("call " + myCall + " not hung");
-        return;
-    }
-    loaderLog("call " + myCall + " marking process complete");
-    this.onTier = -1;
-    this.isComplete = true;
-    for (let listener of this.listeners) {
-        loaderLog("executing " + listener);
-        listener();
-    }
-    for (let listener of this.ephemeralListeners) {
-        loaderLog("executing " + listener);
-        listener();
-    }
-    this.ephemeralListeners.splice(0);
-    loaderLog("process call " + myCall + " is now done");
-}
-
 let processCall = 0;
 
 Loader.protoModel.process = function process() {
+    /*if (processCall >= 30) {
+        console.log("about to fail. loader is");
+        console.log(this);
+        console.log("printing any unfinisheds");
+        for (let i in this.items) for (let t in this.tiersByName) if (!this.items[i].isComplete[t]) console.log(i + " " + t);
+        throw Error("too many processes?");
+    }*/
+    if (this.isMidProcess) return;
+    this.isMidProcess = true;
     loaderLog("process call " + ++processCall);
     let myCall = processCall;
-    if (!isEmpty(this.listOfItemsToAdd)) {
-        loaderLog("call " + myCall + " ending with item flush");
-        return this.flushItemsList();
-    }
-    //console.trace();
     this.isComplete = false;
     if (this.onTier < 0) this.onTier = 0;
     else loaderLog("already processing tier "+this.onTier + " out of " + this.tiers.length + " on call " + myCall);
-    while ((this.onTier < this.tiers.length) && this.tiers[this.onTier].isComplete) {loaderLog("call " + myCall + " tier " + this.onTier + " is complete");++this.onTier;}
+    while ((this.onTier < this.tiers.length) && this.tiers[this.onTier].isComplete) {
+        loaderLog("call " + myCall + " tier " + this.onTier + " is complete");
+        ++this.onTier;
+    }
+    // think process is complete because each tier is complete
     if (this.onTier === this.tiers.length) {
-        loaderLog("call " + myCall + " ending with mark process complete");
-        return this.markProcessComplete(myCall);
+        loaderLog("checking that process call " + myCall + " is complete");
+        let allComplete = true;
+        for (let item in this.items) for (let tier in this.items[item].isComplete) allComplete = allComplete && this.items[item].isComplete[tier];
+        if (!allComplete) {
+            loaderLog("call " + myCall + " is not actually complete");
+            if (this.isHung) this.process();
+            else loaderLog("call " + myCall + " is not hung, something is wrong with tier completion statuses");
+            this.isMidProcess = false;
+            return;
+        }
+        loaderLog("process call " + myCall + " is complete");
+        this.onTier = -1;
+        this.isComplete = true;
+        this.isMidProcess = false;
+        this.cueExtraProcess = false;
+        for (let listener of this.listeners) {
+            loaderLog("executing " + listener);
+            listener();
+        }
+        for (let listener of this.ephemeralListeners) {
+            loaderLog("executing " + listener);
+            listener();
+        }
+        this.ephemeralListeners.splice(0);
+        if (this.cueExtraProcess) this.process();
+        return;
     }
     let tier = this.tiers[this.onTier];
     for (let itemName in this.items) {
@@ -190,14 +178,18 @@ Loader.protoModel.process = function process() {
             if (!item.isComplete[tier.name]) {
                 this.isHung = true;
                 loaderLog("became hung on call " + myCall);
+                this.isMidProcess = false;
+                return;
             }
         }
     }
     if (!this.isHung) {
         loaderLog("call " + myCall + " is not hung, reprocessing");
+        this.isMidProcess = false;
         this.process();
     }
     loaderLog("call " + myCall + " terminating");
+    this.isMidProcess = false;
 }
 
 Loader.protoModel.markComplete = function markComplete(item, tier) {
@@ -208,7 +200,7 @@ Loader.protoModel.markComplete = function markComplete(item, tier) {
     for (let waiterName in item.dependedOnBy[tier.name]) {
         let waiter = this.items[waiterName];
         waiter.isReady[tier.name] = true;
-        for (let sub in waiter.dependsOn[tier.name]) if (!this.items[sub].isComplete[tier.name]) waiter.isReady[tier.name] = false;
+        for (let sub in waiter.dependsOn[tier.name]) waiter.isReady[tier.name] = waiter.isReady[tier.name] && this.items[sub].isComplete[tier.name];
         if (waiter.isReady[tier.name]) this.process();
     }
     let tierComplete = true;
@@ -220,10 +212,7 @@ Loader.protoModel.markComplete = function markComplete(item, tier) {
     for (let listener of item.listeners[tier.name]) listener(item);
     for (let listener of item.ephemeralListeners[tier.name]) listener(item);
     item.ephemeralListeners[tier.name].splice(0);
-    let allComplete = true;
-    for (let aTier of this.tiers) allComplete = allComplete && aTier.isComplete;
-    if (allComplete) this.markProcessComplete("from marking item "+item.name);
-    else if (this.onTier < 0) this.process();
+    this.process();
 }
 
 Loader.protoModel.addListener = Loader.tierProto.addListener;

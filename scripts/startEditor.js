@@ -2,8 +2,7 @@
 scriptLoader.addItem("gui", {js: {generalFunctions: undefined}}, {js: filePrefix+"scripts/gui.js"});
 scriptLoader.addEphemeralListener(function() {
     scriptLoader.items.gui.addEphemeralListener("js", function() {
-        //gui.ensureAllModules(start)
-        gui.ensureModule("animations");
+        gui.ensureAllModules(start);
     });
 });
 
@@ -73,8 +72,6 @@ function newTimer(callback, timeout) {
 }
 
 function start() {
-    console.log("starting");
-    if (1>0) return;
     // set up loading screen/inactivity timer
     let activityTimer = newTimer(removeSkippedPages, 10000);
     

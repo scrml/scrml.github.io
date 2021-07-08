@@ -1,6 +1,4 @@
-gui.ensureModule("textWidth");
-gui.moduleSetups.animations = function() {
-    console.log("hello from animations");
+gui.moduleDependency("animations", ["textWidth"], function() {
     gui.defaultOptions.smoothErase = {
         duration: .5,
         onEnd: emptyFunction,
@@ -17,10 +15,6 @@ gui.moduleSetups.animations = function() {
         onEnd: emptyFunction,
         doSmoothly: true
     }
-}
-scriptLoader.items["gui/animations"].addEphemeralListener("js", function() {
-    console.log("ephemeral listener from animations");
-    scriptLoader.setDependencies("gui/animations", {guiModules: {"gui/textWidth": undefined}})
 });
 
 gui.smoothErase = function smoothErase(element, options = {}) {

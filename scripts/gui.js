@@ -1,18 +1,19 @@
 loadCSS("styles/gui.css");
 
+let guiLog = console.log;
+
 var gui = {
     defaultOptions: {},
-    allModules: ["animations", "buttons", "clipboard", "datalists", "details", "disabler", "focuseds", "inputs", "linkeds", "loadingScreen", "messages", "popup", "screens", "tables", "textWidth"]
+    allModules: ["animations", "buttons", "clipboard", "datalists", "deleteBundle", "details", "disabler", "focuseds", "inputs", "linkeds", "loadingScreen", "messages", "popup", "screens", "tables", "textWidth"]
 }
 
 if (!scriptLoader.guiModulesTier) {
-    console.log("setting up module tier");
+    guiLog("setting up module tier");
     gui.moduleSetups = {};
     scriptLoader.guiModulesTier = scriptLoader.newTier("guiModules", function(item) {
-        //console.log("guiModule tier processing " + item.name);
-        //window.setTimeout(function() {
-            scriptLoader.markComplete(item, scriptLoader.guiModulesTier);
-        //}, 100);
+        guiLog("guiModule tier processing " + item.name);
+        if (gui.moduleSetups[item.name]) gui.moduleSetups[item.name]();
+        scriptLoader.markComplete(item, scriptLoader.guiModulesTier);
     });
 }
 
@@ -57,10 +58,10 @@ gui.replace = function swap(oldElement, newElement) {
 }
 
 gui.ensureModule = function ensureModule(name, location = filePrefix+"scripts/gui/"+name+".js", dependencies = {}) {
-    console.log("ensuring " + name);
+    guiLog("ensuring " + name);
     if (!dependencies.js) dependencies.js = {};
     if (!dependencies.js.gui) dependencies.js.gui = undefined;
-    if (!(name in scriptLoader.items)) scriptLoader.addItem("gui/"+name, dependencies, {js: location});
+    if (!(("gui/"+name) in scriptLoader.items)) scriptLoader.addItem("gui/"+name, dependencies, {js: location});
 }
 
 gui.ensureModules = function ensureModules(modules) {
@@ -68,9 +69,19 @@ gui.ensureModules = function ensureModules(modules) {
 }
 
 gui.ensureAllModules = function ensureAllModules(finished = emptyFunction) {
+    scriptLoader.onTier = -2;
     let allModules = gui.allModules;
     if (allModules.length === 1) gui.ensureModule(allModules[0]);
     else gui.ensureModules(allModules);
-    // fix this... with a tier probably
-    window.setTimeout(finished, 1000);
+    scriptLoader.guiModulesTier.addEphemeralListener(finished);
+}
+
+gui.moduleDependency = function moduleDependency(currentModule, dependsOnThese, whenReady) {
+    gui.ensureModules(dependsOnThese);
+    gui.moduleSetups["gui/"+currentModule] = whenReady;
+    scriptLoader.items["gui/"+currentModule].addEphemeralListener("js", function() {
+        let dependencies = {};
+        for (let dependency of dependsOnThese) dependencies["gui/"+dependency] = undefined;
+        scriptLoader.setDependencies("gui/"+currentModule, {guiModules: dependencies});
+    });
 }
