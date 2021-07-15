@@ -1,7 +1,6 @@
 // load required scripts
 scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.ensureJS("xml", ["gui"]);
-scriptLoader.ensureJS("idManager");
 scriptLoader.ensureJS("jax");
 scriptLoader.ensureJS("autosaveFormat", ["storage"]);
 scriptLoader.ensureJS("guiWorkerLink", ["gui"]);
@@ -66,26 +65,24 @@ function start() {
     }
     
     // start the worker
-    worker = new Worker(filePrefix+"scripts/worker.js");
+    worker = guiWorkerLink.worker = new Worker(filePrefix+"scripts/worker.js");
     
     // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
         //console.log("received message from worker " + e.data);
+        let line = e.data.toString();
         try {
             workerFunctions[e.data.shift()](...e.data);
         } catch (x) {
-            console.log("failing");
-            console.log(e.data);
-            workerFunctions[e.data.shift()](...e.data);
+            console.log("failing " + line);
+            throw x;
         }
         
     }
     
     workerFunctions.openChapter = guiWorkerLink.openers.chapter;
     
-    
     post("newChapter", null, null, "Book", true);
-    
     
     if (1>0) return;
     
@@ -337,14 +334,15 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
 fetchTypes.page = {};
 
 fetchTypes.page.name = function setName(linkId, name) {
-    let guiUnit = pageLinks[linkId].guiUnit;
-    if (guiUnit.nameSpan.hasAttribute("messagerevertto")) guiUnit.nameSpan.setAttribute("messagerevertto", name);
+    let page = guiWorkerLink.links[linkId];
+    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
     else {
-        guiUnit.nameSpan.value = name;
-        guiUnit.nameSpan.removeAttribute("disabled");
-        guiUnit.nameSpan.blur();
+        page.nameSpan.value = name;
+        page.nameSpan.removeAttribute("disabled");
+        page.nameSpan.blur();
     }
-    pageLinks[linkId].guiUnit.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
+    page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
 }
 
 workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {

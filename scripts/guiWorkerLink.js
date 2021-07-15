@@ -2,16 +2,14 @@ var guiWorkerLink = {};
 
 guiWorkerLink.linkProto = {};
 
-guiWorkerLink.newLink = function newLink(loadHere, worker, type, insertBefore, protoModel = guiWorkerLink.linkProto) {
-    let returner = Object.create(protoModel);
-    returner.guiUnit = guiWorkerLink.newGuiUnit(loadHere, insertBefore, type);
-    returner.worker = worker;
-    return returner;
-}
-
-guiWorkerLink.newGuiUnit = function newGuiUnit(loadHere, insertBefore, type) {
-    let returner = type.createUnit(loadHere, insertBefore);
-    guiWorkerLink.guiUnits.addItem(returner);
+guiWorkerLink.newLink = function newLink(linkId, loadHere, type, insertBefore = null) {
+    console.log("making new link");
+    let returner = Object.create(type.protoModel);
+    returner.linkId = linkId;
+    guiWorkerLink.links[linkId] = returner;
+    // if there ever comes a situation where there are multiple web workers using guiWorkerLinks: this is where the link is assigned a worker
+    returner.worker = guiWorkerLink.worker;
+    console.log("new link made");console.log(returner);
     return returner;
 }
 
@@ -19,11 +17,12 @@ guiWorkerLink.linkProto.askWorker = function askWorker(questionType, proposedVal
     console.log("asking worker " + questionType + " " + proposedValue);
 }
 
+guiWorkerLink.linkProto.fetch = function fetch(dataName) {
+    console.log("fetching " + dataName);
+}
+
 guiWorkerLink.types = {};
 
-scriptLoader.ensureJS("idManager");
-scriptLoader.items.idManager.addEphemeralListener("js", function() {
-    guiWorkerLink.guiUnits = idManager.newManager();
-});
-
 guiWorkerLink.openers = {};
+
+guiWorkerLink.links = {};
