@@ -26,30 +26,24 @@ function newPage(parentNumber, insertBeforeNumber, name, protoModel = pageProto)
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
-    //returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
+    returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
     //returner.manager.linkListener("name", function() {returner.preSave()});
     returner.manager.setVarValue("nickname", "");
     returner.manager.linkProperty("nickname", returner);
-    //returner.manager.linkListener("nickname", function(newNickname) {guiLinkTickets.addTicket(returner.pageNumber, "nickname", newNickname)}, true);
     //returner.manager.linkListener("nickname", function() {returner.preSave()});
     returner.manager.setVarValue("siblingNumber", 0);
     returner.manager.linkProperty("siblingNumber", returner);
-    /*returner.manager.linkListener("siblingNumber", function(siblingNumber) {
+    returner.manager.linkListener("siblingNumber", function(siblingNumber) {
         returner.updateFullPageNumber(siblingNumber);
         if (returner.nextPage) returner.nextPage.manager.setVarValue("siblingNumber", siblingNumber+1);
-        guiLinkTickets.addTicket(returner.pageNumber, "siblingNumber", siblingNumber);
     });
     returner.manager.setVarValue("fullPageNumber", 0);
     returner.manager.linkProperty("fullPageNumber", returner);
-    returner.manager.linkListener("fullPageNumber", function(fullPageNumber) {
-        returner.updateFullName();
-        guiLinkTickets.addTicket(returner.pageNumber, "fullPageNumber", fullPageNumber);
-    });
+    returner.manager.linkListener("fullPageNumber", function(fullPageNumber) {returner.updateFullName()});
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
-    returner.manager.linkListener("fullName", function(fullName) {guiLinkTickets.addTicket(returner.pageNumber, "fullName", fullName)});
-    movePage(pageNumber, parentNumber, insertBeforeNumber);*/
-    returner.manager.setVarValue("isInUse", false);
+    //movePage(pageNumber, parentNumber, insertBeforeNumber);
+    //returner.manager.setVarValue("isInUse", false);
     //returner.manager.linkListener("isInUse", function(inUse) {guiLinkTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
     //returner.manager.linkListener("isInUse", function() {returner.preSave()});
     //returner.preSave();
@@ -131,6 +125,12 @@ guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
     let unlinks = chapter.unlinkGuiLink = {};
     unlinks.name = chapter.manager.linkListener("name", function(name) {
         guiLinkTickets.addTicket(chapter.linkId, "name", name);
+    }, true);
+    unlinks.nickname = chapter.manager.linkListener("nickname", function(nickname) {
+        guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
+    }, true);
+    unlinks.fullName = chapter.manager.linkListener("fullName", function(fullName) {
+        guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
     }, true);
 }
 
@@ -405,12 +405,12 @@ function emptyFunction() {}
         fetched("page", linkId, "name", name);
     });
 
-    guiLinkTickets.addTicketFunction("nickname", function(pageNumber, nickname) {
-        fetched(pageNumber, "nickname", nickname);
+    guiLinkTickets.addTicketFunction("nickname", function(linkId, nickname) {
+        fetched("page", linkId, "nickname", nickname);
     });
 
-    guiLinkTickets.addTicketFunction("fullName", function(pageNumber, fullName) {
-        fetched(pageNumber, "fullName", fullName);
+    guiLinkTickets.addTicketFunction("fullName", function(linkId, fullName) {
+        fetched("page", linkId, "fullName", fullName);
     });
 
     guiLinkTickets.addTicketFunction("pageNameCheck", function(pageId, proposedValue) {

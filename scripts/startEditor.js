@@ -345,6 +345,18 @@ fetchTypes.page.name = function setName(linkId, name) {
     page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
 }
 
+fetchTypes.page.nickname = function setNickname(linkId, nickname) {
+    let page = guiWorkerLink.links[linkId];
+    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    page.nicknameSpan.value = nickname;
+}
+
+fetchTypes.page.fullName = function setFullName(linkId, fullName) {
+    let page = guiWorkerLink.links[linkId];
+    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    page.fullNameText.nodeValue = fullName;
+}
+
 workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
     let page = getPage(pageNumber);
     switch (dataName) {

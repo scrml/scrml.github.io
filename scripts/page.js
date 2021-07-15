@@ -75,7 +75,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     chapterType.protoModel.isChapter = true;
     
     chapterType.climber = gui.basicClimber(".chapter", editor);
-    portTypedEventListeners(pageType, chapterType, ["getLinkFromEvent", "nameBlurredListener", "focusListener", "nameProcessorListener"]);
+    portTypedEventListeners(pageType, chapterType, ["getLinkFromEvent", "nameBlurredListener", "focusListener", "toggleListener", "nameProcessorListener"]);
         
     guiWorkerLink.openers.chapter = function openGuiChapter(linkId, name) {
         let returner = pageType.createUnit(linkId, editor, null, chapterType);
