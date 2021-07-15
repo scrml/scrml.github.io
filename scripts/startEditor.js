@@ -71,7 +71,14 @@ function start() {
     // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
         //console.log("received message from worker " + e.data);
-        workerFunctions[e.data.shift()](...e.data);
+        try {
+            workerFunctions[e.data.shift()](...e.data);
+        } catch (x) {
+            console.log("failing");
+            console.log(e.data);
+            workerFunctions[e.data.shift()](...e.data);
+        }
+        
     }
     
     workerFunctions.openChapter = guiWorkerLink.openers.chapter;
@@ -98,7 +105,7 @@ function start() {
     loadPages();
 }
 
-function loadPages() {
+/*function loadPages() {
     post("openPageProcess");
     doSmoothly = false;
     let page = 0, line;
@@ -109,12 +116,12 @@ function loadPages() {
         loadPage(page++);
     }
     for (let info of pageLoadingInformation) if (info) post("move", info.page, info.parent);
-    /*function doIt(pageNumber) {
-        //console.log("doing " + pageNumber);
+    function doIt(pageNumber) {
+        console.log("doing " + pageNumber);
         if (pageLoadingInformation[pageNumber]) post("move", pageNumber, pageLoadingInformation[pageNumber].parent, pageLoadingInformation[pageNumber].insertBefore);
         if (pageNumber < pageLoadingInformation.length) window.setTimeout(function() {doIt(pageNumber + 1)}, 1000);
     }
-    doIt(-1);*/
+    doIt(-1);
     post("closePageProcess");
 }
 
@@ -151,13 +158,14 @@ function loadPage(pageNumber) {
     }
     post("setNickname", pageNumber, lines[2]);
     if (lines[3] == "o") getPage(pageNumber).div.setAttribute("open", "");
-}
+}*/
+
 function post(functionName, ...args) {
     workerFunctions.setLoadingScreen(functionName + ": " + commaJoin(args));
     worker.postMessage([functionName, ...args]);
 }
 
-function newStatement(parentNumber = null, insertBefore = null, name = "Book") {
+/*function newStatement(parentNumber = null, insertBefore = null, name = "Book") {
     let pageNumber = pages.length;
     newPage(pageNumber);
     let page = getPage(pageNumber);
@@ -232,7 +240,7 @@ function newPageInChanged(event) {
     clearPageGap({target: gap});
     post("pageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
 }
-
+*/
 workerFunctions.pseudoPost = post;
 
 let fetchTypes = {};
@@ -242,9 +250,9 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
     
     fetchTypes[typeName][dataName](id, ...data);
     
-    if (1<0) {
+    /*if (1<0) {
         switch (dataName) {
-            /*move*/ case "parent": // data is [parentNumber, insertBefore]
+            /*move/ case "parent": // data is [parentNumber, insertBefore]
                 if (data[0] == null) {
                     // this case is only for adding the root page (page 0) to the editor
                     if (pageNumber != 0) throw Error("only page 0 can be the root, not page " + pageNumber);
@@ -298,23 +306,23 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
                         });
                     }
                 }
-            break; /*set nickname*/ case "nickname": // data is [nickname]
+            break; /*set nickname/ case "nickname": // data is [nickname]
                 if (page.nicknameSpan.hasAttribute("messagerevertto")) page.nicknameSpan.setAttribute("messagerevertto", data[0]);
                 else page.nicknameSpan.value = data[0];
                 page.nicknameSpan.setAttribute("value", data[0]);
-            break; /*set pageNumber*/ case "siblingNumber": // data is [siblingNumber]
+            break; /*set pageNumber/ case "siblingNumber": // data is [siblingNumber]
                 page.siblingNumberText.nodeValue = data[0];
-            break; /*set fullPageNumber*/ case "fullPageNumber": // data is [fullPageNumber]
+            break; /*set fullPageNumber/ case "fullPageNumber": // data is [fullPageNumber]
                 page.fullPageNumberText.nodeValue = data[0];
-            break; /*set fullName*/ case "fullName": // data is [fullName]
+            break; /*set fullName/ case "fullName": // data is [fullName]
                 page.fullNameText.nodeValue = data[0];
-            break; /*show or hide delete button*/ case "isInUse": // data is [isInUse]
+            break; /*show or hide delete button/ case "isInUse": // data is [isInUse]
                 page.div.setAttribute("isinuse", data[0]);
                 if (page == isFocused) {
                     deleteBundleReset();
                     deleteBundleReset = data[0]? gui.disable(pageTools.deleteBundle.deleteLaunch): emptyFunction;
                 }
-            break; /*set comment's tex*/ case "tex": // data is [tex]
+            break; /*set comment's tex/ case "tex": // data is [tex]
                 page.texIn.value = data[0];
                 //page.texOut.innerHTML = texAttToInnerHTML(data[0]);
                 typeset(function() {
@@ -323,7 +331,7 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
                 });
             break; default: console.log("do not recognize fetched type " + dataName);
         }
-    }
+    }*/
 }
 
 fetchTypes.page = {};
@@ -386,7 +394,7 @@ workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
 
 workerFunctions.moveModeOff = moveModeOff;
 
-let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
+/*let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
 
 function pageFocusInFromEvent(e) {pageFocusIn(getPage(getPageNumberFromEvent(e)))}
 function pageFocusIn(page) {
@@ -439,7 +447,7 @@ function deletePage(page) {
     storage.erase("tex " + page.pageNumber);
     post("deletePage", page.pageNumber);
 }
-
+*/
 function onInactivity() {
     
 }
