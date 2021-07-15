@@ -6,6 +6,14 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     pageType.protoModel.isType = function() {return "page"};
     pageType.protoModel.isPage = true;
     
+    pageType.protoModel.fetch = function fetch(dataName) {
+        guiWorkerLink.linkProto.fetch.call(this, "page", dataName);
+    }
+    
+    pageType.protoModel.askWorker = function askWorker(questionType, proposedValue) {
+        guiWorkerLink.linkProto.askWorker.call(this, "page", questionType, proposedValue);
+    }
+    
     pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
         let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
         page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId], insertBefore);
@@ -57,7 +65,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     
     pageType.nameBlurredListener = function(e, type = pageType) {
         e = type.getLinkFromEvent(e, type);
-        console.log("name blurred");
+        e.fetch("name");
     }
     
     let chapterType = guiWorkerLink.types.chapter = Object.create(pageType);

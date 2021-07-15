@@ -4,6 +4,7 @@ The worker holds all information about the SCRML file. The only thing not in the
 */
 
 onmessage = function onmessage(e) {
+    //console.log("recieved " + e.data);
     guiLinkTickets.openProcess();
     functions[e.data.shift()](...e.data);
     guiLinkTickets.closeProcess();
@@ -166,41 +167,28 @@ functions.setNickname = function setNickname(pageNumber, nickname) {
     guiLinkTickets.addTicket(pageNumber, "save");
 }
 
-functions.fetchParent = function fetchParent(pageNumber) {
-    fetched(pageNumber, "parent", pages[pageNumber].parent);
+functions.fetch = function fetch(type, linkId, dataName) {
+    let link = guiLinks.items[linkId], data;
+    switch (type) {
+        case "page":
+            switch (dataName) {
+                case "name": data = [link.name];
+                break; default: throw Error("do not recognize dataName " + dataName);
+            }
+        break; default: throw Error("do not recognize type " + type);
+    }
+    fetched(type, linkId, dataName, ...data);
 }
 
-functions.fetchName = function fetchName(pageNumber) {
-    fetched(pageNumber, "name", pages[pageNumber].name);
-}
-
-functions.fetchNickname = function fetchNickname(pageNumber) {
-    fetched(pageNumber, "nickname", pages[pageNumber].nickname);
-}
-
-functions.fetchFullName = function fetchFullName(pageNumber) {
-    fetched(pageNumber, "fullName", pages[pageNumber].fullName);
-}
-
-functions.fetchPageNumber = function fetchPageNumber(pageNumber) {
-    fetched(pageNumber, "pageNumber", pages[pageNumber].pageNumber);
-}
-
-functions.fetchFullPageNumber = function fetchFullPageNumber(pageNumber) {
-    fetched(pageNumber, "fullPageNumber", pages[pageNumber].fullPageNumber);
-}
-
-functions.fetchAll = function fetchAll(pageNumber) {
-    functions.fetchParent(pageNumber);
-    functions.fetchName(pageNumber);
-    functions.fetchNickname(pageNumber);
-    functions.fetchFullName(pageNumber);
-    functions.fetchPageNumber(pageNumber);
-    functions.fetchFullPageNumber(pageNumber);
-}
-
-functions.pageNameCheck = function pageNameCheck(guiLinkId, proposedValue) {
-    guiLinkTickets.addTicket(getPageIdFromGuiLinkId(guiLinkId), "pageNameCheck", proposedValue);
+functions.ask = function ask(type, linkId, questionType, proposedValue) {
+    switch (type) {
+        case "page":
+            switch (questionType) {
+                case "name": guiLinkTickets.addTicket(getPageIdFromGuiLinkId(linkId), "pageNameCheck", proposedValue);
+                break; default: throw Error("do not recognize dataName " + dataName);
+            }
+        break; default: throw Error("do not recognize type " + type);
+    }
 }
 
 functions.openDetails = function openDetails(pageNumber, open) {
@@ -341,10 +329,12 @@ commentProto.saveToString = function saveToString() {
 
 function emptyFunction() {}
 
+// Workers don't have a way of importing js except modules, but modules don't work on locally hosted sites, so we just put copy/paste all the modules here.
+
 // ticket system
 {
     /*
-        A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open (if there are no open processes, the ticket is executed immediately). A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed.
+        A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open. A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed. If there are no open processes, the ticket is executed immediately.
     */
 
     var ticketSystem = {};
