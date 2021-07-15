@@ -16,9 +16,9 @@ gui.screenedInput = function screenedInput(loadHere, options = {}) {
     let returner = gui.element("input", loadHere, ["type", "text", "placeholder", option("placeholder")].concat(option("atts")));
     returner.select();
     let screen = option("screen"), onchange = option("onchange"), failMessage = option("failMessage"), messageTime = option("messageTime");
-    returner.addEventListener("change", function() {
+    returner.addEventListener("change", function(e) {
         let line = returner.value;
-        if (screen(line)) onchange(line);
+        if (screen(line)) onchange(e);
         else gui.messages.inputText(returner, failMessage, messageTime)
     });
     if (option("absorbClicks")) gui.absorbClicks(returner);

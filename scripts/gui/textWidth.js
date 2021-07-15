@@ -19,4 +19,5 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
     let changeWidth = function() {input.style.width = Math.max(gui.getWidth(input, input.value), gui.getWidth(input, input.placeholder)) + "px"}
     input.addEventListener("input", changeWidth);
     input.setWidth = changeWidth;
+    changeWidth();
 }

@@ -1,10 +1,16 @@
 // load required scripts
 scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.ensureJS("xml", ["gui"]);
+scriptLoader.ensureJS("idManager");
 scriptLoader.ensureJS("jax");
+scriptLoader.ensureJS("autosaveFormat", ["storage"]);
+scriptLoader.ensureJS("guiWorkerLink", ["gui"]);
+scriptLoader.ensureJS("page", ["guiWorkerLink"]);
 scriptLoader.addEphemeralListener(function() {
     scriptLoader.items.gui.addEphemeralListener("js", function() {
-        gui.ensureAllModules(start);
+        gui.ensureAllModules(function() {
+            scriptLoader.addEphemeralListener(start);
+        });
     });
 });
 
@@ -38,20 +44,16 @@ let doSmoothly, smoothDuration = .3, newPageHeight, pageMode;
 }
 
 // editor parts
-let root, pageTools, pages = [], worker,  workerFunctions = {log: console.log}, focusedPageGap, lockedPageFocus = false, loadingScreen;
+let root, pageTools, pageLinks = {}, worker,  workerFunctions = {log: console.log}, focusedPageGap, lockedPageFocus = false, loadingScreen;
 
-// check for page then fetch, use this to access pages instead of directly getting them from pages array
-function getPage(pageNumber) {
-    if (!pages[pageNumber]) throw Error("cannot find page " + pageNumber);
-    return pages[pageNumber];
-}
-
+var ids;
 function start() {
-    // Loading screen setup: loading screen message is updated any time the worker does anything. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
+    // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
     
-    let activityTimer = newTimer(onInactivity, 3000);
+    let activityTimer = newTimer(onInactivity, 10000);
     
     loadingScreen = gui.loadingScreen(editor);
+    loadingScreen.loadingTitle.nodeValue = "Working...";
     
     workerFunctions.setLoadingScreen = function(message) {
         loadingScreen.openLoadingScreen(message);
@@ -63,6 +65,23 @@ function start() {
         activityTimer.restart();
     }
     
+    // start the worker
+    worker = new Worker(filePrefix+"scripts/worker.js");
+    
+    // all messages start with the name of the response handler function then list the arguments to give that handler
+    worker.onmessage = function onmessage(e) {
+        //console.log("received message from worker " + e.data);
+        workerFunctions[e.data.shift()](...e.data);
+    }
+    
+    workerFunctions.openChapter = guiWorkerLink.openers.chapter;
+    
+    
+    post("newChapter", null, null, "Book", true);
+    
+    
+    if (1>0) return;
+    
     editor.appendChild(testDiv);
     makePageTools();
     
@@ -72,14 +91,6 @@ function start() {
     for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
         editor.setAttribute("pageaction", "new"+pageAction+"mode");
         pageMode = pageAction;
-    }
-    
-    // start worker
-    worker = new Worker(filePrefix+"scripts/worker.js");
-    
-    // all messages start with the name of the response handler function then list the arguments to give that handler
-    worker.onmessage = function onmessage(e) {
-        workerFunctions[e.data.shift()](...e.data);
     }
     
     // make root chapter/saved pages
@@ -142,44 +153,8 @@ function loadPage(pageNumber) {
     if (lines[3] == "o") getPage(pageNumber).div.setAttribute("open", "");
 }
 function post(functionName, ...args) {
+    workerFunctions.setLoadingScreen(functionName + ": " + commaJoin(args));
     worker.postMessage([functionName, ...args]);
-}
-
-// prototypical new page, do not call this from anything except a (specific type of) page constructor
-function newPage(pageNumber) {
-    if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
-    let page = pages[pageNumber] = {pageNumber: pageNumber, pageType: "page"};
-    page.div = gui.element("details", null, ["class", "page", "pagenumber", pageNumber]);
-    page.div.addEventListener("toggle", openDetailsFromEvent);
-    page.div.addEventListener("mouseenter", pageFocusInFromEvent);
-    page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
-    page.pageHead.addEventListener("mouseenter", pageFocusInFromEvent);
-    page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
-    page.siblingNumberText = gui.text("", page.siblingNumberSpan);
-    page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullpagenumber"]);
-    page.fullPageNumberText = gui.text("", page.fullPageNumberSpan);
-    page.nameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "page name", "class", "name", "disguise", ""]);
-    page.nameSpan.addEventListener("change", nameProcessorFromEvent);
-    page.nameSpan.addEventListener("blur", nameBlurredFromEvent);
-    gui.absorbClicks(page.nameSpan);
-    page.nicknameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "nickname", "class", "nickname", "disguise", ""]);
-    page.nicknameSpan.addEventListener("change", nameProcessorFromEvent);
-    gui.absorbClicks(page.nicknameSpan);
-    page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
-    page.fullNameText = gui.text("", page.fullNameSpan);
-    //page.pageNumberOut = gui.text(pageNumber, page.pageHead);
-}
-
-function newChapter(parentNumber = null, insertBefore = null, name = "Book") {
-    let pageNumber = pages.length;
-    newPage(pageNumber);
-    let page = getPage(pageNumber);
-    page.name = name;
-    page.pageType = "chapter";
-    page.div.setAttribute("class", "chapter");
-    post("newChapter", parentNumber, insertBefore, pageNumber, name);
-    newPageGap(page);
-    return pageNumber;
 }
 
 function newStatement(parentNumber = null, insertBefore = null, name = "Book") {
@@ -255,98 +230,113 @@ function newPageInChanged(event) {
     let gap = getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
     if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newPageIn, "invalid nodeName");
     clearPageGap({target: gap});
-    post("newPageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
+    post("pageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
 }
 
 workerFunctions.pseudoPost = post;
 
-workerFunctions.fetched = function fetched(pageNumber, dataName, ...data) {
-    let page = getPage(pageNumber);
-    switch (dataName) {
-        /*move*/ case "parent": // data is [parentNumber, insertBefore]
-            if (data[0] == null) {
-                // this case is only for adding the root page (page 0) to the editor
-                if (pageNumber != 0) throw Error("only page 0 can be the root, not page " + pageNumber);
-                editor.appendChild(page.div);
-                newPageHeight = page.div.getBoundingClientRect().height;
-            } else {
-                let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]), templateGapBBox = newParent.div.firstChild.nextElementSibling.getBoundingClientRect();
-                if (page.div.parentElement) {
-                    // existing page (actual move)
-                    let gapSpot, pageSpot, newGap = newPageGap();
-                    if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
-                        // moving down
-                        gui.smoothErase(page.div.previousElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
-                        gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
-                        pageSpot = gui.element("div", newParent.div, [], gapSpot);
-                    } else {
-                        // moving up
-                        gui.smoothErase(page.div.nextElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
-                        pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
-                        gapSpot = gui.element("div", newParent.div, [], pageSpot);
-                    }
-                    gui.smoothInsert(newGap, newParent.div, gapSpot, {
-                        onEnd: function() {newParent.div.removeChild(gapSpot)},
-                        width: templateGapBBox.width,
-                        height: templateGapBBox.height,
-                        duration: smoothDuration,
-                        doSmoothly: doSmoothly
-                    });
-                    gui.smoothMove(page.div, pageSpot, {
-                        onEnd: function() {newParent.div.removeChild(pageSpot)},
-                        width: templateGapBBox.width,
-                        duration: smoothDuration,
-                        doSmoothly: doSmoothly
-                    });
+let fetchTypes = {};
+
+workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
+    //console.log("fetched " + typeName + " " + id + " " + dataName + " " + data);
+    
+    fetchTypes[typeName][dataName](id, ...data);
+    
+    if (1<0) {
+        switch (dataName) {
+            /*move*/ case "parent": // data is [parentNumber, insertBefore]
+                if (data[0] == null) {
+                    // this case is only for adding the root page (page 0) to the editor
+                    if (pageNumber != 0) throw Error("only page 0 can be the root, not page " + pageNumber);
+                    editor.appendChild(page.div);
+                    newPageHeight = page.div.getBoundingClientRect().height;
                 } else {
-                    // new page (birth move)
-                    let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
-                    gui.smoothInsert(page.div, newParent.div, deleteMe1, {
-                        onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
-                        width: templateGapBBox.width,
-                        height: newPageHeight,
-                        duration: smoothDuration,
-                        doSmoothly: doSmoothly
-                    });
-                    gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
-                        onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
-                        width: templateGapBBox.width,
-                        height: templateGapBBox.height,
-                        duration: smoothDuration,
-                        doSmoothly: doSmoothly
-                    });
+                    let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]), templateGapBBox = newParent.div.firstChild.nextElementSibling.getBoundingClientRect();
+                    if (page.div.parentElement) {
+                        // existing page (actual move)
+                        let gapSpot, pageSpot, newGap = newPageGap();
+                        if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
+                            // moving down
+                            gui.smoothErase(page.div.previousElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
+                            gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
+                            pageSpot = gui.element("div", newParent.div, [], gapSpot);
+                        } else {
+                            // moving up
+                            gui.smoothErase(page.div.nextElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
+                            pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
+                            gapSpot = gui.element("div", newParent.div, [], pageSpot);
+                        }
+                        gui.smoothInsert(newGap, newParent.div, gapSpot, {
+                            onEnd: function() {newParent.div.removeChild(gapSpot)},
+                            width: templateGapBBox.width,
+                            height: templateGapBBox.height,
+                            duration: smoothDuration,
+                            doSmoothly: doSmoothly
+                        });
+                        gui.smoothMove(page.div, pageSpot, {
+                            onEnd: function() {newParent.div.removeChild(pageSpot)},
+                            width: templateGapBBox.width,
+                            duration: smoothDuration,
+                            doSmoothly: doSmoothly
+                        });
+                    } else {
+                        // new page (birth move)
+                        let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
+                        gui.smoothInsert(page.div, newParent.div, deleteMe1, {
+                            onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
+                            width: templateGapBBox.width,
+                            height: newPageHeight,
+                            duration: smoothDuration,
+                            doSmoothly: doSmoothly
+                        });
+                        gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
+                            onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
+                            width: templateGapBBox.width,
+                            height: templateGapBBox.height,
+                            duration: smoothDuration,
+                            doSmoothly: doSmoothly
+                        });
+                    }
                 }
-            }
-        break; /*set name*/ case "name": // data is [name]
-            if (page.nameSpan.hasAttribute("inputoutputrevertto")) page.nameSpan.setAttribute("inputoutputrevertto", data[0]);
-            else page.nameSpan.value = data[0];
-            page.nicknameSpan.setAttribute("placeholder", "nickname for " + data[0]);
-            page.nameSpan.setAttribute("value", data[0]);
-        break; /*set nickname*/ case "nickname": // data is [nickname]
-            if (page.nicknameSpan.hasAttribute("inputoutputrevertto")) page.nicknameSpan.setAttribute("inputoutputrevertto", data[0]);
-            else page.nicknameSpan.value = data[0];
-            page.nicknameSpan.setAttribute("value", data[0]);
-        break; /*set pageNumber*/ case "siblingNumber": // data is [siblingNumber]
-            page.siblingNumberText.nodeValue = data[0];
-        break; /*set fullPageNumber*/ case "fullPageNumber": // data is [fullPageNumber]
-            page.fullPageNumberText.nodeValue = data[0];
-        break; /*set fullName*/ case "fullName": // data is [fullName]
-            page.fullNameText.nodeValue = data[0];
-        break; /*show or hide delete button*/ case "isInUse": // data is [isInUse]
-            page.div.setAttribute("isinuse", data[0]);
-            if (page == isFocused) {
-                deleteBundleReset();
-                deleteBundleReset = data[0]? gui.disable(pageTools.deleteBundle.deleteLaunch): emptyFunction;
-            }
-        break; /*set comment's tex*/ case "tex": // data is [tex]
-            page.texIn.value = data[0];
-            //page.texOut.innerHTML = texAttToInnerHTML(data[0]);
-            typeset(function() {
-                page.texOut.innerHTML = texAttToInnerHTML(data[0]);
-                return [page.texOut];
-            });
-        break; default: console.log("do not recognize fetched type " + dataName);
+            break; /*set nickname*/ case "nickname": // data is [nickname]
+                if (page.nicknameSpan.hasAttribute("messagerevertto")) page.nicknameSpan.setAttribute("messagerevertto", data[0]);
+                else page.nicknameSpan.value = data[0];
+                page.nicknameSpan.setAttribute("value", data[0]);
+            break; /*set pageNumber*/ case "siblingNumber": // data is [siblingNumber]
+                page.siblingNumberText.nodeValue = data[0];
+            break; /*set fullPageNumber*/ case "fullPageNumber": // data is [fullPageNumber]
+                page.fullPageNumberText.nodeValue = data[0];
+            break; /*set fullName*/ case "fullName": // data is [fullName]
+                page.fullNameText.nodeValue = data[0];
+            break; /*show or hide delete button*/ case "isInUse": // data is [isInUse]
+                page.div.setAttribute("isinuse", data[0]);
+                if (page == isFocused) {
+                    deleteBundleReset();
+                    deleteBundleReset = data[0]? gui.disable(pageTools.deleteBundle.deleteLaunch): emptyFunction;
+                }
+            break; /*set comment's tex*/ case "tex": // data is [tex]
+                page.texIn.value = data[0];
+                //page.texOut.innerHTML = texAttToInnerHTML(data[0]);
+                typeset(function() {
+                    page.texOut.innerHTML = texAttToInnerHTML(data[0]);
+                    return [page.texOut];
+                });
+            break; default: console.log("do not recognize fetched type " + dataName);
+        }
     }
+}
+
+fetchTypes.page = {};
+
+fetchTypes.page.name = function setName(linkId, name) {
+    let guiUnit = pageLinks[linkId].guiUnit;
+    if (guiUnit.nameSpan.hasAttribute("messagerevertto")) guiUnit.nameSpan.setAttribute("messagerevertto", name);
+    else {
+        guiUnit.nameSpan.value = name;
+        guiUnit.nameSpan.removeAttribute("disabled");
+        guiUnit.nameSpan.blur();
+    }
+    pageLinks[linkId].guiUnit.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
 }
 
 workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
@@ -357,7 +347,9 @@ workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
     }
 }
 
-workerFunctions.newPageNameCheck = function newPageNameCheck(parentNumber, line, result) {
+workerFunctions.pageNameCheck = function pageNameCheck(parentNumber, line, result) {
+    console.log("page name result " + parentNumber + " " + line + " " + result);
+    if (1>0) return;
     if (parentNumber != focusedPageGap.parentElement.getAttribute("pagenumber")) throw Error("mismatch in parent during check for new page");
     let newPageIn = focusedPageGap.querySelector(".newpagein");
     if (result) {
@@ -393,14 +385,6 @@ workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
 }
 
 workerFunctions.moveModeOff = moveModeOff;
-
-function getPageNumberFromEvent(e) {
-    let element = e.target;
-    while (!element.hasAttribute("pagenumber")) element = element.parentElement;
-    let pageNumber = element.getAttribute("pagenumber");
-    activePage = pageNumber;
-    return pageNumber;
-}
 
 let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
 
@@ -457,25 +441,7 @@ function deletePage(page) {
 }
 
 function onInactivity() {
-    removeSkippedPages();
-}
-
-function removeSkippedPages() {
-    let newPages = pages.filter(function(page) {return page != "skipped"});
-    if (newPages.length == pages.length) return;
-    let i = 0;
-    while (i < newPages.length) {
-        newPages[i].pageNumber = i;
-        newPages[i].div.setAttribute("pagenumber", i);
-        //newPages[i].pageNumberOut.nodeValue = i;
-        ++i;
-    }
-    while (i < pages.length) {
-        storage.erase(i);
-        storage.erase("tex " + i);
-        ++i;
-    }
-    post("removeSkippedPages");
+    
 }
 
 function makePageTools() {

@@ -82,6 +82,26 @@ gui.insertAbove = function insertAbove(child, layer) {
     layer.appendChild(child);
 }
 
+// return a function which will serve as an event listener to select the nearest ancestor of the received event/element which matches selector, searching only descendants of root
+
+gui.basicClimber = function basicClimber(selector, root = document.body) {
+    return function(elementOrEvent) {
+        if (elementOrEvent.target) elementOrEvent = elementOrEvent.target;
+        let matches = Array.from(root.querySelectorAll(selector));
+        for (let i = 0; i < matches.length; ++i) if (!isAncestorOf(matches[i], elementOrEvent, "parentNode")) matches[i] = false;
+        matches = matches.filter(identityFunction);
+        while (elementOrEvent && !matches.includes(elementOrEvent)) elementOrEvent = elementOrEvent.parentElement;
+        return elementOrEvent;
+    }
+}
+
+/*function climbElementAncestryUntil(elementOrEvent, selector, filter = trueFunction, root = document.body) {
+    if (elementOrEvent.target) elementOrEvent = elementOrEvent.target;
+    let matches = root.querySelectorAll(selector).filter(filter);
+    while (elementOrEvent && !matches.includes(elementOrEvent)) elementOrEvent = elementOrEvent.parentElement;
+    return elementOrEvent;
+}*/
+
 gui.ensureModule = function ensureModule(name, location = filePrefix+"scripts/gui/"+name+".js", dependencies = {}) {
     guiLog("ensuring " + name);
     if (!dependencies.js) dependencies.js = {};

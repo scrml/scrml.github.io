@@ -1,0 +1,4 @@
+var autosave = {};
+
+autosave.pageProto = {};
+

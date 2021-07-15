@@ -21,6 +21,11 @@ function commaJoin(lines) {
     return returner.substring(0, returner.length - 2);
 }
 
+function capitalizeFirstLetter(line) {
+    if (line.length == 0) return line;
+    return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
 function optionFetcher(defaultOptions, options = {}) {
     return function fetchOption(name) {
         if (name in options) return options[name];
@@ -42,4 +47,12 @@ function newTimer(callback, timeout) {
     return returner;
 }
 
+function climbElementAncestryUntil(elementOrEvent, selector, filter = trueFunction, root = document.body) {
+    if (elementOrEvent.target) elementOrEvent = elementOrEvent.target;
+    let matches = root.querySelectorAll(selector).filter(filter);
+    while (elementOrEvent && !matches.includes(elementOrEvent)) elementOrEvent = elementOrEvent.parentElement;
+    return elementOrEvent;
+}
+
 function trueFunction() {return true}
+function identityFunction(x) {return x}

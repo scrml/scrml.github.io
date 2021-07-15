@@ -9,9 +9,9 @@ onmessage = function onmessage(e) {
     pageTickets.closeProcess();
 }
 
-function fetched(pageNumber, dataName, ...data) {postMessage(["fetched", pageNumber, dataName, ...data])}
+function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id, dataName, ...data])}
 
-let functions = {}, pages = [], pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false;
+let functions = {}, pages, pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiUnits = [], guiLinkSetups = {};
 
 functions.log = console.log;
 
@@ -19,24 +19,22 @@ functions.printAll = function() {
     console.dir(pages);
 };
 
-function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = pageProto) {
+function newPage(parentNumber, insertBeforeNumber, name, protoModel = pageProto) {
     let returner = Object.create(protoModel);
-    if (pageNumber != pages.length) throw Error("mismatch in number of pages when creating new page, trying to add page " + pageNumber + " but length is " + pages.length);
-    pages[pageNumber] = returner;
-    returner.pageNumber = pageNumber;
+    pages.addItem(returner);
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
-    returner.manager.linkListener("name", function(newName) {pageTickets.addTicket(returner.pageNumber, "name", newName)}, true);
-    returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
-    returner.manager.linkListener("name", function() {returner.preSave()});
+    //returner.manager.linkListener("name", function(newName) {pageTickets.addTicket(returner.pageNumber, "name", newName)}, true);
+    //returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
+    //returner.manager.linkListener("name", function() {returner.preSave()});
     returner.manager.setVarValue("nickname", "");
     returner.manager.linkProperty("nickname", returner);
-    returner.manager.linkListener("nickname", function(newNickname) {pageTickets.addTicket(returner.pageNumber, "nickname", newNickname)}, true);
-    returner.manager.linkListener("nickname", function() {returner.preSave()});
+    //returner.manager.linkListener("nickname", function(newNickname) {pageTickets.addTicket(returner.pageNumber, "nickname", newNickname)}, true);
+    //returner.manager.linkListener("nickname", function() {returner.preSave()});
     returner.manager.setVarValue("siblingNumber", 0);
     returner.manager.linkProperty("siblingNumber", returner);
-    returner.manager.linkListener("siblingNumber", function(siblingNumber) {
+    /*returner.manager.linkListener("siblingNumber", function(siblingNumber) {
         returner.updateFullPageNumber(siblingNumber);
         if (returner.nextPage) returner.nextPage.manager.setVarValue("siblingNumber", siblingNumber+1);
         pageTickets.addTicket(returner.pageNumber, "siblingNumber", siblingNumber);
@@ -50,16 +48,16 @@ function newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel 
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
     returner.manager.linkListener("fullName", function(fullName) {pageTickets.addTicket(returner.pageNumber, "fullName", fullName)});
-    movePage(pageNumber, parentNumber, insertBeforeNumber);
+    movePage(pageNumber, parentNumber, insertBeforeNumber);*/
     returner.manager.setVarValue("isInUse", false);
-    returner.manager.linkListener("isInUse", function(inUse) {pageTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
-    returner.manager.linkListener("isInUse", function() {returner.preSave()});
-    returner.preSave();
+    //returner.manager.linkListener("isInUse", function(inUse) {pageTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
+    //returner.manager.linkListener("isInUse", function() {returner.preSave()});
+    //returner.preSave();
     return returner;
 }
 
-function newChapter(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = chapterProto) {
-    let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
+function newChapter(parentId, insertBeforeId, name, protoModel = chapterProto) {
+    let returner = newPage(parentId, insertBeforeId, name, protoModel);
     returner.pageType = "chapter";
     returner.childPages = [];
     return returner;
@@ -121,7 +119,21 @@ function movePage(pageNumber, parentNumber, insertBeforeNumber) {
     }
 }
 
-functions.newChapter = newChapter;
+functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, open = false) {
+    let chapter = newChapter(parentId, insertBeforeId, name);
+    if (open) guiLinkSetups.chapter(chapter);
+}
+
+guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
+    if (chapter.unlinkGuiLink) throw Error("gui link already set up for chapter id " + chapter.id);
+    guiLinks.addItem(chapter);
+    postMessage(["openChapter", chapter.linkId, chapter.name]);
+    let unlinks = chapter.unlinkGuiLink = {};
+    unlinks.name = chapter.manager.linkListener("name", function(name) {
+        fetched("page", chapter.id, "name", name);
+    }, true);
+}
+
 functions.newStatement = newStatement;
 functions.newComment = newComment;
 
@@ -188,8 +200,8 @@ functions.fetchAll = function fetchAll(pageNumber) {
     functions.fetchFullPageNumber(pageNumber);
 }
 
-functions.newPageNameCheck = function newPageNameCheck(parentNumber, line) {
-    pageTickets.addTicket(parentNumber, "newPageNameCheck", line);
+functions.pageNameCheck = function pageNameCheck(guiLinkId, proposedValue) {
+    pageTickets.addTicket(getPageIdFromGuiLinkId(guiLinkId), "pageNameCheck", proposedValue);
 }
 
 functions.openDetails = function openDetails(pageNumber, open) {
@@ -250,8 +262,12 @@ functions.saveAll = function saveAll() {
     for (let page of pages) page.preSave();
 }
 
-pageProto.setPageNumber = function setPageNumber(newPageNumber) {
-    this.pageNumber = newPageNumber;
+function getPageIdFromGuiLinkId(guiLinkId) {
+    return guiLinks.items[guiLinkId].id;
+}
+
+pageProto.setId = function setId(newId) {
+    this.id = newId;
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
@@ -324,6 +340,114 @@ commentProto.saveToString = function saveToString() {
     return line;
 }
 
+function emptyFunction() {}
+
+// ticket system
+{
+    /*
+        A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open (if there are no open processes, the ticket is executed immediately). A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed.
+    */
+
+    var ticketSystem = {};
+
+    var ticketProto = {};
+
+    ticketSystem.newTicketSystem = function newTicketSystem(protoModel = ticketProto) {
+        let returner = Object.create(protoModel);
+        returner.items = {};
+        returner.ticketFunctions = {};
+        returner.openProcesses = 0;
+        return returner;
+    }
+
+    ticketProto.addTicketFunction = function addTicketFunction(name, func) {
+        if (this.ticketFunctions[name]) throw Error(name + " is already a ticket function");
+        this.ticketFunctions[name] = func
+    }
+
+    ticketProto.openProcess = function openProcess() {++this.openProcesses}
+
+    ticketProto.closeProcess = function closeProcess() {
+        if (--this.openProcesses == 0) {
+            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
+            this.items = {};
+        }
+    }
+
+    ticketProto.addTicket = function addTicket(item, ticketFunction, ...data) {
+        if (this.openProcesses == 0) return this.ticketFunctions[ticketFunction](item, ...data);
+        if (!this.items[item]) this.items[item] = {};
+        this.items[item][ticketFunction] = data;
+    }
+
+    var pageTickets = ticketSystem.newTicketSystem();
+    pageTickets.saveTheseObject = {};
+
+    pageTickets.addTicket = function addTicket(pageId, ticketFunction, ...data) {
+        postMessage(["setLoadingScreen", pages.items[pageId].name + " " + ticketFunction + " " + data]);
+        ticketProto.addTicket.call(this, pageId, ticketFunction, ...data);
+    }
+
+    pageTickets.closeProcess = function closeProcess() {
+        if (--this.openProcesses == 0) {
+            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
+            this.items = {};
+            postMessage(["save", this.saveThese()]);
+            postMessage(["closeLoadingScreen"]);
+        }
+    }
+
+    pageTickets.saveThese = function saveThese() {
+        let returner = [];
+        for (let pageNumber in this.saveTheseObject) {
+            let save = {pageNumber: pageNumber};
+            if (pages[pageNumber] == "skipped") save.line = "skipped";
+            else save.line = pages[pageNumber].saveToString();
+            if (pages[pageNumber].pageType == "comment") {
+                save.commentTex = pages[pageNumber].tex;
+            }
+            returner.push(save);
+        }
+        this.saveTheseObject = {};
+        return returner;
+    }
+
+    pageTickets.addTicketFunction("name", function(pageNumber, name) {
+        fetched(pageNumber, "name", name);
+    });
+
+    pageTickets.addTicketFunction("nickname", function(pageNumber, nickname) {
+        fetched(pageNumber, "nickname", nickname);
+    });
+
+    pageTickets.addTicketFunction("fullName", function(pageNumber, fullName) {
+        fetched(pageNumber, "fullName", fullName);
+    });
+
+    pageTickets.addTicketFunction("pageNameCheck", function(pageId, proposedValue) {
+        let page = pages.items[pageId];
+        if (page.parent) for (let child of page.parent.childPages) if (proposedValue === child.name) return postMessage(["pageNameCheck", pageId, proposedValue, false]);
+        page.manager.setVarValue("name", proposedValue);
+    });
+
+    pageTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
+        fetched(pageNumber, "siblingNumber", siblingNumber);
+    });
+
+    pageTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
+        fetched(pageNumber, "fullPageNumber", fullPageNumber);
+    });
+
+    pageTickets.addTicketFunction("save", function(pageNumber) {
+        pageTickets.saveTheseObject[pageNumber] = undefined;
+    });
+
+    pageTickets.addTicketFunction("isInUse", function(pageNumber, inUse) {
+        fetched(pageNumber, "isInUse", inUse);
+    });
+}
+
+// varManager
 {
     let unitProto = {
         unlink: function() {
@@ -434,105 +558,55 @@ commentProto.saveToString = function saveToString() {
     }
 }
 
-function emptyFunction() {}
-
-/*
-A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open (if there are no open processes, the ticket is executed immediately). A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed.
-*/
-
-var ticketSystem = {};
-
-let ticketProto = {};
-
-ticketSystem.newTicketSystem = function newTicketSystem(protoModel = ticketProto) {
-    let returner = Object.create(protoModel);
-    returner.items = {};
-    returner.ticketFunctions = {};
-    returner.openProcesses = 0;
-    return returner;
-}
-
-ticketProto.addTicketFunction = function addTicketFunction(name, func) {
-    if (this.ticketFunctions[name]) throw Error(name + " is already a ticket function");
-    this.ticketFunctions[name] = func
-}
-
-ticketProto.openProcess = function openProcess() {++this.openProcesses}
-
-ticketProto.closeProcess = function closeProcess() {
-    if (--this.openProcesses == 0) {
-        for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-        this.items = {};
+// idSystem
+{
+    function capitalizeFirstLetter(line) {
+        if (line.length == 0) return line;
+        return line.charAt(0).toUpperCase() + line.slice(1);
     }
-}
+    
+    var idManager = {};
 
-ticketProto.addTicket = function addTicket(item, ticketFunction, ...data) {
-    if (this.openProcesses == 0) return this.ticketFunctions[ticketFunction](item, ...data);
-    if (!this.items[item]) this.items[item] = {};
-    this.items[item][ticketFunction] = data;
-}
+    idManager.protoModel = {};
 
-let pageTickets = ticketSystem.newTicketSystem();
-pageTickets.saveTheseObject = {};
-
-pageTickets.addTicket = function addTicket(item, ticketFunction, ...data) {
-    postMessage(["setLoadingScreen", pages[item].name + " " + ticketFunction + " " + data]);
-    ticketProto.addTicket.call(this, item, ticketFunction, ...data);
-}
-
-pageTickets.closeProcess = function closeProcess() {
-    if (--this.openProcesses == 0) {
-        for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-        this.items = {};
-        postMessage(["save", this.saveThese()]);
-        postMessage(["closeLoadingScreen"]);
+    idManager.newManager = function newManager(idName = "id", protoModel = idManager.protoModel) {
+        let returner = Object.create(protoModel);
+        returner.items = [];
+        returner.idName = idName;
+        returner.setIdName = "set"+capitalizeFirstLetter(idName);
+        returner.defaultSetIdName = function(id) {this[idName] = id};
+        returner.numHoles = 0;
+        return returner;
     }
-}
 
-pageTickets.saveThese = function saveThese() {
-    let returner = [];
-    for (let pageNumber in this.saveTheseObject) {
-        let save = {pageNumber: pageNumber};
-        if (pages[pageNumber] == "skipped") save.line = "skipped";
-        else save.line = pages[pageNumber].saveToString();
-        if (pages[pageNumber].pageType == "comment") {
-            save.commentTex = pages[pageNumber].tex;
+    idManager.protoModel.addItem = function addItem(item) {
+        if (this.idName in item) throw Error("item already has property " + this.idName);
+        if (!item[this.setIdName]) item[this.setIdName] = this.defaultSetIdName;
+        item[this.setIdName](this.items.length);
+        this.items.push(item);
+    }
+
+    idManager.protoModel.eraseItem = function eraseItem(id) {
+        this.items[id] = false;
+        ++this.numHoles;
+    }
+
+    idManager.protoModel.collapse = function collapse() {
+        if (this.numHoles === 0) return;
+        let shift = 0;
+        for (let i = 0; i < this.items.length; ++i) {
+            if (this.items[i]) {
+                if (shift === 0) continue;
+                let item = this.items[i];
+                item[this.idName] -= shift;
+                this.items[item[this.idName]] = item;
+                if (item.setId) item.setId(item[this.idName]);
+            } else ++shift;
         }
-        returner.push(save);
+        this.items.splice(this.items.length - this.numHoles);
+        this.numHoles = 0;
     }
-    this.saveTheseObject = {};
-    return returner;
+    
+    pages = idManager.newManager();
+    guiLinks = idManager.newManager("linkId");
 }
-
-pageTickets.addTicketFunction("name", function(pageNumber, name) {
-    fetched(pageNumber, "name", name);
-});
-
-pageTickets.addTicketFunction("nickname", function(pageNumber, nickname) {
-    fetched(pageNumber, "nickname", nickname);
-});
-
-pageTickets.addTicketFunction("fullName", function(pageNumber, fullName) {
-    fetched(pageNumber, "fullName", fullName);
-});
-
-pageTickets.addTicketFunction("newPageNameCheck", function(parentNumber, line) {
-    for (let child of pages[parentNumber].childPages) if (line == child.name) return postMessage(["newPageNameCheck", parentNumber, line, false]);
-    postMessage(["newPageNameCheck", parentNumber, line, true]);
-});
-
-pageTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
-    fetched(pageNumber, "siblingNumber", siblingNumber);
-});
-
-pageTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
-    fetched(pageNumber, "fullPageNumber", fullPageNumber);
-});
-
-pageTickets.addTicketFunction("save", function(pageNumber) {
-    pageTickets.saveTheseObject[pageNumber] = undefined;
-});
-
-pageTickets.addTicketFunction("isInUse", function(pageNumber, inUse) {
-    fetched(pageNumber, "isInUse", inUse);
-})

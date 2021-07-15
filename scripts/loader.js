@@ -254,12 +254,14 @@ Loader.tiers = {}
         document.head.appendChild(script);
         script.addEventListener("load", function() {item.loader.markComplete(item, item.loader.jsTier)});
     }
+    let ensureJS = function ensureJS(name, dependencies = [], location = filePrefix+"scripts/"+name+".js") {
+        if (name in this.items) return;
+        let d = {};
+        for (let x of dependencies) d[x] = undefined;
+        this.addItem(name, {js: d}, {js: location});
+    }
     Loader.tiers.js = function addJSTier(loader) {
         loader.jsTier = loader.newTier(tierName, processor);
-        loader.ensureJS = function ensureJS(name, dependencies = [], location = filePrefix+"scripts/"+name+".js") {
-            let d = {};
-            for (let x of dependencies) d[x] = undefined;
-            loader.addItem(name, {js: d}, {js: location});
-        }
+        loader.ensureJS = ensureJS;
     }
 }

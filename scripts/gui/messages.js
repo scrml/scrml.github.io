@@ -10,7 +10,7 @@ gui.messages.textNode = function textNode(textNode, message, time) {
 
 gui.messages.inputText = function inputText(input, message, time = 1000) {
     let wasAble = !input.hasAttribute("disabled");
-    input.setAttribute("messagesRevertTo", input.value);
+    input.setAttribute("messagerevertto", input.value);
     input.value = message;
     input.setAttribute("disabled", "");
     let width = Math.ceil(gui.getWidth(input, message));
@@ -18,8 +18,8 @@ gui.messages.inputText = function inputText(input, message, time = 1000) {
     style.innerHTML = "[min-width" + width + "] {min-width: " + width + "px}";
     input.setAttribute("min-width" + width, "");
     window.setTimeout(function() {
-        input.value = input.getAttribute("messagesRevertTo");
-        input.removeAttribute("messagesRevertTo");
+        input.value = input.getAttribute("messagerevertto");
+        input.removeAttribute("messagerevertto");
         if (wasAble) input.removeAttribute("disabled");
         document.head.removeChild(style);
         input.removeAttribute("min-width" + width);

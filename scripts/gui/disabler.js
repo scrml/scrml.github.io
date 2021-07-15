@@ -1,3 +1,7 @@
+loadCSS("styles/gui/disabler.css");
+
+gui.focusableElementsString = "a, area, button, input, object, select, textarea";
+
 gui.eventShielder = function(e) {
     e.stopPropagation();
 }
@@ -16,7 +20,7 @@ gui.absorbClicks = function absorbClicks(element) {
 }
 
 gui.blockTheseEvents = {
-    focus: undefined,
+    focusin: undefined,
     click: undefined
 }
 
@@ -38,13 +42,21 @@ gui.disablerStylesToCopy = {
 }
 
 gui.disable = function disable(element, copyTheseStyles = gui.disablerStylesToCopy) {
-    let disabler = gui.element("div", null, ["class", "disabler"]);
+    let disablerShell = gui.element("div", null, ["class", "disablershell"]);
     let styles = getComputedStyle(element);
-    for (let style in copyTheseStyles) disabler.style[style] = styles.getPropertyValue(style);
-    element.parentElement.replaceChild(disabler, element);
-    disabler.appendChild(element);
+    for (let style in copyTheseStyles) disablerShell.style[style] = styles.getPropertyValue(style);
+    gui.insertAbove(element, disablerShell);
+    let disabler = gui.element("div", disablerShell, ["class", "disabler"]);
     gui.blockEvents(disabler);
-    return function() {disabler.parentElement.replaceChild(element, disabler)};
+    let tabPairs = [];
+    for (let tabPair of disablerShell.querySelectorAll("[tabindex]")) tabPairs.push({element: tabPair, tabindex: tabPair.getAttribute("tabindex")});
+    for (let e of disablerShell.querySelectorAll(gui.focusableElementsString)) e.setAttribute("tabindex", -1);
+    return function() {
+        for (let e of disablerShell.querySelectorAll(gui.focusableElementsString)) e.removeAttribute("tabindex");
+        for (let e of tabPairs) e.element.setAttribute("tabindex", e.tabindex);
+        gui.orphan(disabler);
+        gui.removeLayer(disablerShell);
+    };
 }
 
 {

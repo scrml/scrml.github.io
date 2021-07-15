@@ -33,7 +33,7 @@ gui.loadingScreen = function loadingScreen(coverMe = document.body, insertAbove 
     returner.isOpen = false;
     returner.unblock = emptyFunction;
     returner.icon = gui.element("div", returner.screenContents, ["class", "loadingicon"]);
-    gui.text("Loading...", gui.element("p", returner.screenContents));
+    returner.loadingTitle = gui.text("Loading...", gui.element("p", returner.screenContents));
     returner.msgSpan = gui.element("p", returner.screenContents);
     returner.msgText = gui.text("loading screen is hidden", returner.msgSpan);
     return returner;
