@@ -123,7 +123,7 @@ function movePage(page, parent, insertBefore) {
         if (pageNumber != 0) throw Error("only page 0 can not have a parent");
         page.manager.setVarValue("siblingNumber", 1);
     }
-    if (page.unlinks.length>0) {
+    if (page.unlinks.length > 0) {
         guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
     }
 }
@@ -174,7 +174,13 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pageId);
     // set up guiLinks for visible pages
     guiLinkSetups.chapter(pages.items[0]);
-    if (preLoaders[0][3] === "o") pages.items[0].togglePage(true);
+    function openPage(page) {
+        if (preLoaders[page.pageId][3] === "o") {
+            page.togglePage(true);
+            if (page.isChapter) for (let child of page.childPages) openPage(child);
+        }
+    }
+    openPage(pages.items[0]);
     pageTickets.addTicket(0, "smoothMode", "true");
 }
 
@@ -273,7 +279,7 @@ functions.deletePage = function deletePage(pageNumber) {
     page.parent.preSave();
 }
 
-function getPageIdFromGuiLinkId(guiLinkId) {
+function getPageIdFromGuiLinkId(linkId) {
     return getPageFromLinkId(linkId).pageId;
 }
 
@@ -375,7 +381,7 @@ pageProto.saveToString = function saveToString() {
 
 chapterProto.saveToString = function saveToString() {
     let line = pageProto.saveToString.call(this) + "\n";
-    for (let child of this.childPages) line += child.pageNumber + " ";
+    for (let child of this.childPages) line += child.pageId + " ";
     if (this.childPages.length > 0) line = line.substring(0, line.length - 1);
     return line;
 }

@@ -99,8 +99,6 @@ function start() {
     if (!storage.fetch("max pageId")) storage.store("max pageId", 1);
     if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
     loadPages();
-    
-    storage.deactivated = true;
 }
 
 function loadPages() {
