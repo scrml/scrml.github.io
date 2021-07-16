@@ -22,24 +22,30 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         else this.div.removeAttribute("open");
     }
     
-    pageType.protoModel.movePage = function movePage(parent, insertBefore) {
+    pageType.protoModel.movePage = function movePage(parent, insertBefore, doSmooth = doSmoothly) {
         let div = gui.element("div", this.div.parentElement, [], this.div);
         div.appendChild(div.previousSibling);
         div.appendChild(div.nextSibling);
         gui.smoothMove(div, parent.div, insertBefore? insertBefore.div.previousSibling: parent.div.lastChild, {
-            doSmoothly: doSmoothly,
+            doSmoothly: doSmooth,
             onEnd: function() {
                 gui.removeLayer(div);
             }
         });
     }
     
+    pageType.protoModel.erase = function erase() {
+        gui.orphan(this.div.previousSibling);
+        gui.orphan(this.div);
+        guiWorkerLink.linkProto.erase.call(this);
+    }
+    
     pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
         let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
-        page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId], insertBefore);
+        page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId, "ispage", ""], insertBefore);
         page.div.addEventListener("toggle", type.toggleListener);
         page.div.addEventListener("mouseenter", type.focusListener);
-        page.pageHead = gui.element("summary", page.div, ["class", "pageHead"]);
+        page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
         page.pageHead.addEventListener("mouseenter", type.focusListener);
         page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
         page.siblingNumberText = gui.text("", page.siblingNumberSpan);
@@ -57,36 +63,37 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         gui.absorbClicks(page.nicknameSpan);
         page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
         page.fullNameText = gui.text("", page.fullNameSpan);
-        page.pageNumberOut = gui.text(linkId, page.pageHead);
+        page.pageNumberOut = gui.text("linkId: "+linkId, page.pageHead);
         // if this is not the first page then create a page gap before this page
         if (linkId) chapterType.newPageGap(loadHere, page.div);
         return page;
     }
     
-    pageType.climber = gui.basicClimber(".page", editor);
+    pageType.climber = gui.basicClimber("[ispage]", editor);
     
-    pageType.getLinkFromEvent = function getLinkFromEvent(e, type = pageType) {
-        e = type.climber(e);
+    pageType.getLinkFromEvent = function getLinkFromEvent(e) {
+        e = pageType.climber(e);
         return guiWorkerLink.links[e.getAttribute("linkid")];
     }
     
-    pageType.toggleListener = function(e, type = pageType) {
-        e = type.getLinkFromEvent(e, type);
+    pageType.toggleListener = function(e) {
+        e = pageType.getLinkFromEvent(e);
         post("togglePage", e.linkId, e.div.hasAttribute("open"));
     }
     
-    pageType.focusListener = function(e, type = pageType) {
-        e = type.getLinkFromEvent(e, type);
-        console.log("focusing");
+    pageType.focusListener = function(e) {
+        if (lockedPageFocus) return;
+        e = pageType.getLinkFromEvent(e);
+        e.pageHead.appendChild(pageTools);
     }
     
-    pageType.nameProcessorListener = function(e, type = pageType) {
-        e = type.getLinkFromEvent(e, type);
+    pageType.nameProcessorListener = function(e) {
+        e = pageType.getLinkFromEvent(e);
         e.askWorker("name", e.nameSpan.value);
     }
     
-    pageType.nameBlurredListener = function(e, type = pageType) {
-        e = type.getLinkFromEvent(e, type);
+    pageType.nameBlurredListener = function(e) {
+        e = pageType.getLinkFromEvent(e);
         e.fetch("name");
     }
     
@@ -152,9 +159,6 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
             return gap;
         }
     }
-    
-    chapterType.climber = gui.basicClimber(".chapter", editor);
-    portTypedEventListeners(pageType, chapterType, ["getLinkFromEvent", "nameBlurredListener", "focusListener", "toggleListener", "nameProcessorListener"]);
         
     guiWorkerLink.linkCreators.chapter = function openGuiChapter(linkId, name) {
         let returner = pageType.createUnit(linkId, editor, null, chapterType);

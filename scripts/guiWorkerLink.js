@@ -17,6 +17,10 @@ guiWorkerLink.linkProto.askWorker = function askWorker(type, questionType, propo
     post("ask", type, this.linkId, questionType, proposedValue);
 }
 
+guiWorkerLink.linkProto.erase = function erase() {
+    delete guiWorkerLink.links[this.linkId];
+}
+
 guiWorkerLink.types = {};
 
 guiWorkerLink.linkCreators = {};

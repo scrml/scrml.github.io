@@ -115,7 +115,7 @@ textarea {
     display: none;
 }
 
-[pagenumber="0"] > .pagehead #pagetools, [pagenumber="0"] > .pagehead .siblingnumber, [pagenumber="0"] > .pagehead .fullpagenumber {
+[linkid="0"] > .pagehead #pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
     display: none;
 }
 

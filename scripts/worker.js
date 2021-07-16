@@ -18,6 +18,12 @@ onmessage = function onmessage(e) {
 
 function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id, dataName, ...data])}
 
+function getPageFromLinkId(linkId) {
+    let returner = guiLinks.items[linkId];
+    if (!returner.isPage) throw Error("link " + linkId + " is not a page");
+    return returner;
+}
+
 let functions = {}, pages, pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiUnits = [], guiLinkSetups = {};
 
 functions.log = console.log;
@@ -25,6 +31,8 @@ functions.log = console.log;
 functions.printAll = function() {
     console.dir(pages);
 };
+
+pageProto.isPage = true;
 
 function newPage(name, nickname = "", protoModel = pageProto) {
     let returner = Object.create(protoModel);
@@ -125,16 +133,25 @@ guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
     if (chapter.unlinkGuiLink) throw Error("gui link already set up for chapter id " + chapter.pageId);
     guiLinks.addItem(chapter);
     postMessage(["showChapter", chapter.linkId, chapter.name]);
-    let unlinks = chapter.unlinkGuiLink = {};
-    unlinks.name = chapter.manager.linkListener("name", function(name) {
+    let unlinks = [];
+    unlinks.push(chapter.manager.linkListener("name", function(name) {
         guiLinkTickets.addTicket(chapter.linkId, "name", name);
-    }, true);
-    unlinks.nickname = chapter.manager.linkListener("nickname", function(nickname) {
+    }, true));
+    unlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
         guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
-    }, true);
-    unlinks.fullName = chapter.manager.linkListener("fullName", function(fullName) {
+    }, true));
+    unlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
         guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
-    }, true);
+    }, true));
+    unlinks.push(function() {
+        guiLinkTickets.addTicket(chapter.linkId, "eraseLink");
+        guiLinks.eraseItem(chapter.linkId);
+        delete chapter.linkId;
+        delete chapter.unlinkGuiLink;
+    });
+    chapter.unlinkGuiLink = function unlinkGuiLink() {
+        for (let f of unlinks) f();
+    }
 }
 
 pageProto.ensureVisible = function ensureVisible() {
@@ -201,7 +218,7 @@ functions.setNickname = function setNickname(pageNumber, nickname) {
 }
 
 functions.fetch = function fetch(type, linkId, dataName) {
-    let link = guiLinks.items[linkId], data;
+    let link = getPageFromLinkId(linkId), data;
     switch (type) {
         case "page":
             switch (dataName) {
@@ -225,16 +242,16 @@ functions.ask = function ask(type, linkId, questionType, proposedValue) {
 }
 
 functions.togglePage = function togglePage(linkId, open) {
-    guiLinks.items[linkId].togglePage(open);
+    getPageFromLinkId(linkId).togglePage(open);
 }
 
 functions.setTex = function setTex(pageNumber, tex) {
     pages[pageNumber].manager.setVarValue("tex", tex);
 }
 
-functions.startMoveModeChecks = function startMoveModeChecks(pageNumber) {
-    movingPage = pages[pageNumber];
-    for (let page of pages) if (page.isOpen && page.isChapter) postMessage(["canAcceptMove", page.pageNumber, page.canAcceptMove(pages[pageNumber])]);
+functions.startMoveModeChecks = function startMoveModeChecks(linkId) {
+    movingPage = getPageFromLinkId(linkId);
+    for (let page of guiLinks.items) if (page.isChapter) postMessage(["canAcceptMove", page.linkId, page.canAcceptMove(movingPage)]);
 }
 
 functions.endMoveMode = function endMoveMode() {
@@ -265,7 +282,7 @@ functions.deletePage = function deletePage(pageNumber) {
 }
 
 function getPageIdFromGuiLinkId(guiLinkId) {
-    return guiLinks.items[guiLinkId].pageId;
+    return getPageFromLinkId(linkId).pageId;
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
@@ -297,10 +314,14 @@ pageProto.togglePage = function togglePage(open = false) {
     if (this.isOpen == open) return;
     this.isOpen = open;
     guiLinkTickets.addTicket(this.linkId, "setOpen", this.isOpen);
-    if (open && this.isChapter) {
+    if (this.isChapter) {
         for (let childPage of this.childPages) {
-            childPage.ensureVisible();
-            guiLinkTickets.addTicket(childPage.linkId, "moveTo", this.linkId);
+            if (open) {
+                childPage.ensureVisible();
+                guiLinkTickets.addTicket(childPage.linkId, "moveTo", this.linkId, null, false);
+            } else {
+                childPage.unlinkGuiLink();
+            }
         }
     }
     this.preSave();
@@ -312,7 +333,7 @@ chapterProto.isChapter = true;
 
 chapterProto.isAncestorOf = function isAncestorOf(page) {
     while (page) {
-        if (this == page) return true;
+        if (this === page) return true;
         page = page.parent;
     }
     return false;
@@ -325,7 +346,7 @@ chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber)
 
 chapterProto.canAcceptMove = function canAcceptMove(page) {
     if (page.isChapter && page.isAncestorOf(this)) return false;
-    for (let child of this.childPages) if (page != child && child.name == page.name) return false;
+    for (let child of this.childPages) if (page !== child && child.name === page.name) return false;
     return true;
 }
 
@@ -430,7 +451,7 @@ function emptyFunction() {}
     var guiLinkTickets = ticketSystem.newTicketSystem();
     
     guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
-        postMessage(["setLoadingScreen", guiLinks.items[linkId].name + " " + ticketFunction + " " + data]);
+        postMessage(["setLoadingScreen", getPageFromLinkId(linkId).name + " " + ticketFunction + " " + data]);
         ticketProto.addTicket.call(this, linkId, ticketFunction, ...data);
     }
     
@@ -476,9 +497,13 @@ function emptyFunction() {}
         fetched("page", linkId, "setOpen", open);
     });
     
-    guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId) {
-        postMessage(["movePage", linkId, parentId]);
-    })
+    guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId, insertBeforeId, doSmoothly) {
+        postMessage(["movePage", linkId, parentId, insertBeforeId, doSmoothly]);
+    });
+    
+    guiLinkTickets.addTicketFunction("eraseLink", function(linkId) {
+        postMessage(["eraseLink", linkId]);
+    });
 }
 
 // varManager

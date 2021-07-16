@@ -289,19 +289,23 @@ workerFunctions.smoothMode = function smoothMode(smoothMode) {
     doSmoothly = smoothMode;
 }
 
-workerFunctions.movePage = function movePage(linkId, parentId, insertBeforeId) {
-    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), isFinite(insertBeforeId)? getPageFromLinkId(insertBeforeId): null);
+workerFunctions.movePage = function movePage(linkId, parentId, insertBeforeId, doSmoothly) {
+    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), typeof insertBeforeId === "number"? getPageFromLinkId(insertBeforeId): null, doSmoothly);
 }
 
 workerFunctions.save = function save(pageId, line) {
     storage.store("page " + pageId, line);
 }
 
-workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {
-    getPage(pageNumber).div.setAttribute("canacceptmove", accept);
+workerFunctions.canAcceptMove = function canAcceptMove(linkId, accept) {
+    getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
 }
 
 workerFunctions.moveModeOff = moveModeOff;
+
+workerFunctions.eraseLink = function eraseLink(linkId) {
+    guiWorkerLink.links[linkId].erase();
+}
 
 /*let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
 
@@ -370,16 +374,15 @@ function makePageTools() {
 
 function toggleMoveMode(e) {
     if (editor.hasAttribute("movemode")) moveModeOff();
-    else moveModeOn(getPageNumberFromEvent(e));
+    else moveModeOn(guiWorkerLink.types.page.getLinkFromEvent(e));
 }
 
-function moveModeOn(pageNumber) {
-    let page = getPage(pageNumber);
+function moveModeOn(page) {
     if (editor.hasAttribute("movemode")) throw Error("already in move mode");
     lockedPageFocus = true;
     editor.setAttribute("movemode", "");
-    page.div.setAttribute("movingPage", "");
-    post("startMoveModeChecks", pageNumber);
+    page.div.setAttribute("movingpage", "");
+    post("startMoveModeChecks", page.linkId);
 }
 
 function moveModeOff() {
