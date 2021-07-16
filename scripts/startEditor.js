@@ -263,8 +263,8 @@ fetchTypes.page.setOpen = function setOpen(linkId, open) {
     getPageFromLinkId(linkId).setOpen(open);
 }
 
-workerFunctions.setMaxPageId = function setMaxPageId(maxId) {
-    storage.store("max pageId", maxId);
+workerFunctions.changeLinkId = function changeLinkId(oldId, newId) {
+    guiWorkerLink.links[oldId].setLinkId(newId);
 }
 
 function getPageFromLinkId(linkId) {

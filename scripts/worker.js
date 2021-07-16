@@ -57,6 +57,7 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
     returner.isOpen = false;
+    returner.unlinks = [];
     //movePage(pageNumber, parentNumber, insertBeforeNumber);
     //returner.manager.setVarValue("isInUse", false);
     //returner.manager.linkListener("isInUse", function(inUse) {guiLinkTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
@@ -122,7 +123,7 @@ function movePage(page, parent, insertBefore) {
         if (pageNumber != 0) throw Error("only page 0 can not have a parent");
         page.manager.setVarValue("siblingNumber", 1);
     }
-    if (page.unlinkGuiLink) {
+    if (page.unlinks.length>0) {
         guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
     }
 }
@@ -133,32 +134,19 @@ functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, n
 }
 
 guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
-    if (chapter.unlinkGuiLink) throw Error("gui link already set up for chapter id " + chapter.pageId);
+    if (chapter.unlinks.length > 0) throw Error("gui link already set up for chapter id " + chapter.pageId);
     guiLinks.addItem(chapter);
     postMessage(["showChapter", chapter.linkId, chapter.name]);
-    let unlinks = [];
-    unlinks.push(chapter.manager.linkListener("name", function(name) {
+    chapter.unlinks.push(chapter.manager.linkListener("name", function(name) {
         guiLinkTickets.addTicket(chapter.linkId, "name", name);
     }, true));
-    unlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
+    chapter.unlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
         guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
     }, true));
-    unlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
+    chapter.unlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
         guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
     }, true));
-    unlinks.push(function() {
-        guiLinkTickets.addTicket(chapter.linkId, "eraseLink");
-        guiLinks.eraseItem(chapter.linkId);
-        delete chapter.linkId;
-        delete chapter.unlinkGuiLink;
-    });
-    chapter.unlinkGuiLink = function unlinkGuiLink() {
-        for (let f of unlinks) f();
-    }
-}
-
-pageProto.ensureVisible = function ensureVisible() {
-    if (!this.unlinkGuiLink) guiLinkSetups[this.pageType](this);
+    if (chapter.isOpen) chapter.showToggle();
 }
 
 let preLoaders = [];
@@ -314,22 +302,44 @@ pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
 }
 
 pageProto.togglePage = function togglePage(open = false) {
-    if (!this.unlinkGuiLink) throw Error("cannot toggle page " + this.id + " because it is not visible");
+    if (this.unlinks.length === 0) throw Error("cannot toggle page " + this.id + " because it is not visible");
     if (this.isOpen == open) return;
     this.isOpen = open;
-    guiLinkTickets.addTicket(this.linkId, "setOpen", this.isOpen);
-    if (this.isChapter) {
-        for (let childPage of this.childPages) {
-            if (open) {
-                childPage.ensureVisible();
-                guiLinkTickets.addTicket(childPage.linkId, "moveTo", this.linkId, null, false);
-            } else {
-                childPage.unlinkGuiLink();
-            }
-        }
-    }
+    if (open) this.showToggle();
+    else if (this.isChapter) for (let child of this.childPages) child.unlinkGuiLinks();
     this.preSave();
     //if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
+}
+
+pageProto.showToggle = function showToggle() {
+    if (this.unlinks.length === 0 || !this.isOpen) throw Error("cannot showToggle page " + this.pageId);
+    guiLinkTickets.addTicket(this.linkId, "setOpen", true);
+    if (this.isChapter) {
+        postMessage(["smoothMode", false]);
+        for (let childPage of this.childPages) {
+            childPage.ensureVisible();
+            guiLinkTickets.addTicket(childPage.linkId, "moveTo", this.linkId, null, false);
+        }
+        postMessage(["smoothMode", true]);
+    }
+}
+
+pageProto.ensureVisible = function ensureVisible() {
+    if (this.unlinks.length === 0) guiLinkSetups[this.pageType](this);
+}
+
+pageProto.setLinkId = function setLinkId(newLinkId) {
+    let oldLinkId = this.linkId;
+    this.linkId = newLinkId;
+    if (oldLinkId == +oldLinkId && oldLinkId !== newLinkId) postMessage(["changeLinkId", oldLinkId, newLinkId]);
+}
+
+pageProto.unlinkGuiLinks = function unlinkGuiLinks() {
+    for (let unlink of this.unlinks) unlink();
+    guiLinkTickets.addTicket(this.linkId, "eraseLink");
+    guiLinks.eraseItem(this.linkId);
+    delete this.linkId;
+    this.unlinks.splice(0);
 }
 
 pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
@@ -352,6 +362,11 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
     if (page.isChapter && page.isAncestorOf(this)) return false;
     for (let child of this.childPages) if (page !== child && child.name === page.name) return false;
     return true;
+}
+
+chapterProto.unlinkGuiLinks = function unlinkGuiLinks() {
+    for (let child of this.childPages) child.unlinkGuiLinks();
+    pageProto.unlinkGuiLinks.call(this);
 }
 
 pageProto.saveToString = function saveToString() {
@@ -449,7 +464,6 @@ function emptyFunction() {}
     pageTickets.save = function save() {
         for (let pageId in this.saveTheseObject) postMessage(["save", pageId, pages.items[pageId].saveToString()]);
         this.saveTheseObject = {};
-        postMessage(["setMaxPageId", pages.items.length]);
     }
     
     var guiLinkTickets = ticketSystem.newTicketSystem();
@@ -642,7 +656,6 @@ function emptyFunction() {}
         returner.idName = idName;
         returner.setIdName = "set"+capitalizeFirstLetter(idName);
         returner.defaultSetIdName = function(id) {this[idName] = id};
-        returner.numHoles = 0;
         return returner;
     }
 
@@ -654,28 +667,9 @@ function emptyFunction() {}
     }
 
     idManager.protoModel.eraseItem = function eraseItem(id) {
-        this.items[id] = false;
-        ++this.numHoles;
-    }
-    
-    idManager.protoModel.skip = function skip() {
-        this.eraseItem(this.items.length);
-    }
-
-    idManager.protoModel.collapse = function collapse() {
-        if (this.numHoles === 0) return;
-        let shift = 0;
-        for (let i = 0; i < this.items.length; ++i) {
-            if (this.items[i]) {
-                if (shift === 0) continue;
-                let item = this.items[i];
-                item[this.idName] -= shift;
-                this.items[item[this.idName]] = item;
-                if (item.setId) item.setId(item[this.idName]);
-            } else ++shift;
-        }
-        this.items.splice(this.items.length - this.numHoles);
-        this.numHoles = 0;
+        this.items[id] = this.items[this.items.length-1];
+        this.items[id][this.setIdName](id);
+        this.items.pop();
     }
     
     pages = idManager.newManager("pageId");

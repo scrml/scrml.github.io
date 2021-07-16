@@ -34,8 +34,14 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         });
     }
     
+    pageType.protoModel.setLinkId = function setLinkId(newId, oldId = this.linkId) {
+        guiWorkerLink.linkProto.setLinkId.call(this, newId, oldId);
+        this.div.setAttribute("linkid", newId);
+        this.pageNumberOut.nodeValue = "linkId: " + newId;
+    }
+    
     pageType.protoModel.erase = function erase() {
-        gui.orphan(this.div.previousSibling);
+        gui.orphan(this.div.previousSibling); // erase the preceding page gap
         gui.orphan(this.div);
         guiWorkerLink.linkProto.erase.call(this);
     }
