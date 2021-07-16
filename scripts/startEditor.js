@@ -238,16 +238,6 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
     }*/
 }
 
-workerFunctions.setMaxPageId = function setMaxPageId(maxId) {
-    storage.store("max pageId", maxId);
-}
-
-function getPageFromLinkId(linkId) {
-    let page = guiWorkerLink.links[linkId];
-    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
-    return page;
-}
-
 fetchTypes.page = {};
 
 fetchTypes.page.name = function setName(linkId, name) {
@@ -273,6 +263,16 @@ fetchTypes.page.setOpen = function setOpen(linkId, open) {
     getPageFromLinkId(linkId).setOpen(open);
 }
 
+workerFunctions.setMaxPageId = function setMaxPageId(maxId) {
+    storage.store("max pageId", maxId);
+}
+
+function getPageFromLinkId(linkId) {
+    let page = guiWorkerLink.links[linkId];
+    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    return page;
+}
+
 workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
     let page = getPage(pageNumber);
     switch (dataName) {
@@ -287,6 +287,10 @@ workerFunctions.pageNameCheck = function pageNameCheck(parentNumber, line, resul
 
 workerFunctions.smoothMode = function smoothMode(smoothMode) {
     doSmoothly = smoothMode;
+}
+
+workerFunctions.movePage = function movePage(linkId, parentId, insertBeforeId) {
+    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), isFinite(insertBeforeId)? getPageFromLinkId(insertBeforeId): null);
 }
 
 workerFunctions.save = function save(pageId, line) {

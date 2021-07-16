@@ -66,7 +66,7 @@ gui.filicide = function filicide(element) {
 
 gui.removeLayer = function removeLayer(element) {
     if (!element.parentNode) return gui.filicide(element);
-    while (element.lastChild) element.parentNode.insertBefore(element.lastChild, element);
+    while (element.firstChild) element.parentNode.insertBefore(element.firstChild, element);
     gui.orphan(element);
 }
 
