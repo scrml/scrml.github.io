@@ -19,6 +19,6 @@ guiWorkerLink.linkProto.askWorker = function askWorker(type, questionType, propo
 
 guiWorkerLink.types = {};
 
-guiWorkerLink.openers = {};
+guiWorkerLink.linkCreators = {};
 
 guiWorkerLink.links = {};

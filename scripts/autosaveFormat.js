@@ -1,4 +1,0 @@
-var autosave = {};
-
-autosave.pageProto = {};
-

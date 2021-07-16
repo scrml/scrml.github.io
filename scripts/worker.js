@@ -4,10 +4,16 @@ The worker holds all information about the SCRML file. The only thing not in the
 */
 
 onmessage = function onmessage(e) {
-    //console.log("recieved " + e.data);
-    guiLinkTickets.openProcess();
-    functions[e.data.shift()](...e.data);
-    guiLinkTickets.closeProcess();
+    let line = e.data.toString();
+    try {
+        pageTickets.openProcess();
+        functions[e.data.shift()](...e.data);
+        pageTickets.closeProcess();
+    } catch (x) {
+        console.log("worker failing");
+        console.log(line);
+        throw x;
+    }
 }
 
 function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id, dataName, ...data])}
@@ -20,17 +26,17 @@ functions.printAll = function() {
     console.dir(pages);
 };
 
-function newPage(parentNumber, insertBeforeNumber, name, protoModel = pageProto) {
+function newPage(name, nickname = "", protoModel = pageProto) {
     let returner = Object.create(protoModel);
     pages.addItem(returner);
     returner.manager = newVarManager();
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
     returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
-    //returner.manager.linkListener("name", function() {returner.preSave()});
-    returner.manager.setVarValue("nickname", "");
+    returner.manager.linkListener("name", function() {returner.preSave()});
+    returner.manager.setVarValue("nickname", nickname);
     returner.manager.linkProperty("nickname", returner);
-    //returner.manager.linkListener("nickname", function() {returner.preSave()});
+    returner.manager.linkListener("nickname", function() {returner.preSave()});
     returner.manager.setVarValue("siblingNumber", 0);
     returner.manager.linkProperty("siblingNumber", returner);
     returner.manager.linkListener("siblingNumber", function(siblingNumber) {
@@ -42,22 +48,23 @@ function newPage(parentNumber, insertBeforeNumber, name, protoModel = pageProto)
     returner.manager.linkListener("fullPageNumber", function(fullPageNumber) {returner.updateFullName()});
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
+    returner.isOpen = false;
     //movePage(pageNumber, parentNumber, insertBeforeNumber);
     //returner.manager.setVarValue("isInUse", false);
     //returner.manager.linkListener("isInUse", function(inUse) {guiLinkTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
     //returner.manager.linkListener("isInUse", function() {returner.preSave()});
-    //returner.preSave();
+    returner.preSave();
     return returner;
 }
 
-function newChapter(parentId, insertBeforeId, name, protoModel = chapterProto) {
-    let returner = newPage(parentId, insertBeforeId, name, protoModel);
+function newChapter(name, nickname, protoModel = chapterProto) {
+    let returner = newPage(name, nickname, protoModel);
     returner.pageType = "chapter";
     returner.childPages = [];
     return returner;
 }
 
-function newStatement(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = statementProto) {
+/*function newStatement(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = statementProto) {
     let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
     returner.pageType = "statement";
     return returner;
@@ -71,57 +78,53 @@ function newComment(parentNumber, insertBeforeNumber, pageNumber, name, protoMod
     returner.manager.linkListener("tex", function(tex) {fetched(returner.pageNumber, "tex", tex)});
     returner.manager.linkListener("tex", function() {returner.preSave()});
     return returner;
-}
+}*/
 
-function movePage(pageNumber, parentNumber, insertBeforeNumber) {
-    if (pageNumber == insertBeforeNumber) return;
-    let page = pages[pageNumber], newParent = pages[parentNumber], insertBefore = pages[insertBeforeNumber];
-    if (insertBefore && page.nextPage == insertBefore) return;
-    else if (page.parent && page.parent.pageNumber == parentNumber && insertBefore == null && !page.nextPage) return;
-    fetched(pageNumber, "parent", parentNumber, insertBeforeNumber);
+function movePage(page, parent, insertBefore) {
+    if (page === insertBefore) return;
+    if (insertBefore && page.nextPage === insertBefore) return;
+    else if (page.parent && page.parent === parent && insertBefore === null && !page.nextPage) return;
     if (page.parent) {
         let oldParent = page.parent, sn = page.siblingNumber, prev = page.previousPage, next = page.nextPage;
         page.previousPage = page.nextPage = undefined;
         if (prev) prev.nextPage = next;
         if (next) next.previousPage = prev;
         oldParent.childPages.splice(sn-1, 1);
-        if (oldParent.childPages.length == 0) oldParent.manager.setVarValue("isInUse", false);
         if (next) next.manager.setVarValue("siblingNumber", next.siblingNumber - 1);
-        guiLinkTickets.addTicket(oldParent.pageNumber, "save");
+        oldParent.preSave();
     }
-    if (newParent) {
-        page.parent = newParent;
+    if (parent) {
+        page.parent = parent;
         if (insertBefore) {
             page.nextPage = insertBefore;
             page.previousPage = insertBefore.previousPage;
             if (page.previousPage) page.previousPage.nextPage = page;
             insertBefore.previousPage = page;
-            newParent.childPages.splice(insertBefore.siblingNumber-1, 0, page);
+            parent.childPages.splice(insertBefore.siblingNumber-1, 0, page);
             page.manager.setVarValue("siblingNumber", insertBefore.siblingNumber);
         } else {
-            let prev = newParent.childPages[newParent.childPages.length - 1];
-            newParent.childPages.push(page);
+            let prev = parent.childPages[parent.childPages.length - 1];
+            parent.childPages.push(page);
             page.previousPage = prev;
             if (prev) prev.nextPage = page;
-            page.manager.setVarValue("siblingNumber", newParent.childPages.length);
+            page.manager.setVarValue("siblingNumber", parent.childPages.length);
         }
-        if (!newParent.isInUse) newParent.manager.setVarValue("isInUse", true);
-        guiLinkTickets.addTicket(parentNumber, "save");
+        parent.preSave();
     } else {
         if (pageNumber != 0) throw Error("only page 0 can not have a parent");
-        page.manager.setVarValue("siblingNumber", 0);
+        page.manager.setVarValue("siblingNumber", 1);
     }
 }
 
-functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, open = false) {
+functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
     let chapter = newChapter(parentId, insertBeforeId, name);
-    if (open) guiLinkSetups.chapter(chapter);
+    if (visible) guiLinkSetups.chapter(chapter);
 }
 
 guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
-    if (chapter.unlinkGuiLink) throw Error("gui link already set up for chapter id " + chapter.id);
+    if (chapter.unlinkGuiLink) throw Error("gui link already set up for chapter id " + chapter.pageId);
     guiLinks.addItem(chapter);
-    postMessage(["openChapter", chapter.linkId, chapter.name]);
+    postMessage(["showChapter", chapter.linkId, chapter.name]);
     let unlinks = chapter.unlinkGuiLink = {};
     unlinks.name = chapter.manager.linkListener("name", function(name) {
         guiLinkTickets.addTicket(chapter.linkId, "name", name);
@@ -134,8 +137,33 @@ guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
     }, true);
 }
 
-functions.newStatement = newStatement;
-functions.newComment = newComment;
+let preLoaders = [];
+
+functions.preloadPageFromAutosave = function preloadPageFromAutosave(pageId, line) {
+    preLoaders[pageId] = line;
+}
+
+functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
+    // create all pages
+    for (let i = 0; i < preLoaders.length; ++i) {
+        if (preLoaders[i] === "skip") {
+            pages.skip();
+            continue;
+        }
+        let lines = preLoaders[i] = preLoaders[i].split("\n");
+        switch (lines[0]) {
+            case "chapter":
+                newChapter(lines[1], lines[2]);
+            break; default: throw Error("do not recognize page type " + lines[0]);
+        }
+    }
+    // set parent/child relationships
+    for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId] === "skip") continue;
+    else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pageId);
+    // set up guiLinks for visible pages
+    guiLinkSetups.chapter(pages.items[0]);
+    if (preLoaders[0][3] === "o") pages.items[0].togglePage(true);
+}
 
 functions.resetName = function resetName(pageNumber) {
     fetched(pageNumber, "name", pages[pageNumber].name);
@@ -191,8 +219,8 @@ functions.ask = function ask(type, linkId, questionType, proposedValue) {
     }
 }
 
-functions.openDetails = function openDetails(pageNumber, open) {
-    pages[pageNumber].openDetails(open);
+functions.togglePage = function togglePage(linkId, open) {
+    guiLinks.items[linkId].togglePage(open);
 }
 
 functions.setTex = function setTex(pageNumber, tex) {
@@ -212,13 +240,9 @@ functions.move = function move(movingPageNumber, parentNumber, insertBeforeNumbe
     movePage(movingPageNumber, parentNumber, insertBeforeNumber);
 }
 
-functions.openPageProcess = function openPageProcess() {guiLinkTickets.openProcess()};
+functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
 
-functions.closePageProcess = function closePageProcess() {guiLinkTickets.closeProcess()};
-
-functions.skipPageSpot = function skipPageSpot() {
-    pages.push("skipped");
-}
+functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
 functions.deletePage = function deletePage(pageNumber) {
     let page = pages[pageNumber];
@@ -235,26 +259,8 @@ functions.deletePage = function deletePage(pageNumber) {
     page.parent.preSave();
 }
 
-functions.removeSkippedPages = function removeSkippedPages() {
-    let newPages = pages.filter(function(page) {return page != "skipped"});
-    // check this part interval? after deleting page it throws this error
-    if (newPages.length == pages.length) throw Error("should only call worker's removeSkippedPages if there are skipped pages to remove, did not find any");
-    let i = 0;
-    while (i < newPages.length) newPages[i].setPageNumber(i++);
-    pages.splice(0, pages.length, ...newPages);
-    functions.saveAll();
-}
-
-functions.saveAll = function saveAll() {
-    for (let page of pages) page.preSave();
-}
-
 function getPageIdFromGuiLinkId(guiLinkId) {
-    return guiLinks.items[guiLinkId].id;
-}
-
-pageProto.setId = function setId(newId) {
-    this.id = newId;
+    return guiLinks.items[guiLinkId].pageId;
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
@@ -277,14 +283,20 @@ pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
 }
 
-pageProto.openDetails = function openDetails(open) {
-    this.isOpen = open;
-    guiLinkTickets.saveTheseObject[this.pageNumber] = undefined;
-    if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
+pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
+    movePage(this, pages.items[parentId]);
 }
 
-pageProto.preSave = function preSave() {guiLinkTickets.saveTheseObject[this.pageNumber] = undefined}
+pageProto.togglePage = function togglePage(open = false) {
+    if (!this.unlinkGuiLink) throw Error("cannot toggle page " + this.id + " because it is not visible");
+    if (this.isOpen == open) return;
+    this.isOpen = !this.isOpen;
+    guiLinkTickets.addTicket(this.linkId, "setOpen", this.isOpen);
+    this.preSave();
+    //if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
+}
 
+pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
 chapterProto.childPages = [];
 
 chapterProto.isAncestorOf = function isAncestorOf(page) {
@@ -336,11 +348,11 @@ function emptyFunction() {}
     /*
         A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open. A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed. If there are no open processes, the ticket is executed immediately.
     */
-
+    
     var ticketSystem = {};
-
+    
     var ticketProto = {};
-
+    
     ticketSystem.newTicketSystem = function newTicketSystem(protoModel = ticketProto) {
         let returner = Object.create(protoModel);
         returner.items = {};
@@ -348,91 +360,105 @@ function emptyFunction() {}
         returner.openProcesses = 0;
         return returner;
     }
-
+    
     ticketProto.addTicketFunction = function addTicketFunction(name, func) {
         if (this.ticketFunctions[name]) throw Error(name + " is already a ticket function");
         this.ticketFunctions[name] = func
     }
-
+    
     ticketProto.openProcess = function openProcess() {++this.openProcesses}
-
+    
     ticketProto.closeProcess = function closeProcess() {
         if (--this.openProcesses == 0) {
             for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
             this.items = {};
         }
     }
-
+    
     ticketProto.addTicket = function addTicket(item, ticketFunction, ...data) {
         if (this.openProcesses == 0) return this.ticketFunctions[ticketFunction](item, ...data);
         if (!this.items[item]) this.items[item] = {};
         this.items[item][ticketFunction] = data;
     }
-
+    
+    var pageTickets = ticketSystem.newTicketSystem();
+    pageTickets.saveTheseObject = {};
+    
+    pageTickets.addTicketFunction("save", function(pageId) {
+        pageTickets.saveTheseObject[pageId] = undefined;
+    });
+    
+    pageTickets.addTicket = function addTicket(pageId, ticketFunction, ...data) {
+        postMessage(["setLoadingScreen", pages.items[pageId].name + " " + ticketFunction + " " + data]);
+        ticketProto.addTicket.call(this, pageId, ticketFunction, ...data);
+    }
+    
+    pageTickets.openProcess = function openProcess() {
+        ticketProto.openProcess.call(this);
+    }
+    
+    pageTickets.closeProcess = function closeProcess() {
+        if (--this.openProcesses == 0) {
+            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
+            this.items = {};
+            this.save();
+            postMessage(["closeLoadingScreen"]);
+        }
+    }
+    
+    pageTickets.save = function save() {
+        for (let pageId in this.saveTheseObject) postMessage(["save", pageId, pages.items[pageId].saveToString()]);
+        this.saveTheseObject = {};
+        postMessage(["setMaxPageId", pages.items.length]);
+    }
+    
     var guiLinkTickets = ticketSystem.newTicketSystem();
-    guiLinkTickets.saveTheseObject = {};
-
+    
     guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
         postMessage(["setLoadingScreen", guiLinks.items[linkId].name + " " + ticketFunction + " " + data]);
         ticketProto.addTicket.call(this, linkId, ticketFunction, ...data);
     }
-
+    
+    guiLinkTickets.openProcess = function openProcess() {
+        pageTickets.openProcess();
+        ticketProto.openProcess.call(this);
+    }
+    
     guiLinkTickets.closeProcess = function closeProcess() {
         if (--this.openProcesses == 0) {
             for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-            this.items = {};
-            postMessage(["save", this.saveThese()]);
-            postMessage(["closeLoadingScreen"]);
+            pageTickets.closeProcess();
         }
     }
-
-    guiLinkTickets.saveThese = function saveThese() {
-        let returner = [];
-        for (let pageNumber in this.saveTheseObject) {
-            let save = {pageNumber: pageNumber};
-            if (pages[pageNumber] == "skipped") save.line = "skipped";
-            else save.line = pages[pageNumber].saveToString();
-            if (pages[pageNumber].pageType == "comment") {
-                save.commentTex = pages[pageNumber].tex;
-            }
-            returner.push(save);
-        }
-        this.saveTheseObject = {};
-        return returner;
-    }
-
+    
     guiLinkTickets.addTicketFunction("name", function(linkId, name) {
         fetched("page", linkId, "name", name);
     });
-
+    
     guiLinkTickets.addTicketFunction("nickname", function(linkId, nickname) {
         fetched("page", linkId, "nickname", nickname);
     });
-
+    
     guiLinkTickets.addTicketFunction("fullName", function(linkId, fullName) {
         fetched("page", linkId, "fullName", fullName);
     });
-
+    
     guiLinkTickets.addTicketFunction("pageNameCheck", function(pageId, proposedValue) {
         let page = pages.items[pageId];
         if (page.parent) for (let child of page.parent.childPages) if (proposedValue === child.name) return postMessage(["pageNameCheck", pageId, proposedValue, false]);
         page.manager.setVarValue("name", proposedValue);
     });
-
+    
     guiLinkTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
         fetched(pageNumber, "siblingNumber", siblingNumber);
     });
-
+    
     guiLinkTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
         fetched(pageNumber, "fullPageNumber", fullPageNumber);
     });
-
-    guiLinkTickets.addTicketFunction("save", function(pageNumber) {
-        guiLinkTickets.saveTheseObject[pageNumber] = undefined;
-    });
-
-    guiLinkTickets.addTicketFunction("isInUse", function(pageNumber, inUse) {
-        fetched(pageNumber, "isInUse", inUse);
+    
+    guiLinkTickets.addTicketFunction("setOpen", function(linkId, open) {
+        fetched("page", linkId, "setOpen", open);
     });
 }
 
@@ -579,6 +605,10 @@ function emptyFunction() {}
         this.items[id] = false;
         ++this.numHoles;
     }
+    
+    idManager.protoModel.skip = function skip() {
+        this.eraseItem(this.items.length);
+    }
 
     idManager.protoModel.collapse = function collapse() {
         if (this.numHoles === 0) return;
@@ -596,6 +626,6 @@ function emptyFunction() {}
         this.numHoles = 0;
     }
     
-    pages = idManager.newManager();
+    pages = idManager.newManager("pageId");
     guiLinks = idManager.newManager("linkId");
 }

@@ -2,7 +2,6 @@
 scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.ensureJS("xml", ["gui"]);
 scriptLoader.ensureJS("jax");
-scriptLoader.ensureJS("autosaveFormat", ["storage"]);
 scriptLoader.ensureJS("guiWorkerLink", ["gui"]);
 scriptLoader.ensureJS("page", ["guiWorkerLink"]);
 scriptLoader.addEphemeralListener(function() {
@@ -23,6 +22,10 @@ function setDebugAction(action) {
 
 setDebugAction(function() {
     localStorage.clear();
+    localStorage.setItem("max pageId", "3");
+    localStorage.setItem("page 0", "chapter\nBook\n\no\n1 2");
+    localStorage.setItem("page 1", "chapter\nfirstChild\nFirst Child\nc\n");
+    localStorage.setItem("page 2", "chapter\nsecondChild\nSecond Child\nc\n");
     window.location.reload();
 });
 
@@ -80,13 +83,8 @@ function start() {
         
     }
     
-    workerFunctions.openChapter = guiWorkerLink.openers.chapter;
+    workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
     
-    post("newChapter", null, null, "Book", true);
-    
-    if (1>0) return;
-    
-    editor.appendChild(testDiv);
     makePageTools();
     
     // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
@@ -98,64 +96,21 @@ function start() {
     }
     
     // make root chapter/saved pages
-    if (!storage.fetch("0")) storage.store("0", "chapter\nBook\n\no\n");
+    if (!storage.fetch("max pageId")) storage.store("max pageId", 1);
+    if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
     loadPages();
+    
+    storage.deactivated = true;
 }
 
-/*function loadPages() {
+function loadPages() {
     post("openPageProcess");
     doSmoothly = false;
-    let page = 0, line;
-    let codeout = document.getElementById("codeout");
-    codeout.innerHTML = "<hr>";
-    while (line = storage.fetch(page)) {
-        codeout.innerHTML += line + "<hr>";
-        loadPage(page++);
-    }
-    for (let info of pageLoadingInformation) if (info) post("move", info.page, info.parent);
-    function doIt(pageNumber) {
-        console.log("doing " + pageNumber);
-        if (pageLoadingInformation[pageNumber]) post("move", pageNumber, pageLoadingInformation[pageNumber].parent, pageLoadingInformation[pageNumber].insertBefore);
-        if (pageNumber < pageLoadingInformation.length) window.setTimeout(function() {doIt(pageNumber + 1)}, 1000);
-    }
-    doIt(-1);
+    let maxPageId = storage.fetch("max pageId");
+    for (let i = 0; i < maxPageId; ++i) post("preloadPageFromAutosave", i, storage.fetch("page " + i));
+    post("flushLoadPagesFromAutosave");
     post("closePageProcess");
 }
-
-let pageLoadingInformation = [];
-
-let printSaves = false;
-if (printSaves) document.getElementById("codeout").innerHTML = "<hr>";
-
-function loadPage(pageNumber) {
-    doSmoothly = false;
-    if (pages[pageNumber]) throw Error("page " + pageNumber + " already exists");
-    let line = storage.fetch(pageNumber);
-    if (printSaves) document.getElementById("codeout").innerHTML += (line == "skipped"? pageNumber + " skipped": line) + "<hr>";
-    if (line == "skipped") return skipPageSpot();
-    let lines = line.split("\n");
-    switch (lines[0]) {
-        case "chapter":
-            if (pageNumber != newChapter(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
-            if (lines[4].length > 0) {
-                let preChildren = lines[4].split(" "), children = [];
-                for (let child of preChildren) if (child != "") children.push(child);
-                for (let i = 0; i < children.length; ++i) pageLoadingInformation.push({
-                    page: children[i],
-                    parent: pageNumber,
-                    insertBefore: i+1==children.length? null: children[i+1]
-                });
-            }
-        break; case "statement":
-            if (pageNumber != newStatement(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
-        break; case "comment":
-            if (pageNumber != newComment(pageNumber == 0? null: 0, null, lines[1])) throw Error("wrong page number");
-            post("setTex", pageNumber, storage.fetch("tex " + pageNumber));
-        break; default: throw Error("do not recognize page type " + lines[0]);
-    }
-    post("setNickname", pageNumber, lines[2]);
-    if (lines[3] == "o") getPage(pageNumber).div.setAttribute("open", "");
-}*/
 
 function post(functionName, ...args) {
     workerFunctions.setLoadingScreen(functionName + ": " + commaJoin(args));
@@ -188,54 +143,6 @@ function newComment(parentNumber = null, insertBefore = null, name = "Book") {
     page.texOut = gui.element("p", page.div, ["class", "texout"]);
     page.texOut.addEventListener("click", texInFromEvent);
     return pageNumber;
-}
-
-function newPageGap(page, insertBefore = null) {
-    let returner = gui.element("div", page? page.div: null, ["class", "pagegap"], insertBefore? insertBefore.div: null);
-    returner.addEventListener("focusin", pageGapFocus);
-    let newPageIn = gui.element("input", returner, ["class", "newpagein", "placeholder", "new "+pageMode, "disguise", ""]);
-    newPageIn.addEventListener("blur", clearPageGap);
-    newPageIn.addEventListener("change", newPageInChanged);
-    gui.text("❌", gui.element("button", returner, ["class", "dontmovehere", "disabled", ""]));
-    let moveHereButton = gui.element("button", returner, ["class", "movehere"]);
-    gui.text("⇦", moveHereButton);
-    moveHereButton.addEventListener("click", doMove);
-    return returner;
-}
-
-function getPageGapFromEvent(event) {
-    let gap = event.target;
-    while (gap.getAttribute("class") != "pagegap") gap = gap.parentElement;
-    return gap;
-}
-
-function pageGapFocus(event) {
-    focusedPageGap = getPageGapFromEvent(event);
-}
-
-function clearPageGap(event) {
-    let gap = getPageGapFromEvent(event);
-    for (let child of gap.querySelectorAll(".newpagein")) {
-        child.blur();
-        child.value = "";
-    }
-}
-
-function getGapParentNumber(gap) {
-    while (!gap.hasAttribute("pagenumber")) gap = gap.parentElement;
-    return gap.getAttribute("pagenumber");
-}
-
-function getGapNextPageNumber(gap) {
-    if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("pagenumber");
-    else return null;
-}
-
-function newPageInChanged(event) {
-    let gap = getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
-    if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newPageIn, "invalid nodeName");
-    clearPageGap({target: gap});
-    post("pageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
 }
 */
 workerFunctions.pseudoPost = post;
@@ -331,11 +238,20 @@ workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
     }*/
 }
 
+workerFunctions.setMaxPageId = function setMaxPageId(maxId) {
+    storage.store("max pageId", maxId);
+}
+
+function getPageFromLinkId(linkId) {
+    let page = guiWorkerLink.links[linkId];
+    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    return page;
+}
+
 fetchTypes.page = {};
 
 fetchTypes.page.name = function setName(linkId, name) {
-    let page = guiWorkerLink.links[linkId];
-    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
+    let page = getPageFromLinkId(linkId);
     if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
     else {
         page.nameSpan.value = name;
@@ -346,15 +262,15 @@ fetchTypes.page.name = function setName(linkId, name) {
 }
 
 fetchTypes.page.nickname = function setNickname(linkId, nickname) {
-    let page = guiWorkerLink.links[linkId];
-    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
-    page.nicknameSpan.value = nickname;
+    getPageFromLinkId(linkId).nicknameSpan.value = nickname;
 }
 
 fetchTypes.page.fullName = function setFullName(linkId, fullName) {
-    let page = guiWorkerLink.links[linkId];
-    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
-    page.fullNameText.nodeValue = fullName;
+    getPageFromLinkId(linkId).fullNameText.nodeValue = fullName;
+}
+
+fetchTypes.page.setOpen = function setOpen(linkId, open) {
+    getPageFromLinkId(linkId).setOpen(open);
 }
 
 workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
@@ -367,35 +283,14 @@ workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
 
 workerFunctions.pageNameCheck = function pageNameCheck(parentNumber, line, result) {
     console.log("page name result " + parentNumber + " " + line + " " + result);
-    if (1>0) return;
-    if (parentNumber != focusedPageGap.parentElement.getAttribute("pagenumber")) throw Error("mismatch in parent during check for new page");
-    let newPageIn = focusedPageGap.querySelector(".newpagein");
-    if (result) {
-        let constructors = {
-            chapter: newChapter,
-            statement: newStatement,
-            comment: newComment
-        };
-        let pageNumber = constructors[pageMode](parentNumber, focusedPageGap.nextElementSibling? focusedPageGap.nextElementSibling.getAttribute("pagenumber"): null, line);
-        getPage(pageNumber).div.setAttribute("open", "");
-        post("openDetails", pageNumber, true);
-        newPageIn.value = "";
-        newPageIn.blur();
-    } else {
-        newPageIn.value = line;
-        gui.inputOutput.inputText(newPageIn, "naming conflict");
-    }
 }
 
 workerFunctions.smoothMode = function smoothMode(smoothMode) {
     doSmoothly = smoothMode;
 }
 
-workerFunctions.save = function save(saves) {
-    for (let save of saves) {
-        storage.store(save.pageNumber, save.line);
-        if ("commentTex" in save) storage.store("tex " + save.pageNumber, save.commentTex); 
-    }
+workerFunctions.save = function save(pageId, line) {
+    storage.store("page " + pageId, line);
 }
 
 workerFunctions.canAcceptMove = function canAcceptMove(pageNumber, accept) {

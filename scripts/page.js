@@ -14,6 +14,71 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         guiWorkerLink.linkProto.askWorker.call(this, "page", questionType, proposedValue);
     }
     
+    pageType.protoModel.setOpen = function setOpen(open) {
+        if (open) {
+            this.div.setAttribute("open", "");
+            if (!this.firstPageGap) this.firstPageGap = this.lastPageGap = this.newPageGap();
+        }
+        else this.div.removeAttribute("open");
+    }
+    
+    // page gaps
+    {
+        let gaps = pageType.pageGaps = {};
+        gaps.getPageGapFromEvent = function getPageGapFromEvent(event) {
+            let gap = event.target;
+            while (gap.getAttribute("class") != "pagegap") gap = gap.parentElement;
+            return gap;
+        }
+        
+        gaps.pageGapFocus = function pageGapFocus(event) {
+            focusedPageGap = gaps.getPageGapFromEvent(event);
+        }
+        
+        gaps.clearPageGap = function clearPageGap(event) {
+            let gap = gaps.getPageGapFromEvent(event);
+            for (let child of gap.querySelectorAll(".newpagein")) {
+                child.blur();
+                child.value = "";
+            }
+        }
+        
+        gaps.getGapParentId = function getGapParentId(gap) {
+            while (!gap.hasAttribute("linkid")) gap = gap.parentElement;
+            return gap.getAttribute("linkid");
+        }
+        
+        gaps.getGapNextPageId = function getGapNextPageId(gap) {
+            if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("linkid");
+            else return null;
+        }
+        
+        gaps.newPageInChanged = function newPageInChanged(event) {
+            let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
+            if (1>0) return console.log("under construction newPageInChanged");
+            if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newPageIn, "invalid nodeName");
+            clearPageGap({target: gap});
+            post("pageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
+        }
+        
+        gaps.doMove = function doMove(event) {
+            console.log("doing move");
+        }
+
+        pageType.protoModel.newPageGap = function newPageGap(insertBefore = null) {
+            let gap = gui.element("div", this.div, ["class", "pagegap"], insertBefore? insertBefore.div: null);
+            gap.addEventListener("focusin", gaps.pageGapFocus);
+            gap.newPageIn = gui.element("input", gap, ["class", "newpagein", "placeholder", "new "+pageMode, "disguise", ""]);
+            gap.newPageIn.addEventListener("blur", gaps.clearPageGap);
+            gap.newPageIn.addEventListener("change", gaps.newPageInChanged);
+            gui.text("❌", gui.element("button", gap, ["class", "dontmovehere", "disabled", ""]));
+            gap.moveHereButton = gui.element("button", gap, ["class", "movehere"]);
+            gui.text("⇦", gap.moveHereButton);
+            gap.moveHereButton.addEventListener("click", gaps.doMove);
+            return gap;
+        }
+    }
+    
     pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
         let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
         page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId], insertBefore);
@@ -50,7 +115,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     
     pageType.toggleListener = function(e, type = pageType) {
         e = type.getLinkFromEvent(e, type);
-        console.log("toggling");
+        post("togglePage", e.linkId, e.div.hasAttribute("open"));
     }
     
     pageType.focusListener = function(e, type = pageType) {
@@ -77,7 +142,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     chapterType.climber = gui.basicClimber(".chapter", editor);
     portTypedEventListeners(pageType, chapterType, ["getLinkFromEvent", "nameBlurredListener", "focusListener", "toggleListener", "nameProcessorListener"]);
         
-    guiWorkerLink.openers.chapter = function openGuiChapter(linkId, name) {
+    guiWorkerLink.linkCreators.chapter = function openGuiChapter(linkId, name) {
         let returner = pageType.createUnit(linkId, editor, null, chapterType);
         return returner;
     }
