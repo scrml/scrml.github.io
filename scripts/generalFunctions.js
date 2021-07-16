@@ -8,7 +8,7 @@ function loadCSS(location) {
 
 function isAncestorOf(older, younger, parentCalled = "parent") {
     while (younger) {
-        if (older == younger) return true;
+        if (older === younger) return true;
         younger = younger[parentCalled];
     }
     return false;

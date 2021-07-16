@@ -78,6 +78,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     
     pageType.toggleListener = function(e) {
         e = pageType.getLinkFromEvent(e);
+        if (lockedPageFocus && e !== lockedPageFocus && isAncestorOf(e.div, lockedPageFocus.div, "parentElement")) return e.div.setAttribute("open", "");
         post("togglePage", e.linkId, e.div.hasAttribute("open"));
     }
     
@@ -108,7 +109,7 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         let gaps = chapterType.pageGaps = {};
         gaps.getPageGapFromEvent = function getPageGapFromEvent(event) {
             let gap = event.target;
-            while (gap.getAttribute("class") != "pagegap") gap = gap.parentElement;
+            while (gap.className !== "pagegap") gap = gap.parentElement;
             return gap;
         }
         
@@ -143,7 +144,8 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         }
         
         gaps.doMove = function doMove(event) {
-            console.log("doing move");
+            let gap = gaps.getPageGapFromEvent(event);
+            post("movePage", editor.querySelector("[movingpage]").getAttribute("linkid"), gaps.getGapParentId(gap), gaps.getGapNextPageId(gap));
         }
 
         chapterType.newPageGap = function newPageGap(loadHere, insertBefore = null) {

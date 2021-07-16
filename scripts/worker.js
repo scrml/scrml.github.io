@@ -122,6 +122,9 @@ function movePage(page, parent, insertBefore) {
         if (pageNumber != 0) throw Error("only page 0 can not have a parent");
         page.manager.setVarValue("siblingNumber", 1);
     }
+    if (page.unlinkGuiLink) {
+        guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
+    }
 }
 
 functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
@@ -258,8 +261,9 @@ functions.endMoveMode = function endMoveMode() {
     movingPage = false;
 }
 
-functions.move = function move(movingPageNumber, parentNumber, insertBeforeNumber) {
-    movePage(movingPageNumber, parentNumber, insertBeforeNumber);
+functions.movePage = function movePageTranslation(movingPageLinkId, parentLinkId, insertBeforeLinkId) {
+    movePage(getPageFromLinkId(movingPageLinkId), getPageFromLinkId(parentLinkId), insertBeforeLinkId == +insertBeforeLinkId? getPageFromLinkId(insertBeforeLinkId): null);
+    guiLinkTickets.addTicket(movingPageLinkId, "moveModeOff");
 }
 
 functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
@@ -500,6 +504,10 @@ function emptyFunction() {}
     guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId, insertBeforeId, doSmoothly) {
         postMessage(["movePage", linkId, parentId, insertBeforeId, doSmoothly]);
     });
+    
+    guiLinkTickets.addTicketFunction("moveModeOff", function() {
+        postMessage(["moveModeOff"]);
+    })
     
     guiLinkTickets.addTicketFunction("eraseLink", function(linkId) {
         postMessage(["eraseLink", linkId]);

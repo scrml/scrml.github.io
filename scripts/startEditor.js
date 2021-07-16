@@ -290,7 +290,7 @@ workerFunctions.smoothMode = function smoothMode(smoothMode) {
 }
 
 workerFunctions.movePage = function movePage(linkId, parentId, insertBeforeId, doSmoothly) {
-    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), typeof insertBeforeId === "number"? getPageFromLinkId(insertBeforeId): null, doSmoothly);
+    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), insertBeforeId == +insertBeforeId? getPageFromLinkId(insertBeforeId): null, doSmoothly);
 }
 
 workerFunctions.save = function save(pageId, line) {
@@ -379,7 +379,7 @@ function toggleMoveMode(e) {
 
 function moveModeOn(page) {
     if (editor.hasAttribute("movemode")) throw Error("already in move mode");
-    lockedPageFocus = true;
+    lockedPageFocus = page;
     editor.setAttribute("movemode", "");
     page.div.setAttribute("movingpage", "");
     post("startMoveModeChecks", page.linkId);
