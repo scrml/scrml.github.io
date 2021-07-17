@@ -20,13 +20,17 @@ function setDebugAction(action) {
     debugButton.onclick = action;
 }
 
-setDebugAction(function() {
+/*setDebugAction(function() {
     localStorage.clear();
-    localStorage.setItem("max pageId", "3");
     localStorage.setItem("page 0", "chapter\nBook\n\no\n1 2");
     localStorage.setItem("page 1", "chapter\nfirstChild\nFirst Child\nc\n");
     localStorage.setItem("page 2", "chapter\nsecondChild\nSecond Child\nc\n");
     window.location.reload();
+});*/
+
+setDebugAction(function() {
+    let pn = 0, line;
+    while (line = storage.fetch("page " + pn++)) console.log(line);
 });
 
 // configuration parameters

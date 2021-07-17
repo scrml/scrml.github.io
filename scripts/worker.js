@@ -6,9 +6,10 @@ The worker holds all information about the SCRML file. The only thing not in the
 onmessage = function onmessage(e) {
     let line = e.data.toString();
     try {
-        pageTickets.openProcess();
+        let line = e.data.toString();
+        guiLinkTickets.openProcess();
         functions[e.data.shift()](...e.data);
-        pageTickets.closeProcess();
+        guiLinkTickets.closeProcess();
     } catch (x) {
         console.log("worker failing");
         console.log(line);
@@ -176,15 +177,10 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // set parent/child relationships
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId] === "skip") continue;
     else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pageId);
+    // set toggles
+    for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] == "o");
     // set up guiLinks for visible pages
     guiLinkSetups.chapter(pages.items[0]);
-    function openPage(page) {
-        if (preLoaders[page.pageId][3] === "o") {
-            page.togglePage(true);
-            if (page.isChapter) for (let child of page.childPages) openPage(child);
-        }
-    }
-    openPage(pages.items[0]);
     pageTickets.addTicket(0, "smoothMode", "true");
 }
 
@@ -329,13 +325,13 @@ pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
 }
 
 pageProto.togglePage = function togglePage(open = false) {
-    if (this.unlinks.length === 0) throw Error("cannot toggle page " + this.id + " because it is not visible");
     if (this.isOpen == open) return;
     this.isOpen = open;
+    this.preSave();
+    if (this.unlinks.length === 0) return;
     if (open) this.showToggle();
     else if (this.isChapter) for (let child of this.childPages) child.unlinkGuiLinks();
-    this.preSave();
-    //if (open && movingPage) postMessage(["canAcceptMove", this.pageNumber, this.canAcceptMove(movingPage)]);
+    //if (open && movingPage) postMessage(["canAcceptMove", this.linkId, this.canAcceptMove(movingPage)]);
 }
 
 pageProto.showToggle = function showToggle() {
@@ -359,11 +355,12 @@ pageProto.setLinkId = function setLinkId(newLinkId) {
     let oldLinkId = this.linkId;
     this.linkId = newLinkId;
     if (oldLinkId == +oldLinkId && oldLinkId !== newLinkId) postMessage(["changeLinkId", oldLinkId, newLinkId]);
+    guiLinkTickets.items[newLinkId] = guiLinkTickets.items[oldLinkId];
 }
 
 pageProto.unlinkGuiLinks = function unlinkGuiLinks() {
     for (let unlink of this.unlinks) unlink();
-    guiLinkTickets.addTicket(this.linkId, "eraseLink");
+    postMessage(["eraseLink", this.linkId]);
     guiLinks.eraseItem(this.linkId);
     delete this.linkId;
     this.unlinks.splice(0);
@@ -392,7 +389,7 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
 }
 
 chapterProto.unlinkGuiLinks = function unlinkGuiLinks() {
-    for (let child of this.childPages) child.unlinkGuiLinks();
+    if (this.isOpen) for (let child of this.childPages) child.unlinkGuiLinks();
     pageProto.unlinkGuiLinks.call(this);
 }
 
@@ -444,14 +441,19 @@ function emptyFunction() {}
         this.ticketFunctions[name] = func
     }
     
-    ticketProto.openProcess = function openProcess() {++this.openProcesses}
+    ticketProto.openProcess = function openProcess() {
+        ++this.openProcesses;
+    }
     
     ticketProto.closeProcess = function closeProcess() {
         if (--this.openProcesses == 0) {
             for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
             this.items = {};
+            this.closeProcessHook();
         }
     }
+    
+    ticketProto.closeProcessHook = emptyFunction;
     
     ticketProto.addTicket = function addTicket(item, ticketFunction, ...data) {
         if (this.openProcesses == 0) return this.ticketFunctions[ticketFunction](item, ...data);
@@ -460,6 +462,7 @@ function emptyFunction() {}
     }
     
     var pageTickets = ticketSystem.newTicketSystem();
+    pageTickets.name = "page tickets";
     pageTickets.saveTheseObject = {};
     
     pageTickets.addTicketFunction("save", function(pageId) {
@@ -479,13 +482,9 @@ function emptyFunction() {}
         ticketProto.openProcess.call(this);
     }
     
-    pageTickets.closeProcess = function closeProcess() {
-        if (--this.openProcesses == 0) {
-            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-            this.items = {};
-            this.save();
-            postMessage(["closeLoadingScreen"]);
-        }
+    pageTickets.closeProcessHook = function closeProcessHook() {
+        this.save();
+        postMessage(["closeLoadingScreen"]);
     }
     
     pageTickets.save = function save() {
@@ -494,6 +493,7 @@ function emptyFunction() {}
     }
     
     var guiLinkTickets = ticketSystem.newTicketSystem();
+    guiLinkTickets.name = "guiLink tickets";
     
     guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
         postMessage(["setLoadingScreen", getPageFromLinkId(linkId).name + " " + ticketFunction + " " + data]);
@@ -505,11 +505,8 @@ function emptyFunction() {}
         ticketProto.openProcess.call(this);
     }
     
-    guiLinkTickets.closeProcess = function closeProcess() {
-        if (--this.openProcesses == 0) {
-            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-            pageTickets.closeProcess();
-        }
+    guiLinkTickets.closeProcessHook = function closeProcessHook() {
+        pageTickets.closeProcess();
     }
     
     guiLinkTickets.addTicketFunction("name", function(linkId, name) {
@@ -546,10 +543,6 @@ function emptyFunction() {}
     
     guiLinkTickets.addTicketFunction("moveModeOff", function() {
         postMessage(["moveModeOff"]);
-    })
-    
-    guiLinkTickets.addTicketFunction("eraseLink", function(linkId) {
-        postMessage(["eraseLink", linkId]);
     });
     
     guiLinkTickets.addTicketFunction("newPageNameCheckFail", function(linkId) {
@@ -693,7 +686,7 @@ function emptyFunction() {}
     }
 
     idManager.protoModel.addItem = function addItem(item) {
-        if (this.idName in item) throw Error("item already has property " + this.idName);
+        if (this.idName in item) throw Error("item already has property " + this.idName + ": " + item[this.idName]);
         if (!item[this.setIdName]) item[this.setIdName] = this.defaultSetIdName;
         item[this.setIdName](this.items.length);
         this.items.push(item);
@@ -703,8 +696,14 @@ function emptyFunction() {}
         this.items[id] = this.items[this.items.length-1];
         this.items[id][this.setIdName](id);
         this.items.pop();
+        this.eraseItemHook(id);
     }
+    
+    idManager.protoModel.eraseItemHook = emptyFunction;
     
     pages = idManager.newManager("pageId");
     guiLinks = idManager.newManager("linkId");
+    guiLinks.eraseItemHook = function(id) {
+        delete guiLinkTickets.items[id];
+    }
 }
