@@ -129,8 +129,12 @@ function movePage(page, parent, insertBefore) {
 }
 
 functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
-    let chapter = newChapter(parentId, insertBeforeId, name);
-    if (visible) guiLinkSetups.chapter(chapter);
+    let chapter = newChapter(name);
+    if (visible) {
+        chapter.moveTo(parentId, insertBeforeId);
+        guiLinkSetups.chapter(chapter);
+        guiLinkTickets.addTicket(chapter.linkId, "moveTo", parentId, insertBeforeId, false);
+    }
 }
 
 guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
@@ -260,6 +264,18 @@ functions.movePage = function movePageTranslation(movingPageLinkId, parentLinkId
     guiLinkTickets.addTicket(movingPageLinkId, "moveModeOff");
 }
 
+functions.newPageNameCheck = function newPageNameCheck(parentLinkId, line, insertBeforeLinkId, pageMode) {
+    let parent = getPageFromLinkId(parentLinkId);
+    if (!parent.isChapter) throw Error("page " + page.pageId + " is not a chapter");
+    for (let child of parent.childPages) if (child.name == line) return guiLinkTickets.addTicket(parentLinkId, "newPageNameCheckFail");
+    guiLinkTickets.addTicket(parentLinkId, "clearPageGap");
+    switch (pageMode) {
+        case "chapter":
+            functions.newChapter(parentLinkId, insertBeforeLinkId, line, true);
+        break; default: throw Error("do not recognize page mode " + pageMode);
+    }
+}
+
 functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
@@ -304,7 +320,7 @@ pageProto.updateFullName = function updateFullName() {
 }
 
 pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
-    movePage(this, pages.items[parentId]);
+    movePage(this, pages.items[parentId], insertBefore? pages.items[insertBefore]: null);
 }
 
 pageProto.togglePage = function togglePage(open = false) {
@@ -532,6 +548,14 @@ function emptyFunction() {}
     guiLinkTickets.addTicketFunction("eraseLink", function(linkId) {
         postMessage(["eraseLink", linkId]);
     });
+    
+    guiLinkTickets.addTicketFunction("newPageNameCheckFail", function(linkId) {
+        postMessage(["newPageNameCheckFail", linkId]);
+    });
+    
+    guiLinkTickets.addTicketFunction("clearPageGap", function() {
+        postMessage(["clearPageGap"]);
+    })
 }
 
 // varManager

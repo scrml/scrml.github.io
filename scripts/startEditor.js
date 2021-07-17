@@ -104,8 +104,8 @@ function start() {
 function loadPages() {
     post("openPageProcess");
     doSmoothly = false;
-    let maxPageId = storage.fetch("max pageId");
-    for (let i = 0; i < maxPageId; ++i) post("preloadPageFromAutosave", i, storage.fetch("page " + i));
+    let i = -1, line;
+    while (line = storage.fetch("page " + ++i)) post("preloadPageFromAutosave", i, line);
     post("flushLoadPagesFromAutosave");
     post("closePageProcess");
 }
@@ -271,9 +271,19 @@ function getPageFromLinkId(linkId) {
     return page;
 }
 
-workerFunctions.pageNameCheck = function pageNameCheck(linkId, line, result) {
-    if (result) console.log("success");
-    else getPageFromLinkId(linkId).newNameFail(line);
+workerFunctions.pageNameCheckFail = function pageNameCheckFail(linkId, line) {
+    getPageFromLinkId(linkId).newNameFail(line);
+}
+
+workerFunctions.newPageNameCheckFail = function newPageNameCheckFail(parentLinkId) {
+    if (parentLinkId != guiWorkerLink.types.page.getLinkFromEvent({target: focusedPageGap}).linkId) throw Error("checking new page name message mismatch");
+    gui.messages.inputText(focusedPageGap.newPageIn, "name conflict");
+}
+
+workerFunctions.clearPageGap = function clearPageGap() {
+    if (!focusedPageGap) return;
+    guiWorkerLink.types.chapter.pageGaps.clearPageGap({target: focusedPageGap});
+    focusedPageGap = false;
 }
 
 workerFunctions.smoothMode = function smoothMode(smoothMode) {

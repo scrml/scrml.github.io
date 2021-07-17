@@ -148,10 +148,8 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         
         gaps.newPageInChanged = function newPageInChanged(event) {
             let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
-            if (1>0) return console.log("under construction newPageInChanged");
-            if (!gui.nodeNameScreen(line)) return gui.inputOutput.inputText(newPageIn, "invalid nodeName");
-            clearPageGap({target: gap});
-            post("pageNameCheck", gap.parentElement.getAttribute("pagenumber"), line);
+            if (!gui.nodeNameScreen(line)) return gui.messages.inputText(newPageIn, "invalid nodeName");
+            post("newPageNameCheck", gap.parentElement.getAttribute("linkid"), line, gaps.getGapNextPageId(gap), pageMode);
         }
         
         gaps.doMove = function doMove(event) {
