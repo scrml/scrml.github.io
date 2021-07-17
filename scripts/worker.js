@@ -235,7 +235,7 @@ functions.ask = function ask(type, linkId, questionType, proposedValue) {
     switch (type) {
         case "page":
             switch (questionType) {
-                case "name": guiLinkTickets.addTicket(getPageIdFromGuiLinkId(linkId), "pageNameCheck", proposedValue);
+                case "name": getPageFromLinkId(linkId).tryChangePageName(proposedValue);
                 break; default: throw Error("do not recognize dataName " + dataName);
             }
         break; default: throw Error("do not recognize type " + type);
@@ -317,6 +317,11 @@ pageProto.computeFullName = function computeFullName() {
 
 pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
+}
+
+pageProto.tryChangePageName = function tryChangePageName(proposedName) {
+    if (this.parent) for (let childPage of this.parent.childPages) if (childPage !== this && childPage.name == proposedName) return guiLinkTickets.addTicket(this.linkId, "pageNameCheckFail", proposedName);
+    this.manager.setVarValue("name", proposedName);
 }
 
 pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
@@ -519,10 +524,8 @@ function emptyFunction() {}
         fetched("page", linkId, "fullName", fullName);
     });
     
-    guiLinkTickets.addTicketFunction("pageNameCheck", function(pageId, proposedValue) {
-        let page = pages.items[pageId];
-        if (page.parent) for (let child of page.parent.childPages) if (proposedValue === child.name) return postMessage(["pageNameCheck", pageId, proposedValue, false]);
-        page.manager.setVarValue("name", proposedValue);
+    guiLinkTickets.addTicketFunction("pageNameCheckFail", function(pageId, proposedValue) {
+        postMessage(["pageNameCheckFail", pageId, proposedValue]);
     });
     
     guiLinkTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {

@@ -1,4 +1,6 @@
 gui.nodeNameScreen = function nodeNameScreen(line) {
+    // block these separation characters explicitly
+    if (line.includes(".") || line.includes("/")) return false;
     try {
         document.createElement(line);
         return true;
