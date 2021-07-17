@@ -23,18 +23,23 @@ function setDebugAction(action) {
     debugButton.onclick = action;
 }
 
-/*setDebugAction(function() {
-    localStorage.clear();
-    localStorage.setItem("page 0", "chapter\nBook\n\no\n1 2");
-    localStorage.setItem("page 1", "chapter\nfirstChild\nFirst Child\nc\n");
-    localStorage.setItem("page 2", "chapter\nsecondChild\nSecond Child\nc\n");
-    window.location.reload();
-});*/
-
-setDebugAction(function() {
-    let pn = 0, line;
-    while (line = storage.fetch("page " + pn++)) console.log(line);
-});
+switch (1) {
+    case 0: 
+        setDebugAction(function() {
+            localStorage.clear();
+            localStorage.setItem("page 0", "chapter\nBook\n\no\n1 2");
+            localStorage.setItem("page 1", "chapter\nfirstChild\nFirst Child\nc\n");
+            localStorage.setItem("page 2", "chapter\nsecondChild\nSecond Child\nc\n");
+            window.location.reload();
+        });
+    break; case 1:
+        setDebugAction(function() {
+            let pn = 0, line, lineOut = "saves:";
+            while (line = storage.fetch("page " + pn++)) lineOut += "\npage " + (pn-1) + ":\n"+line;
+            document.getElementById("errorout").textContent = lineOut;
+        });
+    break;
+}
 
 // configuration parameters
 let doSmoothly, smoothDuration = .3, newPageHeight, pageMode;
@@ -55,8 +60,12 @@ let doSmoothly, smoothDuration = .3, newPageHeight, pageMode;
 // editor parts
 let root, pageTools, pageLinks = {}, worker,  workerFunctions = {log: console.log}, focusedPageGap, lockedPageFocus = false, loadingScreen;
 
+// functions to be initialized
+let getLinkFromElement;
+
 var ids;
 function start() {
+    getLinkFromElement = guiWorkerLink.types.page.getLinkFromEvent;
     // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
     
     let activityTimer = newTimer(onInactivity, 10000);
@@ -104,7 +113,6 @@ function start() {
     }
     
     // make root chapter/saved pages
-    if (!storage.fetch("max pageId")) storage.store("max pageId", 1);
     if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
     loadPages();
 }
@@ -284,7 +292,7 @@ workerFunctions.pageNameCheckFail = function pageNameCheckFail(linkId, line) {
 }
 
 workerFunctions.newPageNameCheckFail = function newPageNameCheckFail(parentLinkId) {
-    if (parentLinkId != guiWorkerLink.types.page.getLinkFromEvent({target: focusedPageGap}).linkId) throw Error("checking new page name message mismatch");
+    if (parentLinkId != getLinkFromElement(focusedPageGap).linkId) throw Error("checking new page name message mismatch");
     gui.messages.inputText(focusedPageGap.newPageIn, "name conflict");
 }
 
@@ -314,6 +322,17 @@ workerFunctions.moveModeOff = moveModeOff;
 
 workerFunctions.eraseLink = function eraseLink(linkId) {
     guiWorkerLink.links[linkId].erase();
+}
+
+workerFunctions.canDelete = function canDelete(linkId) {
+    let item = guiWorkerLink.links[linkId];
+    if (item.isPage) {
+        if (item === getLinkFromElement(pageTools)) pageTools.deleteBundle.showDelete();
+    }
+}
+
+workerFunctions.deleteAutosaveEntry = function deleteAutosaveEntry(pageId) {
+    storage.erase("page " + pageId);
 }
 
 workerFunctions.errorOut = function errorOut(message) {
@@ -382,12 +401,16 @@ function makePageTools() {
     pageTools = gui.element("div", false, ["id", "pagetools"]);
     pageTools.moveButton = gui.button("⇳", pageTools, toggleMoveMode, ["disguise", "", "bigger", ""]);
     gui.shieldClicks(pageTools.moveButton);
-    pageTools.deleteBundle = gui.deleteBundle(pageTools, function() {deletePage(isFocused)});
+    pageTools.deleteBundle = gui.deleteBundle(pageTools, function() {
+        let page = getLinkFromElement(pageTools);
+        if (!page.isPage) throw Error("cannot delete link " + page.linkId + ", it is not a page");
+        page.deletePage();
+    });
 }
 
 function toggleMoveMode(e) {
     if (editor.hasAttribute("movemode")) moveModeOff();
-    else moveModeOn(guiWorkerLink.types.page.getLinkFromEvent(e));
+    else moveModeOn(getLinkFromElement(e));
 }
 
 function moveModeOn(page) {

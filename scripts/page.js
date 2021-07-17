@@ -51,13 +51,17 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         guiWorkerLink.linkProto.erase.call(this);
     }
     
+    pageType.protoModel.deletePage = function deletePage() {
+        post("deletePage", this.linkId);
+    }
+    
     pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
         let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
         page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId, "ispage", ""], insertBefore);
         page.div.addEventListener("toggle", type.toggleListener);
         page.div.addEventListener("mouseenter", type.focusListener);
+        page.div.addEventListener("mouseleave", type.blurListener);
         page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
-        page.pageHead.addEventListener("mouseenter", type.focusListener);
         page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
         page.siblingNumberText = gui.text("", page.siblingNumberSpan);
         page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullpagenumber"]);
@@ -97,6 +101,15 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         if (lockedPageFocus) return;
         e = pageType.getLinkFromEvent(e);
         e.pageHead.appendChild(pageTools);
+        pageTools.deleteBundle.hideDelete();
+        e.askWorker("canDelete");
+    }
+    
+    pageType.blurListener = function(e) {
+        if (lockedPageFocus) return;
+        e = pageType.getLinkFromEvent(e);
+        if (e.linkId == 0) return;
+        pageType.focusListener(e.div.parentElement);
     }
     
     pageType.nameProcessorListener = function(e) {

@@ -11,7 +11,7 @@ onmessage = function onmessage(e) {
         functions[e.data.shift()](...e.data);
         guiLinkTickets.closeProcess();
     } catch (x) {
-        postMessage(["errorOut", line + "\n" + x.message]);
+        postMessage(["errorOut", "worker error " + line + "\n" + x.message]);
         throw x;
     }
 }
@@ -20,16 +20,16 @@ function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id,
 
 function getPageFromLinkId(linkId) {
     let returner = guiLinks.items[linkId];
-    if (!returner.isPage) throw Error("link " + linkId + " is not a page");
+    if (!returner || !returner.isPage) throw Error("link " + linkId + " is not a page");
     return returner;
 }
 
-let functions = {}, pages, pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiUnits = [], guiLinkSetups = {};
+let functions = {}, pages, pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiLinkSetups = {};
 
 functions.log = console.log;
 
 functions.printAll = function() {
-    console.dir(pages);
+    console.log(pages);
 };
 
 pageProto.isPage = true;
@@ -38,6 +38,8 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     let returner = Object.create(protoModel);
     pages.addItem(returner);
     returner.manager = newVarManager();
+    returner.manager.setVarValue("pageId", returner.pageId);
+    returner.manager.linkProperty("pageId", returner);
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
     returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
@@ -57,11 +59,8 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
     returner.isOpen = false;
-    returner.unlinks = [];
-    //movePage(pageNumber, parentNumber, insertBeforeNumber);
-    //returner.manager.setVarValue("isInUse", false);
-    //returner.manager.linkListener("isInUse", function(inUse) {guiLinkTickets.addTicket(returner.pageNumber, "isInUse", inUse)}, true);
-    //returner.manager.linkListener("isInUse", function() {returner.preSave()});
+    returner.isVisible = false;
+    returner.guiUnlinks = [];
     returner.preSave();
     return returner;
 }
@@ -73,81 +72,67 @@ function newChapter(name, nickname, protoModel = chapterProto) {
     return returner;
 }
 
-/*function newStatement(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = statementProto) {
-    let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
-    returner.pageType = "statement";
-    return returner;
-}
-
-function newComment(parentNumber, insertBeforeNumber, pageNumber, name, protoModel = commentProto) {
-    let returner = newPage(parentNumber, insertBeforeNumber, pageNumber, name, protoModel);
-    returner.pageType = "comment";
-    returner.manager.setVarValue("tex", "");
-    returner.manager.linkProperty("tex", returner);
-    returner.manager.linkListener("tex", function(tex) {fetched(returner.pageNumber, "tex", tex)});
-    returner.manager.linkListener("tex", function() {returner.preSave()});
-    return returner;
-}*/
-
 function movePage(page, parent, insertBefore) {
+    
+    // some moves result in no change, so return if this is the case
     if (page === insertBefore) return;
     if (insertBefore && page.nextPage === insertBefore) return;
-    else if (page.parent && page.parent === parent && insertBefore === null && !page.nextPage) return;
+    if (page.parent && page.parent === parent && insertBefore === null && !page.nextPage) return;
+    
+    // notify the old parent of the move
     if (page.parent) {
         let oldParent = page.parent, sn = page.siblingNumber, prev = page.previousPage, next = page.nextPage;
         page.previousPage = page.nextPage = undefined;
         if (prev) prev.nextPage = next;
         if (next) next.previousPage = prev;
-        oldParent.childPages.splice(sn-1, 1);
+        oldParent.childPages.splice(sn - 1, 1);
         if (next) next.manager.setVarValue("siblingNumber", next.siblingNumber - 1);
         oldParent.preSave();
     }
-    if (parent) {
-        page.parent = parent;
-        if (insertBefore) {
-            page.nextPage = insertBefore;
-            page.previousPage = insertBefore.previousPage;
-            if (page.previousPage) page.previousPage.nextPage = page;
-            insertBefore.previousPage = page;
-            parent.childPages.splice(insertBefore.siblingNumber-1, 0, page);
-            page.manager.setVarValue("siblingNumber", insertBefore.siblingNumber);
-        } else {
-            let prev = parent.childPages[parent.childPages.length - 1];
-            parent.childPages.push(page);
-            page.previousPage = prev;
-            if (prev) prev.nextPage = page;
-            page.manager.setVarValue("siblingNumber", parent.childPages.length);
-        }
-        parent.preSave();
+    
+    // move to new parent
+    page.parent = parent;
+    if (insertBefore) {
+        page.nextPage = insertBefore;
+        page.previousPage = insertBefore.previousPage;
+        if (page.previousPage) page.previousPage.nextPage = page;
+        insertBefore.previousPage = page;
+        parent.childPages.splice(insertBefore.siblingNumber - 1, 0, page);
+        page.manager.setVarValue("siblingNumber", insertBefore.siblingNumber);
     } else {
-        if (pageNumber != 0) throw Error("only page 0 can not have a parent");
-        page.manager.setVarValue("siblingNumber", 1);
+        let prev = parent.childPages[parent.childPages.length - 1];
+        parent.childPages.push(page);
+        page.previousPage = prev;
+        if (prev) prev.nextPage = page;
+        page.manager.setVarValue("siblingNumber", parent.childPages.length);
     }
-    if (page.unlinks.length > 0) {
-        guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
-    }
+    parent.preSave();
+    
+    // if this is visible, message that the icon needs to move
+    if (page.isVisible) guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
 }
 
 functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
     let chapter = newChapter(name);
-    if (visible) {
-        chapter.moveTo(parentId, insertBeforeId);
-        guiLinkSetups.chapter(chapter);
-        guiLinkTickets.addTicket(chapter.linkId, "moveTo", parentId, insertBeforeId, false);
-    }
+    chapter.moveTo(parentId, insertBeforeId);
+    if (visible) guiLinkSetups.chapter(chapter);
 }
 
 guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
-    if (chapter.unlinks.length > 0) throw Error("gui link already set up for chapter id " + chapter.pageId);
+    if (chapter.isVisible) throw Error("gui link already set up for chapter id " + chapter.pageId);
+    chapter.isVisible = true;
     guiLinks.addItem(chapter);
+    chapter.manager.setVarValue("linkId", chapter.linkId);
+    chapter.manager.linkProperty("linkId", chapter);
     postMessage(["showChapter", chapter.linkId, chapter.name]);
-    chapter.unlinks.push(chapter.manager.linkListener("name", function(name) {
+    if (chapter.parent) guiLinkTickets.addTicket(chapter.linkId, "moveTo", chapter.parent.linkId, chapter.nextPage? chapter.nextPage.linkId: null, false);
+    chapter.guiUnlinks.push(chapter.manager.linkListener("name", function(name) {
         guiLinkTickets.addTicket(chapter.linkId, "name", name);
     }, true));
-    chapter.unlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
+    chapter.guiUnlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
         guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
     }, true));
-    chapter.unlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
+    chapter.guiUnlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
         guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
     }, true));
     if (chapter.isOpen) chapter.showToggle();
@@ -183,42 +168,14 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     pageTickets.addTicket(0, "smoothMode", "true");
 }
 
-functions.resetName = function resetName(pageNumber) {
-    fetched(pageNumber, "name", pages[pageNumber].name);
-}
-
-functions.resetNickname = function resetNickname(pageNumber) {
-    fetched(pageNumber, "nickname", pages[pageNumber].nickname);
-}
-
-functions.setName = function setName(pageNumber, name) {
-    let page = pages[pageNumber];
-    if (!page.parent) return page.manager.setVarValue("name", name);
-    let sibling = page.previousPage;
-    while (sibling) {
-        if (sibling.name == name) return postMessage(["errorOut", pageNumber, "name", name]);
-        sibling = sibling.previousPage;
-    }
-    sibling = page.nextPage;
-    while (sibling) {
-        if (sibling.name == name) return postMessage(["errorOut", pageNumber, "name", name]);
-        sibling = sibling.nextPage;
-    }
-    page.manager.setVarValue("name", name);
-    guiLinkTickets.addTicket(pageNumber, "save");
-}
-
-functions.setNickname = function setNickname(pageNumber, nickname) {
-    pages[pageNumber].manager.setVarValue("nickname", nickname);
-    guiLinkTickets.addTicket(pageNumber, "save");
-}
-
 functions.fetch = function fetch(type, linkId, dataName) {
-    let link = getPageFromLinkId(linkId), data;
+    let idItem, data;
     switch (type) {
         case "page":
+            idItem = getPageFromLinkId(linkId);
             switch (dataName) {
-                case "name": data = [link.name];
+                case "name": data = [idItem.name];
+                break; case "nickname": data = [idItem.nickname];
                 break; default: throw Error("do not recognize dataName " + dataName);
             }
         break; default: throw Error("do not recognize type " + type);
@@ -227,11 +184,14 @@ functions.fetch = function fetch(type, linkId, dataName) {
 }
 
 functions.ask = function ask(type, linkId, questionType, proposedValue) {
+    let idItem;
     switch (type) {
         case "page":
+            idItem = getPageFromLinkId(linkId);
             switch (questionType) {
-                case "name": getPageFromLinkId(linkId).tryChangePageName(proposedValue);
-                break; default: throw Error("do not recognize dataName " + dataName);
+                case "name": idItem.tryChangePageName(proposedValue);
+                break; case "canDelete": idItem.checkCanDelete();
+                break; default: throw Error("do not recognize dataName " + questionType);
             }
         break; default: throw Error("do not recognize type " + type);
     }
@@ -239,10 +199,6 @@ functions.ask = function ask(type, linkId, questionType, proposedValue) {
 
 functions.togglePage = function togglePage(linkId, open) {
     getPageFromLinkId(linkId).togglePage(open);
-}
-
-functions.setTex = function setTex(pageNumber, tex) {
-    pages[pageNumber].manager.setVarValue("tex", tex);
 }
 
 functions.startMoveModeChecks = function startMoveModeChecks(linkId) {
@@ -261,7 +217,7 @@ functions.movePage = function movePageTranslation(movingPageLinkId, parentLinkId
 
 functions.newPageNameCheck = function newPageNameCheck(parentLinkId, line, insertBeforeLinkId, pageMode) {
     let parent = getPageFromLinkId(parentLinkId);
-    if (!parent.isChapter) throw Error("page " + page.pageId + " is not a chapter");
+    if (!parent.isChapter) throw Error("page " + parent.pageId + " is not a chapter");
     for (let child of parent.childPages) if (child.name == line) return guiLinkTickets.addTicket(parentLinkId, "newPageNameCheckFail");
     guiLinkTickets.addTicket(parentLinkId, "clearPageGap");
     switch (pageMode) {
@@ -275,11 +231,12 @@ functions.openPageProcess = function openPageProcess() {pageTickets.openProcess(
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
-functions.deletePage = function deletePage(pageNumber) {
-    let page = pages[pageNumber];
-    if (page.isInUse) throw Error("page " + pageNumber + " is still in use");
-    page.preSave();
-    pages[pageNumber] = "skipped";
+functions.deletePage = function deletePage(linkId) {
+    let page = getPageFromLinkId(linkId);
+    if (!page.canDelete()) throw Error("page " + linkId + " is still in use");
+    // erase gui link
+    page.makeInvisible();
+    // remove from family tree
     let prev = page.previousPage, next = page.nextPage;
     if (prev) {
         prev.nextPage = next;
@@ -288,10 +245,8 @@ functions.deletePage = function deletePage(pageNumber) {
     if (next) next.previousPage = prev;
     page.parent.childPages.splice(page.siblingNumber - 1, 1);
     page.parent.preSave();
-}
-
-function getPageIdFromGuiLinkId(linkId) {
-    return getPageFromLinkId(linkId).pageId;
+    // remove from list of all pages
+    pages.eraseItem(page.pageId);
 }
 
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
@@ -327,45 +282,55 @@ pageProto.togglePage = function togglePage(open = false) {
     if (this.isOpen == open) return;
     this.isOpen = open;
     this.preSave();
-    if (this.unlinks.length === 0) return;
+    if (!this.isVisible) return;
     if (open) this.showToggle();
-    else if (this.isChapter) for (let child of this.childPages) child.unlinkGuiLinks();
+    else if (this.isChapter) for (let child of this.childPages) child.makeInvisible();
     //if (open && movingPage) postMessage(["canAcceptMove", this.linkId, this.canAcceptMove(movingPage)]);
 }
 
 pageProto.showToggle = function showToggle() {
-    if (this.unlinks.length === 0 || !this.isOpen) throw Error("cannot showToggle page " + this.pageId);
+    if (!this.isVisible || !this.isOpen) throw Error("cannot showToggle page " + this.pageId);
     guiLinkTickets.addTicket(this.linkId, "setOpen", true);
-    if (this.isChapter) {
-        postMessage(["smoothMode", false]);
-        for (let childPage of this.childPages) {
-            childPage.ensureVisible();
-            guiLinkTickets.addTicket(childPage.linkId, "moveTo", this.linkId, null, false);
-        }
-        postMessage(["smoothMode", true]);
-    }
+    if (this.isChapter) for (let childPage of this.childPages) guiLinkSetups[childPage.pageType](childPage);
 }
 
 pageProto.ensureVisible = function ensureVisible() {
-    if (this.unlinks.length === 0) guiLinkSetups[this.pageType](this);
+    if (!this.isVisible) guiLinkSetups[this.pageType](this);
+}
+
+pageProto.setPageId = function setPageId(newPageId) {
+    let oldPageId = this.pageId;
+    if (oldPageId == newPageId) return;
+    this.pageId = newPageId;
+    if (oldPageId == undefined) return;
+    pageTickets.items[newPageId] = pageTickets.items[oldPageId];
+    delete pageTickets.items[oldPageId];
+    this.preSave();
+    if (this.parent) this.parent.preSave();
 }
 
 pageProto.setLinkId = function setLinkId(newLinkId) {
     let oldLinkId = this.linkId;
+    if (oldLinkId == newLinkId) return;
     this.linkId = newLinkId;
-    if (oldLinkId == +oldLinkId && oldLinkId !== newLinkId) postMessage(["changeLinkId", oldLinkId, newLinkId]);
+    if (oldLinkId == undefined) return;
+    postMessage(["changeLinkId", oldLinkId, newLinkId]);
     guiLinkTickets.items[newLinkId] = guiLinkTickets.items[oldLinkId];
+    delete guiLinkTickets.items[oldLinkId];
 }
 
-pageProto.unlinkGuiLinks = function unlinkGuiLinks() {
-    for (let unlink of this.unlinks) unlink();
+pageProto.makeInvisible = function makeInvisible() {
     postMessage(["eraseLink", this.linkId]);
+    for (let unlink of this.guiUnlinks) unlink();
+    this.guiUnlinks.splice(0);
     guiLinks.eraseItem(this.linkId);
+    this.manager.deleteVar("linkId");
     delete this.linkId;
-    this.unlinks.splice(0);
+    this.isVisible = false;
 }
 
 pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
+
 chapterProto.isChapter = true;
 
 chapterProto.isAncestorOf = function isAncestorOf(page) {
@@ -387,9 +352,10 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
     return true;
 }
 
-chapterProto.unlinkGuiLinks = function unlinkGuiLinks() {
-    if (this.isOpen) for (let child of this.childPages) child.unlinkGuiLinks();
-    pageProto.unlinkGuiLinks.call(this);
+chapterProto.makeInvisible = function makeInvisible() {
+    if (!this.isVisible) throw Error("page already invisible");
+    if (this.isOpen) for (let child of this.childPages) child.makeInvisible();
+    pageProto.makeInvisible.call(this);
 }
 
 pageProto.saveToString = function saveToString() {
@@ -403,17 +369,20 @@ chapterProto.saveToString = function saveToString() {
     return line;
 }
 
-statementProto.saveToString = function saveToString() {
-    let line = pageProto.saveToString.call(this);
-    return line;
+pageProto.canDelete = trueFunction;
+
+pageProto.checkCanDelete = function checkCanDelete() {
+    if (!this.isVisible) throw Error("checking if an invisible page can be deleted");
+    if (!this.canDelete()) return;
+    guiLinkTickets.addTicket(this.linkId, "canDelete");
 }
 
-commentProto.saveToString = function saveToString() {
-    let line = pageProto.saveToString.call(this);
-    return line;
+chapterProto.canDelete = function canDelete() {
+    return this.childPages.length === 0;
 }
 
 function emptyFunction() {}
+function trueFunction() {return true}
 
 // Workers don't have a way of importing js except modules, but modules don't work on locally hosted sites, so we just put copy/paste all the modules here.
 
@@ -550,7 +519,11 @@ function emptyFunction() {}
     
     guiLinkTickets.addTicketFunction("clearPageGap", function() {
         postMessage(["clearPageGap"]);
-    })
+    });
+    
+    guiLinkTickets.addTicketFunction("canDelete", function(linkId) {
+        postMessage(["canDelete", linkId]);
+    });
 }
 
 // varManager
@@ -695,13 +668,20 @@ function emptyFunction() {}
         this.items[id] = this.items[this.items.length-1];
         this.items[id][this.setIdName](id);
         this.items.pop();
-        this.eraseItemHook(id);
+        this.eraseItemHook(this.items.length);
     }
     
     idManager.protoModel.eraseItemHook = emptyFunction;
     
     pages = idManager.newManager("pageId");
+    
+    pages.eraseItemHook = function(id) {
+        delete pageTickets.items[id];
+        postMessage(["deleteAutosaveEntry", id]);
+    }
+    
     guiLinks = idManager.newManager("linkId");
+    
     guiLinks.eraseItemHook = function(id) {
         delete guiLinkTickets.items[id];
     }
