@@ -11,8 +11,7 @@ onmessage = function onmessage(e) {
         functions[e.data.shift()](...e.data);
         guiLinkTickets.closeProcess();
     } catch (x) {
-        console.log("worker failing");
-        console.log(line);
+        postMessage(["errorOut", line + "\n" + x.message]);
         throw x;
     }
 }
@@ -707,3 +706,5 @@ function emptyFunction() {}
         delete guiLinkTickets.items[id];
     }
 }
+
+postMessage(["errorOut", ""]);

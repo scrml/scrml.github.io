@@ -1,3 +1,5 @@
+document.getElementById("errorout").textContent = "Loading components ...";
+
 // load required scripts
 scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.ensureJS("xml", ["gui"]);
@@ -6,6 +8,7 @@ scriptLoader.ensureJS("guiWorkerLink", ["gui"]);
 scriptLoader.ensureJS("page", ["guiWorkerLink"]);
 scriptLoader.addEphemeralListener(function() {
     scriptLoader.items.gui.addEphemeralListener("js", function() {
+        document.getElementById("errorout").textContent = "Loading gui modules ...";
         gui.ensureAllModules(function() {
             scriptLoader.addEphemeralListener(start);
         });
@@ -72,6 +75,7 @@ function start() {
     }
     
     // start the worker
+    document.getElementById("errorout").textContent = "Loading worker ...";
     worker = guiWorkerLink.worker = new Worker(filePrefix+"scripts/worker.js");
     
     // all messages start with the name of the response handler function then list the arguments to give that handler
@@ -81,7 +85,7 @@ function start() {
         try {
             workerFunctions[e.data.shift()](...e.data);
         } catch (x) {
-            console.log("failing " + line);
+            document.getElementById("errorout").textContent = line + "\n" + x.message;
             throw x;
         }
         
@@ -310,6 +314,10 @@ workerFunctions.moveModeOff = moveModeOff;
 
 workerFunctions.eraseLink = function eraseLink(linkId) {
     guiWorkerLink.links[linkId].erase();
+}
+
+workerFunctions.errorOut = function errorOut(message) {
+    document.getElementById("errorout").textContent = message;
 }
 
 /*let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
