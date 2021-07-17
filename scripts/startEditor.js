@@ -271,16 +271,9 @@ function getPageFromLinkId(linkId) {
     return page;
 }
 
-workerFunctions.errorOut = function errorOut(pageNumber, dataName, ...data) {
-    let page = getPage(pageNumber);
-    switch (dataName) {
-        case "name": // data is [failedName]
-            gui.inputOutput.inputText(page.nameSpan, "naming conflict");
-    }
-}
-
-workerFunctions.pageNameCheck = function pageNameCheck(parentNumber, line, result) {
-    console.log("page name result " + parentNumber + " " + line + " " + result);
+workerFunctions.pageNameCheck = function pageNameCheck(linkId, line, result) {
+    if (result) console.log("success");
+    else getPageFromLinkId(linkId).newNameFail(line);
 }
 
 workerFunctions.smoothMode = function smoothMode(smoothMode) {

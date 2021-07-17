@@ -9,7 +9,8 @@ gui.messages.textNode = function textNode(textNode, message, time) {
 }
 
 gui.messages.inputText = function inputText(input, message, time = 1000) {
-    let wasAble = !input.hasAttribute("disabled");
+    let wasFocused = input === document.activeElement;
+    if (!input.hasAttribute("disabled")) input.setAttribute("wasable", "");
     input.setAttribute("messagerevertto", input.value);
     input.value = message;
     input.setAttribute("disabled", "");
@@ -20,10 +21,12 @@ gui.messages.inputText = function inputText(input, message, time = 1000) {
     window.setTimeout(function() {
         input.value = input.getAttribute("messagerevertto");
         input.removeAttribute("messagerevertto");
-        if (wasAble) input.removeAttribute("disabled");
+        if (input.hasAttribute("wasable")) {
+            input.removeAttribute("disabled");
+            input.removeAttribute("wasable");
+        }
         document.head.removeChild(style);
         input.removeAttribute("min-width" + width);
-        input.focus();
     }, time);
 }
 

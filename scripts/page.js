@@ -40,6 +40,11 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         this.pageNumberOut.nodeValue = "linkId: " + newId;
     }
     
+    pageType.protoModel.newNameFail = function newNameFail(line) {
+        this.nameSpan.value = line;
+        gui.messages.inputText(this.nameSpan, "name conflict");
+    }
+    
     pageType.protoModel.erase = function erase() {
         gui.orphan(this.div.previousSibling); // erase the preceding page gap
         gui.orphan(this.div);
