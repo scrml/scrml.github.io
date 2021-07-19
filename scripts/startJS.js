@@ -1,10 +1,12 @@
-var scriptLoader;
-
 {
-    let loaderScript = document.createElement("script");
-    loaderScript.setAttribute("src", filePrefix + "scripts/loader.js");
+    let loaderScript = document.createElement("script"),
+        scriptLocations = scrmljs.scriptLocations,
+        scripts = scrmljs.scripts,
+        filePrefix = scrmljs.filePrefix;
+    loaderScript.setAttribute("src", scrmljs.filePrefix + "scripts/loader.js");
     loaderScript.addEventListener("load", function() {
-        scriptLoader = Loader.newLoader();
+        let Loader = scrmljs.Loader,
+            scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
         Loader.tiers.js(scriptLoader);
         
         // add items
@@ -22,9 +24,9 @@ var scriptLoader;
     document.head.appendChild(loaderScript);
 }
 
-function emptyFunction() {}
+scrmljs.emptyFunction = function emptyFunction() {}
 
-function isEmpty(obj) {
+scrmljs.isEmpty = function isEmpty(obj) {
     for (let prop in obj) return false;
     return true;
 }

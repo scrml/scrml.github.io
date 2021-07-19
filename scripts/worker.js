@@ -688,3 +688,18 @@ function trueFunction() {return true}
 }
 
 postMessage(["errorOut", ""]);
+
+let obj = {line: "console.log('not set')"};
+
+functions.printLoader = function() {
+    console.log("printing loader");
+    eval(obj.line);
+    console.log(Loader);
+};
+
+let req = new XMLHttpRequest();
+req.onload = function(x) {obj.line = req.responseText};
+req.onerror = function(x) {console.log("error")}
+req.open("get", "../scripts/loader.js");
+req.overrideMimeType("text/plaintext");
+req.send();

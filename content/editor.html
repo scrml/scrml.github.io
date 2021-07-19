@@ -7,18 +7,20 @@
         <link rel="stylesheet" type="text/css" href="../styles/editor.css"/>
         <script>
             // for script loading from startJS
-            let filePrefix = "../";
-            let scriptLocations = {
-                generalFunctions: "scripts/generalFunctions.js",
-                storage: "scripts/storage.js",
-                varManager: "scripts/varManager.js",
-                startEditor: "scripts/startEditor.js"
-            }
-            let scripts = {
-                generalFunctions: [],
-                storage: [],
-                varManager: [],
-                startEditor: ["generalFunctions", "storage"]
+            let scrmljs = {
+                filePrefix: "../",
+                scriptLocations : {
+                    generalFunctions: "scripts/generalFunctions.js",
+                    storage: "scripts/storage.js",
+                    varManager: "scripts/varManager.js",
+                    startEditor: "scripts/startEditor.js"
+                },
+                scripts: {
+                    generalFunctions: [],
+                    storage: [],
+                    varManager: [],
+                    startEditor: ["generalFunctions", "storage"]
+                }
             }
         </script>
         <script src="../scripts/startJS.js"></script>

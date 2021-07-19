@@ -24,10 +24,10 @@
                 linkedLists.lastProperty = {previous: linkedLists.firstProperty, object: linkedLists, propertyName: "value"};
                 linkedLists.firstProperty.next = linkedLists.lastProperty;
                 linkedLists.firstListener = {};
-                linkedLists.lastListener = {previous: linkedLists.firstListener, listener: emptyFunction};
+                linkedLists.lastListener = {previous: linkedLists.firstListener, listener: scrmljs.emptyFunction};
                 linkedLists.firstListener.next = linkedLists.lastListener;
                 linkedLists.firstUnlink = {};
-                linkedLists.lastUnlink = {previous: linkedLists.firstUnlink, unlink: emptyFunction};
+                linkedLists.lastUnlink = {previous: linkedLists.firstUnlink, unlink: scrmljs.emptyFunction};
                 linkedLists.firstUnlink.next = linkedLists.lastUnlink;
             }
             let change = this.vars[name], unit = change.firstProperty, oldValue = change.value;
@@ -109,7 +109,7 @@
         }
     }
     
-    function newVarManager() {
+    scrmljs.newVarManager = function newVarManager() {
         let returner = Object.create(varManagerProtoModel);
         returner.vars = {};
         return returner;
