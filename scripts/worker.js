@@ -108,7 +108,6 @@ function newChapter(name, nickname, protoModel = chapterProto) {
 }
 
 function movePage(page, parent, insertBefore) {
-    
     // some moves result in no change, so return if this is the case
     if (page === insertBefore) return;
     if (insertBefore && page.nextPage === insertBefore) return;
@@ -257,7 +256,7 @@ functions.newPageNameCheck = function newPageNameCheck(parentLinkId, line, inser
     guiLinkTickets.addTicket(parentLinkId, "clearPageGap");
     switch (pageMode) {
         case "chapter":
-            functions.newChapter(parentLinkId, insertBeforeLinkId, line, true);
+            functions.newChapter(parent.pageId, insertBeforeLinkId>=0? getPageFromLinkId(insertBeforeLinkId).pageId: null, line, true);
         break; default: throw Error("do not recognize page mode " + pageMode);
     }
 }

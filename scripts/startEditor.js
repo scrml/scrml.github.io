@@ -70,7 +70,7 @@
     }
     
     // editor parts
-    let root, pageLinks = {}, worker,  workerFunctions = {log: console.log}, focusedPageGap, loadingScreen;
+    let root, pageLinks = {}, worker,  workerFunctions = {log: console.log}, loadingScreen;
     scrmljs.lockedPageFocus = false, bothInitialized = {editor: false, worker: false};
     
     // functions to be initialized
@@ -311,14 +311,14 @@
     }
     
     workerFunctions.newPageNameCheckFail = function newPageNameCheckFail(parentLinkId) {
-        if (parentLinkId != getLinkFromElement(focusedPageGap).linkId) throw Error("checking new page name message mismatch");
-        gui.messages.inputText(focusedPageGap.newPageIn, "name conflict");
+        if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
+        gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
     }
     
     workerFunctions.clearPageGap = function clearPageGap() {
-        if (!focusedPageGap) return;
-        guiWorkerLink.types.chapter.pageGaps.clearPageGap({target: focusedPageGap});
-        focusedPageGap = false;
+        if (!scrmljs.focusedPageGap) return;
+        guiWorkerLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
+        scrmljs.focusedPageGap = false;
     }
     
     workerFunctions.smoothMode = function smoothMode(smoothMode) {

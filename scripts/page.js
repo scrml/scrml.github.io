@@ -149,7 +149,7 @@
             }
             
             gaps.pageGapFocus = function pageGapFocus(event) {
-                focusedPageGap = gaps.getPageGapFromEvent(event);
+                scrmljs.focusedPageGap = gaps.getPageGapFromEvent(event);
             }
             
             gaps.clearPageGap = function clearPageGap(event) {
