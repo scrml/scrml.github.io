@@ -1,23 +1,32 @@
-let scrmljs = {
+let pageTickets, guiLinkTickets, pages, guiLinks, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
         varManager: "scripts/varManager.js",
         idManager: "scripts/idManager.js",
-        initializePages: "scripts/initializePages.js"
+        overloadManager: "scripts/overloadManager.js",
+        guiWorkerLink: "scripts/guiWorkerLink.js",
+        //page: "scripts/guiLinks/page.js"
     },
     scripts: {
         generalFunctions: [],
         varManager: [],
         idManager: ["generalFunctions"],
-        initializePages: ["idManager"]
+        overloadManager: [],
+        guiWorkerLink: ["varManager", "idManager", "overloadManager"],
+        //page: ["guiWorkerLink"]
+    },
+    emptyFunction: function emptyFunction() {},
+        isEmpty: function isEmpty(obj) {
+        for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
+        return true;
     }
 }
 
-scrmljs.importWorkerScript = function importWorkerScript(location, finished) {
+scrmljs.importScript = function importScript(location, finished) {
     let req = new XMLHttpRequest();
     req.onload = function(x) {
-        try {Function(req.responseText)()}
+        try {Function("{"+req.responseText+"\r\n}")()}
         catch (e) {
             console.log("error with imported script " + location);
             console.log(req.responseText);
@@ -31,7 +40,150 @@ scrmljs.importWorkerScript = function importWorkerScript(location, finished) {
     req.send();
 }
 
-scrmljs.importWorkerScript(scrmljs.filePrefix + "scripts/startJSW.js", function() {});
+{
+    let scriptLocations = scrmljs.scriptLocations,
+        scripts = scrmljs.scripts,
+        filePrefix = scrmljs.filePrefix;
+    scrmljs.importScript(filePrefix + "scripts/loader.js", function() {
+        let Loader = scrmljs.Loader,
+            scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
+        Loader.tiers.js(scriptLoader);
+        
+        // add items
+        function addScript(name) {
+            if (name in scriptLoader.items) return;
+            let dependencies = scripts[name].length === 0? {}: {js: {}};
+            for (let subscript of scripts[name]) {
+                addScript(subscript);
+                dependencies.js[subscript] = undefined;
+            }
+            scriptLoader.addItem(name, dependencies, {js: filePrefix+scriptLocations[name]});
+        }
+        for (let script in scripts) addScript(script);
+        scriptLoader.addEphemeralListener(function() {
+            {
+                scrmljs.mainLink = scrmljs.guiWorkerLink.openGuiWorkerLink(functions, "worker");
+                console.log("main link");
+                console.log(scrmljs.mainLink);
+                
+                
+                
+                
+                let overloadProto = scrmljs.overloadManager.protoModel;
+                pageTickets = scrmljs.overloadManager.newOverloadManager();
+                pageTickets.name = "page tickets";
+                pageTickets.saveTheseObject = {};
+                
+                pageTickets.addTicketFunction("save", function(pageId) {
+                    pageTickets.saveTheseObject[pageId] = undefined;
+                });
+                
+                pageTickets.addTicketFunction("smoothMode", function(pageId, smoothMode){
+                    postMessage(["smoothMode", smoothMode]);
+                });
+                
+                pageTickets.addTicket = function addTicket(pageId, ticketFunction, ...data) {
+                    postMessage(["setLoadingScreen", pages.items[pageId].name + " " + ticketFunction + " " + data]);
+                    overloadProto.addTicket.call(this, pageId, ticketFunction, ...data);
+                }
+                
+                pageTickets.openProcess = function openProcess() {
+                    // postMessage(["openLoadingScreen"]);
+                    overloadProto.openProcess.call(this);
+                }
+                
+                pageTickets.closeProcessHook = function closeProcessHook() {
+                    this.save();
+                    postMessage(["closeLoadingScreen"]);
+                }
+                
+                pageTickets.save = function save() {
+                    for (let pageId in this.saveTheseObject) postMessage(["save", pageId, pages.items[pageId].saveToString()]);
+                    this.saveTheseObject = {};
+                }
+                
+                guiLinkTickets = scrmljs.overloadManager.newOverloadManager();
+                guiLinkTickets.name = "guiLink tickets";
+                
+                guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
+                    postMessage(["setLoadingScreen", getPageFromLinkId(linkId).name + " " + ticketFunction + " " + data]);
+                    overloadProto.addTicket.call(this, linkId, ticketFunction, ...data);
+                }
+                
+                guiLinkTickets.openProcess = function openProcess() {
+                    pageTickets.openProcess();
+                    overloadProto.openProcess.call(this);
+                }
+                
+                guiLinkTickets.closeProcessHook = function closeProcessHook() {
+                    pageTickets.closeProcess();
+                }
+                
+                guiLinkTickets.addTicketFunction("name", function(linkId, name) {
+                    fetched("page", linkId, "name", name);
+                });
+                
+                guiLinkTickets.addTicketFunction("nickname", function(linkId, nickname) {
+                    fetched("page", linkId, "nickname", nickname);
+                });
+                
+                guiLinkTickets.addTicketFunction("fullName", function(linkId, fullName) {
+                    fetched("page", linkId, "fullName", fullName);
+                });
+                
+                guiLinkTickets.addTicketFunction("pageNameCheckFail", function(pageId, proposedValue) {
+                    postMessage(["pageNameCheckFail", pageId, proposedValue]);
+                });
+                
+                guiLinkTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
+                    fetched(pageNumber, "siblingNumber", siblingNumber);
+                });
+                
+                guiLinkTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
+                    fetched(pageNumber, "fullPageNumber", fullPageNumber);
+                });
+                
+                guiLinkTickets.addTicketFunction("setOpen", function(linkId, open) {
+                    fetched("page", linkId, "setOpen", open);
+                });
+                
+                guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId, insertBeforeId, doSmoothly) {
+                    postMessage(["movePage", linkId, parentId, insertBeforeId, doSmoothly]);
+                });
+                
+                guiLinkTickets.addTicketFunction("moveModeOff", function() {
+                    postMessage(["moveModeOff"]);
+                });
+                
+                guiLinkTickets.addTicketFunction("newPageNameCheckFail", function(linkId) {
+                    postMessage(["newPageNameCheckFail", linkId]);
+                });
+                
+                guiLinkTickets.addTicketFunction("clearPageGap", function() {
+                    postMessage(["clearPageGap"]);
+                });
+                
+                guiLinkTickets.addTicketFunction("canDelete", function(linkId) {
+                    postMessage(["canDelete", linkId]);
+                });
+                pages = scrmljs.idManager.newManager("pageId");
+                
+                pages.eraseItemHook = function(id) {
+                    delete pageTickets.items[id];
+                    postMessage(["deleteAutosaveEntry", id]);
+                }
+                
+                guiLinks = scrmljs.idManager.newManager("linkId");
+                
+                guiLinks.eraseItemHook = function(id) {
+                    delete guiLinkTickets.items[id];
+                }
+                
+                postMessage(["start"]);
+            }
+        })
+    });
+}
 
 /*
 Some structure:
@@ -59,7 +211,7 @@ function getPageFromLinkId(linkId) {
     return returner;
 }
 
-let functions = {}, pages, pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiLinkSetups = {};
+let pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiLinkSetups = {};
 
 functions.log = console.log;
 
@@ -417,147 +569,5 @@ chapterProto.canDelete = function canDelete() {
 
 function emptyFunction() {}
 function trueFunction() {return true}
-
-// Workers don't have a way of importing js except modules, but modules don't work on locally hosted sites, so we just put copy/paste all the modules here.
-
-// ticket system
-{
-    /*
-        A ticket system is a way of deferring action until a process is complete. It starts by opening a process. Tickets are added while processes are open. A ticket is stored in a (name, function) pair, both strings, where name is intended to be the id of an object and function refers to a function which can be performed on that object. The tickets pile up as a process continues, but only by name and function. That is, no matter how many times a ticket is added for a given (name, function) pair, that function will evaluate for that name only once at the end. The tickets are all automatically evaluated and flushed once the processes are all closed. If there are no open processes, the ticket is executed immediately.
-    */
-    
-    var ticketSystem = {};
-    
-    var ticketProto = {};
-    
-    ticketSystem.newTicketSystem = function newTicketSystem(protoModel = ticketProto) {
-        let returner = Object.create(protoModel);
-        returner.items = {};
-        returner.ticketFunctions = {};
-        returner.openProcesses = 0;
-        return returner;
-    }
-    
-    ticketProto.addTicketFunction = function addTicketFunction(name, func) {
-        if (this.ticketFunctions[name]) throw Error(name + " is already a ticket function");
-        this.ticketFunctions[name] = func
-    }
-    
-    ticketProto.openProcess = function openProcess() {
-        ++this.openProcesses;
-    }
-    
-    ticketProto.closeProcess = function closeProcess() {
-        if (--this.openProcesses == 0) {
-            for (let item in this.items) for (let ticketFunction in this.items[item]) this.ticketFunctions[ticketFunction](item, ...this.items[item][ticketFunction]);
-            this.items = {};
-            this.closeProcessHook();
-        }
-    }
-    
-    ticketProto.closeProcessHook = emptyFunction;
-    
-    ticketProto.addTicket = function addTicket(item, ticketFunction, ...data) {
-        if (this.openProcesses == 0) return this.ticketFunctions[ticketFunction](item, ...data);
-        if (!this.items[item]) this.items[item] = {};
-        this.items[item][ticketFunction] = data;
-    }
-    
-    var pageTickets = ticketSystem.newTicketSystem();
-    pageTickets.name = "page tickets";
-    pageTickets.saveTheseObject = {};
-    
-    pageTickets.addTicketFunction("save", function(pageId) {
-        pageTickets.saveTheseObject[pageId] = undefined;
-    });
-    
-    pageTickets.addTicketFunction("smoothMode", function(pageId, smoothMode){
-        postMessage(["smoothMode", smoothMode]);
-    });
-    
-    pageTickets.addTicket = function addTicket(pageId, ticketFunction, ...data) {
-        postMessage(["setLoadingScreen", pages.items[pageId].name + " " + ticketFunction + " " + data]);
-        ticketProto.addTicket.call(this, pageId, ticketFunction, ...data);
-    }
-    
-    pageTickets.openProcess = function openProcess() {
-        ticketProto.openProcess.call(this);
-    }
-    
-    pageTickets.closeProcessHook = function closeProcessHook() {
-        this.save();
-        postMessage(["closeLoadingScreen"]);
-    }
-    
-    pageTickets.save = function save() {
-        for (let pageId in this.saveTheseObject) postMessage(["save", pageId, pages.items[pageId].saveToString()]);
-        this.saveTheseObject = {};
-    }
-    
-    var guiLinkTickets = ticketSystem.newTicketSystem();
-    guiLinkTickets.name = "guiLink tickets";
-    
-    guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
-        postMessage(["setLoadingScreen", getPageFromLinkId(linkId).name + " " + ticketFunction + " " + data]);
-        ticketProto.addTicket.call(this, linkId, ticketFunction, ...data);
-    }
-    
-    guiLinkTickets.openProcess = function openProcess() {
-        pageTickets.openProcess();
-        ticketProto.openProcess.call(this);
-    }
-    
-    guiLinkTickets.closeProcessHook = function closeProcessHook() {
-        pageTickets.closeProcess();
-    }
-    
-    guiLinkTickets.addTicketFunction("name", function(linkId, name) {
-        fetched("page", linkId, "name", name);
-    });
-    
-    guiLinkTickets.addTicketFunction("nickname", function(linkId, nickname) {
-        fetched("page", linkId, "nickname", nickname);
-    });
-    
-    guiLinkTickets.addTicketFunction("fullName", function(linkId, fullName) {
-        fetched("page", linkId, "fullName", fullName);
-    });
-    
-    guiLinkTickets.addTicketFunction("pageNameCheckFail", function(pageId, proposedValue) {
-        postMessage(["pageNameCheckFail", pageId, proposedValue]);
-    });
-    
-    guiLinkTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
-        fetched(pageNumber, "siblingNumber", siblingNumber);
-    });
-    
-    guiLinkTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
-        fetched(pageNumber, "fullPageNumber", fullPageNumber);
-    });
-    
-    guiLinkTickets.addTicketFunction("setOpen", function(linkId, open) {
-        fetched("page", linkId, "setOpen", open);
-    });
-    
-    guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId, insertBeforeId, doSmoothly) {
-        postMessage(["movePage", linkId, parentId, insertBeforeId, doSmoothly]);
-    });
-    
-    guiLinkTickets.addTicketFunction("moveModeOff", function() {
-        postMessage(["moveModeOff"]);
-    });
-    
-    guiLinkTickets.addTicketFunction("newPageNameCheckFail", function(linkId) {
-        postMessage(["newPageNameCheckFail", linkId]);
-    });
-    
-    guiLinkTickets.addTicketFunction("clearPageGap", function() {
-        postMessage(["clearPageGap"]);
-    });
-    
-    guiLinkTickets.addTicketFunction("canDelete", function(linkId) {
-        postMessage(["canDelete", linkId]);
-    });
-}
 
 postMessage(["errorOut", ""]);

@@ -1,4 +1,3 @@
-//MathJax section
 // configuration
 var MathJax = {
     tex: {
