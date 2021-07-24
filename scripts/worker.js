@@ -1,3 +1,38 @@
+let scrmljs = {
+    filePrefix: "../",
+    scriptLocations : {
+        generalFunctions: "scripts/generalFunctions.js",
+        varManager: "scripts/varManager.js",
+        idManager: "scripts/idManager.js",
+        initializePages: "scripts/initializePages.js"
+    },
+    scripts: {
+        generalFunctions: [],
+        varManager: [],
+        idManager: ["generalFunctions"],
+        initializePages: ["idManager"]
+    }
+}
+
+scrmljs.importWorkerScript = function importWorkerScript(location, finished) {
+    let req = new XMLHttpRequest();
+    req.onload = function(x) {
+        try {Function(req.responseText)()}
+        catch (e) {
+            console.log("error with imported script " + location);
+            console.log(req.responseText);
+            throw e;
+        }
+        finished();
+    };
+    req.onerror = function(x) {postMessage(["errorOut", "worker failed to load script " + location])};
+    req.open("get", location);
+    req.overrideMimeType("text/plaintext");
+    req.send();
+}
+
+scrmljs.importWorkerScript(scrmljs.filePrefix + "scripts/startJSW.js", function() {});
+
 /*
 Some structure:
 The worker holds all information about the SCRML file. The only thing not in the worker, beyond the structure needed to start the worker, is the DOM itself. The page calls to the worker to do things and the worker calls to the page to show/hide/manipulate DOM elements.
@@ -37,7 +72,7 @@ pageProto.isPage = true;
 function newPage(name, nickname = "", protoModel = pageProto) {
     let returner = Object.create(protoModel);
     pages.addItem(returner);
-    returner.manager = newVarManager();
+    returner.manager = scrmljs.newVarManager();
     returner.manager.setVarValue("pageId", returner.pageId);
     returner.manager.linkProperty("pageId", returner);
     returner.manager.setVarValue("name", name);
@@ -526,180 +561,4 @@ function trueFunction() {return true}
     });
 }
 
-// varManager
-{
-    let unitProto = {
-        unlink: function() {
-            this.next.previous = this.previous;
-            this.previous.next = this.next;
-        }
-    }
-    let changeProto = {
-        addUnit: function(lastOne, unit) {
-            lastOne.previous.next = unit;
-            unit.previous = lastOne.previous;
-            lastOne.previous = unit;
-            unit.next = lastOne;
-        }
-    };
-    let varManagerProtoModel = {
-        setVarValue: function setVarValue(name, value) {
-            if (!(name in this.vars)) {
-                let linkedLists = Object.create(changeProto);
-                this.vars[name] = linkedLists;
-                linkedLists.firstProperty = {};
-                linkedLists.lastProperty = {previous: linkedLists.firstProperty, object: linkedLists, propertyName: "value"};
-                linkedLists.firstProperty.next = linkedLists.lastProperty;
-                linkedLists.firstListener = {};
-                linkedLists.lastListener = {previous: linkedLists.firstListener, listener: emptyFunction};
-                linkedLists.firstListener.next = linkedLists.lastListener;
-                linkedLists.firstUnlink = {};
-                linkedLists.lastUnlink = {previous: linkedLists.firstUnlink, unlink: emptyFunction};
-                linkedLists.firstUnlink.next = linkedLists.lastUnlink;
-            }
-            let change = this.vars[name], unit = change.firstProperty, oldValue = change.value;
-            while (unit = unit.next) unit.object[unit.propertyName] = value;
-            unit = change.firstListener;
-            while (unit = unit.next) unit.listener(value, oldValue);
-        },
-        deleteVar: function deleteVar(varName) {
-            let unit = this.vars[varName].firstUnlink;
-            while (unit = unit.next) unit.unlink();
-            delete this.vars[varName];
-        },
-        linkProperty: function linkProperty(varName, object, propertyName = varName) {
-            let change = this.vars[varName];
-            object[propertyName] = change.value;
-            let unit = Object.create(unitProto);
-            unit.object = object;
-            unit.propertyName = propertyName;
-            change.addUnit(change.lastProperty, unit);
-            let unlinkUnit = {};
-            unlinkUnit.unlink = function() {
-                unit.unlink();
-                unit.unlink.call(unlinkUnit);
-            }
-            change.addUnit(change.lastUnlink, unlinkUnit);
-            return unlinkUnit.unlink;
-        },
-        linkListener: function linkListener(varName, listener, fireWith = undefined) {
-            let change = this.vars[varName];
-            if (typeof fireWith != "undefined") listener(change.value, fireWith);
-            let unit = Object.create(unitProto);
-            unit.listener = listener;
-            change.addUnit(change.lastListener, unit);
-            let unlinkUnit = {};
-            unlinkUnit.unlink = function() {
-                unit.unlink();
-                unit.unlink.call(unlinkUnit);
-            }
-            change.addUnit(change.lastUnlink, unlinkUnit);
-            return unlinkUnit.unlink;
-        },
-        clearAll: function clearAll() {
-            for (let v in this.vars) this.deleteVar(v);
-        },
-        numLinkeds: function numLinkeds(varName) {
-            let returner = 0;
-            if (varName === undefined) {
-                for (let name in this.vars) returner += this.numLinkeds(name);
-                return returner;
-            }
-            let change = this.vars[varName];
-            let unit = change.firstProperty.next;
-            while (unit) {
-                ++returner;
-                unit = unit.next;
-            }
-            unit = change.firstListener.next;
-            while (unit) {
-                ++returner;
-                unit = unit.next;
-            }
-            unit = change.firstUnlink.next;
-            while (unit) {
-                ++returner;
-                unit = unit.next;
-            }
-            return returner;
-        },
-        numAllLinkeds: function numAllLinkeds() {
-            let returner = 0;
-            for (let name in this.vars) returner += this.numLinkeds(name);
-            return returner;
-        }
-    };
-
-    function newVarManager(protoModel = varManagerProtoModel) {
-        let returner = Object.create(varManagerProtoModel);
-        returner.vars = {};
-        return returner;
-    }
-}
-
-// idSystem
-{
-    function capitalizeFirstLetter(line) {
-        if (line.length == 0) return line;
-        return line.charAt(0).toUpperCase() + line.slice(1);
-    }
-    
-    var idManager = {};
-
-    idManager.protoModel = {};
-
-    idManager.newManager = function newManager(idName = "id", protoModel = idManager.protoModel) {
-        let returner = Object.create(protoModel);
-        returner.items = [];
-        returner.idName = idName;
-        returner.setIdName = "set"+capitalizeFirstLetter(idName);
-        returner.defaultSetIdName = function(id) {this[idName] = id};
-        return returner;
-    }
-
-    idManager.protoModel.addItem = function addItem(item) {
-        if (this.idName in item) throw Error("item already has property " + this.idName + ": " + item[this.idName]);
-        if (!item[this.setIdName]) item[this.setIdName] = this.defaultSetIdName;
-        item[this.setIdName](this.items.length);
-        this.items.push(item);
-    }
-
-    idManager.protoModel.eraseItem = function eraseItem(id) {
-        this.items[id] = this.items[this.items.length-1];
-        this.items[id][this.setIdName](id);
-        this.items.pop();
-        this.eraseItemHook(this.items.length);
-    }
-    
-    idManager.protoModel.eraseItemHook = emptyFunction;
-    
-    pages = idManager.newManager("pageId");
-    
-    pages.eraseItemHook = function(id) {
-        delete pageTickets.items[id];
-        postMessage(["deleteAutosaveEntry", id]);
-    }
-    
-    guiLinks = idManager.newManager("linkId");
-    
-    guiLinks.eraseItemHook = function(id) {
-        delete guiLinkTickets.items[id];
-    }
-}
-
 postMessage(["errorOut", ""]);
-
-let obj = {line: "console.log('not set')"};
-
-functions.printLoader = function() {
-    console.log("printing loader");
-    eval(obj.line);
-    console.log(Loader);
-};
-
-let req = new XMLHttpRequest();
-req.onload = function(x) {obj.line = req.responseText};
-req.onerror = function(x) {console.log("error")}
-req.open("get", "../scripts/loader.js");
-req.overrideMimeType("text/plaintext");
-req.send();

@@ -1,7 +1,11 @@
 {
-    let gui = scrmljs.gui;
+    let gui = scrmljs.gui,
+        emptyFunction = scrmljs.emptyFunction;
+    
+    scrmljs.loadCSS("styles/gui/deleteBundle.css");
     
     gui.ensureModules(["buttons", "disabler"]);
+    
     {
         let openDuration = 400, closeDuration = 200;
         let animationend = function(e) {
@@ -55,6 +59,16 @@
             this.deleteLaunch.removeAttribute("hide");
         }
         
+        function disableDelete() {
+            if (this.enableDelete !== emptyFunction) return;
+            this.resetBundle();
+            let enabler = gui.disable(this.deleteLaunch, true), me = this;
+            this.enableDelete = function() {
+                enabler();
+                me.enableDelete = emptyFunction;
+            }
+        }
+        
         gui.deleteBundle = function deleteBundle(loadHere, buttonClick) {
             let returner = {};
             let deleteLaunch = returner.deleteLaunch = gui.element("div", loadHere, ["class", "missilelaunch"]);
@@ -69,6 +83,8 @@
             returner.resetBundle = resetBundle;
             returner.hideDelete = hideDelete;
             returner.showDelete = showDelete;
+            returner.disableDelete = disableDelete;
+            returner.enableDelete = emptyFunction;
             let pseudo = {
                 target: deleteTrigger
             };

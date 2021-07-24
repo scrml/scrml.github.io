@@ -42,6 +42,8 @@
     gui.disablerStylesToCopy = {
         float: undefined,
         display: undefined,
+        position: undefined,
+        display: undefined,
         visibility: undefined
     }
     

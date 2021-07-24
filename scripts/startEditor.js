@@ -28,7 +28,7 @@
     });
     
     // DOM elements
-    let editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
+    let editor = scrmljs.editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
     
     let setDebugAction = function setDebugAction(action) {
         debugButton.setAttribute("title", action.toString());
@@ -71,7 +71,7 @@
     
     // editor parts
     let root, pageLinks = {}, worker,  workerFunctions = {log: console.log}, focusedPageGap, loadingScreen;
-    scrmljs.lockedPageFocus = false;
+    scrmljs.lockedPageFocus = false, bothInitialized = {editor: false, worker: false};
     
     // functions to be initialized
     let getLinkFromElement;
@@ -113,7 +113,10 @@
         
         workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
         
-        makePageTools();
+        workerFunctions.start = function() {
+            bothInitialized.worker = true;
+            checkStartLoadingPages();
+        }
         
         // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
         for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
@@ -125,7 +128,12 @@
         
         // make root chapter/saved pages
         if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
-        loadPages();
+        bothInitialized.editor = true;
+        checkStartLoadingPages();
+        
+        function checkStartLoadingPages() {
+            if (bothInitialized.editor && bothInitialized.worker) loadPages();
+        }
     }
     
     let post = scrmljs.post = function post(functionName, ...args) {
@@ -329,23 +337,14 @@
         getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
     }
     
-    let moveModeOff = workerFunctions.moveModeOff = function moveModeOff() {
-        if (!editor.hasAttribute("movemode")) throw Error("cannot turn move mode off if not in move mode");
-        scrmljs.lockedPageFocus = false;
-        editor.removeAttribute("movemode");
-        document.querySelector("[movingpage]").removeAttribute("movingPage");
-        for (let page of document.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
-        post("endMoveMode");
-    }
-    
     workerFunctions.eraseLink = function eraseLink(linkId) {
         guiWorkerLink.links[linkId].erase();
     }
     
-    workerFunctions.canDelete = function canDelete(linkId) {
+    workerFunctions.canDelete = function canDelete(linkId, can) {
         let item = guiWorkerLink.links[linkId];
         if (item.isPage) {
-            if (item === getLinkFromElement(scrmljs.pageTools)) scrmljs.pageTools.deleteBundle.showDelete();
+            item.canDelete(can);
         }
     }
     
@@ -415,34 +414,27 @@
         
     }
     
-    let makePageTools = function makePageTools() {
-        scrmljs.pageTools = gui.element("div", false, ["id", "pagetools"]);
-        scrmljs.pageTools.moveButton = gui.button("⇳", scrmljs.pageTools, toggleMoveMode, ["disguise", "", "bigger", ""]);
-        gui.shieldClicks(scrmljs.pageTools.moveButton);
-        scrmljs.pageTools.deleteBundle = gui.deleteBundle(scrmljs.pageTools, function() {
-            let page = getLinkFromElement(scrmljs.pageTools);
-            if (!page.isPage) throw Error("cannot delete link " + page.linkId + ", it is not a page");
-            page.deletePage();
-        });
-    }
-    
-    let toggleMoveMode = function toggleMoveMode(e) {
-        if (editor.hasAttribute("movemode")) moveModeOff();
-        else moveModeOn(getLinkFromElement(e));
-    }
-    
-    let moveModeOn = function moveModeOn(page) {
+    scrmljs.moveModeOn = function moveModeOn(page) {
         if (editor.hasAttribute("movemode")) throw Error("already in move mode");
         scrmljs.lockedPageFocus = page;
         editor.setAttribute("movemode", "");
         page.div.setAttribute("movingpage", "");
         post("startMoveModeChecks", page.linkId);
     }
-    
+
+    scrmljs.moveModeOff = workerFunctions.moveModeOff = function moveModeOff() {
+        if (!editor.hasAttribute("movemode")) throw Error("cannot turn move mode off if not in move mode");
+        scrmljs.lockedPageFocus = false;
+        editor.removeAttribute("movemode");
+        document.querySelector("[movingpage]").removeAttribute("movingPage");
+        for (let page of document.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
+        post("endMoveMode");
+    }
+
     let doMove = function doMove(e) {
         let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingpage]").getAttribute("pagenumber"));
         post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
-        moveModeOff();
+        scrmljs.moveModeOff();
     }
     
     let skipPageSpot = function skipPageSpot() {

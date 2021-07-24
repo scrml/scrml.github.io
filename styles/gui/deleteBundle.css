@@ -1,0 +1,78 @@
+.missilelaunch {
+    position: relative;
+    display: inline;
+    margin: 10px;
+}
+
+.missilelaunch button.missilelaunchbutton {
+    border: 4px outset darkred;
+    display: inline;
+}
+
+@keyframes missilelaunchtrigger {
+    0% {outline: 4px darkred outset;}
+    100% {
+        transform: translateY(-67%) rotateY(10deg) rotateX(120deg);
+        outline: 4px darkred inset;
+    }
+}
+
+.missilelaunch .trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 0, 0, .5);
+    outline: 4px darkred outset;
+}
+
+.disabler .missilelaunch .trigger {
+    background-color: rgba(160, 160, 130, .5);
+    outline-color: rgb(100, 100, 100);
+}
+
+.missilelaunch .trigger[opening] {
+    animation-name: missilelaunchtrigger;
+    animation-duration: .4s;
+    animation-fill-mode: forwards;
+}
+
+.missilelaunch .trigger[closing] {
+    animation-name: missilelaunchtrigger;
+    animation-duration: .2s;
+    animation-direction: reverse;
+    animation-fill-mode: backwards;
+}
+
+.missilelaunch .trigger[open] {
+    transform: translateY(-67%) rotateY(10deg) rotateX(120deg);
+    outline: 4px darkred inset;
+}
+
+.missilelaunch .trigger[closed] {
+}
+
+@keyframes missilelaunchflashing {
+    0% {
+        background-color: rgb(245, 245, 245);
+    }
+    
+    80% {
+        background-color: rgb(255, 230, 230);
+    }
+    
+    90% {
+        background-color: rgb(255, 220, 220);
+    }
+    
+    100% {
+        background-color: rgb(245, 245, 245);
+    }
+}
+
+.missilelaunch [flashing] {
+    animation: missilelaunchflashing;
+    animation-duration: 3s;
+    animation-iteration-count: infinite;
+}

@@ -43,6 +43,10 @@
             this.div.setAttribute("linkid", newId);
         }
         
+        pageType.protoModel.canDelete = function canDelete(can) {
+            this.div.setAttribute("candelete", can);
+        }
+        
         pageType.protoModel.newNameFail = function newNameFail(line) {
             this.nameSpan.value = line;
             gui.messages.inputText(this.nameSpan, "name conflict");
@@ -60,11 +64,11 @@
         
         pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
             let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
-            page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId, "ispage", ""], insertBefore);
+            page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId, "ispage", "", "candelete", "false"], insertBefore);
             page.div.addEventListener("toggle", type.toggleListener);
             page.div.addEventListener("mouseenter", type.focusListener);
-            page.div.addEventListener("mouseleave", type.blurListener);
             page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
+            page.pageHead.addEventListener("mouseenter", type.focusListener);
             page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
             page.siblingNumberText = gui.text("", page.siblingNumberSpan);
             page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullpagenumber"]);
@@ -81,8 +85,13 @@
             gui.absorbClicks(page.nicknameSpan);
             page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
             page.fullNameText = gui.text("", page.fullNameSpan);
+            page.pageTools = gui.element("div", page.pageHead, ["class", "pagetools"]);
+            page.moveButton = gui.button("⇳", page.pageTools, type.moveModeAction, ["disguise", "", "bigger", ""]);
+            gui.shieldClicks(page.moveButton);
+            page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
             // if this is not the first page then create a page gap before this page
             if (linkId) chapterType.newPageGap(loadHere, page.div);
+            page.askWorker("canDelete");
             return page;
         }
         
@@ -100,18 +109,8 @@
         }
         
         pageType.focusListener = function(e) {
-            if (scrmljs.lockedPageFocus) return;
             e = pageType.getLinkFromEvent(e);
-            e.pageHead.appendChild(scrmljs.pageTools);
-            scrmljs.pageTools.deleteBundle.hideDelete();
             e.askWorker("canDelete");
-        }
-        
-        pageType.blurListener = function(e) {
-            if (scrmljs.lockedPageFocus) return;
-            e = pageType.getLinkFromEvent(e);
-            if (e.linkId == 0) return;
-            pageType.focusListener(e.div.parentElement);
         }
         
         pageType.nameProcessorListener = function(e) {
@@ -122,6 +121,16 @@
         pageType.nameBlurredListener = function(e) {
             e = pageType.getLinkFromEvent(e);
             e.fetch("name");
+        }
+        
+        pageType.moveModeAction = function(e) {
+            if (scrmljs.editor.hasAttribute("movemode")) scrmljs.moveModeOff();
+            else scrmljs.moveModeOn(pageType.getLinkFromEvent(e));
+        }
+        
+        pageType.deleteBundleAction = function(e) {
+            e = pageType.getLinkFromEvent(e);
+            e.deletePage();
         }
         
         let chapterType = guiWorkerLink.types.chapter = Object.create(pageType);

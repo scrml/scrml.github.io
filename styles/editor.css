@@ -96,9 +96,22 @@ textarea {
     visibility: hidden;
 }
 
-#pagetools {
+.pagetools {
     float: right;
     position: relative;
+    opacity: 20%;
+}
+
+.pagehead:hover > .pagetools {
+    opacity: 100%;
+}
+
+.pagehead:not(:hover) > .pagetools .missilelaunch {
+    opacity: 20%;
+}
+
+[candelete="false"] > summary > .pagetools > .missilelaunch {
+    display: none;
 }
 
 #editor[movemode] .chapter, #editor[movemode] .statement, #editor[movemode] .comment {
@@ -115,7 +128,7 @@ textarea {
     display: none;
 }
 
-[linkid="0"] > .pagehead #pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
+[linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
     display: none;
 }
 
