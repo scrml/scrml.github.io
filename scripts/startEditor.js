@@ -2,27 +2,88 @@ let scriptLoader = scrmljs.scriptLoader,
     gui,
     filePrefix = scrmljs.filePrefix,
     storage = scrmljs.storage,
-    guiWorkerLink;
+    guiWorkerLink,
+    root,
+    pageLinks = {},
+    worker, 
+    workerFunctions = {log: console.log},
+    loadingScreen,
+    bothInitialized = {editor: false, worker: false};
+
+scrmljs.lockedPageFocus = false;
 document.getElementById("errorout").textContent = "Loading components ...";
 
 // load required scripts
 scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.items.gui.addEphemeralListener("js", function() {
     gui = scrmljs.gui;
+    document.getElementById("errorout").textContent = "Loading gui modules ...";
+    gui.ensureAllModules();
 });
-scriptLoader.ensureJS("jax");
-scriptLoader.ensureJS("guiWorkerLink", ["gui"]);
+scriptLoader.ensureJS("guiWorkerLink", ["gui", "overloadManager"]);
 scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     guiWorkerLink = scrmljs.guiWorkerLink;
-})
+    worker = guiWorkerLink.worker = new Worker(filePrefix+"scripts/worker.js");
+    mainLink = scrmljs.mainLink = guiWorkerLink.openGuiWorkerLink(workerFunctions, "host", worker);
+});
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
-scriptLoader.addEphemeralListener(function() {
-    scriptLoader.items.gui.addEphemeralListener("js", function() {
-        document.getElementById("errorout").textContent = "Loading gui modules ...";
-        gui.ensureAllModules(function() {
-            scriptLoader.addEphemeralListener(start);
-        });
-    });
+scriptLoader.ensureJS("jax");
+scriptLoader.addEphemeralListener(function start() {
+    //getLinkFromElement = guiWorkerLink.types.page.getLinkFromEvent;
+    // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
+    
+    let activityTimer = scrmljs.newTimer(onInactivity, 10000);
+    
+    loadingScreen = gui.loadingScreen(editor);
+    loadingScreen.loadingTitle.nodeValue = "Working...";
+    
+    workerFunctions.setLoadingScreen = function(message) {
+        loadingScreen.openLoadingScreen(message);
+        activityTimer.restart();
+    }
+    
+    workerFunctions.closeLoadingScreen = function() {
+        loadingScreen.closeLoadingScreen();
+        activityTimer.restart();
+    }
+    
+    mainLink = scrmljs.mainLink = guiWorkerLink.openGuiWorkerLink(workerFunctions, "host");
+    
+    // all messages start with the name of the response handler function then list the arguments to give that handler
+    worker.onmessage = function onmessage(e) {
+        //console.log("received message from worker " + e.data);
+        let line = e.data.toString();
+        try {
+            workerFunctions[e.data.shift()](...e.data);
+        } catch (x) {
+            document.getElementById("errorout").textContent = line + "\n" + x.message;
+            throw x;
+        }
+    }
+    
+    //workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
+    
+    workerFunctions.start = function() {
+        bothInitialized.worker = true;
+        checkStartLoadingPages();
+    }
+    
+    // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
+    for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
+    for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
+    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
+        editor.setAttribute("pageaction", "new"+pageAction+"mode");
+        scrmljs.pageMode = pageAction;
+    }
+    
+    // make root chapter/saved pages
+    if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
+    bothInitialized.editor = true;
+    checkStartLoadingPages();
+    
+    function checkStartLoadingPages() {
+        if (bothInitialized.editor && bothInitialized.worker) loadPages();
+    }
 });
 
 // DOM elements
@@ -65,72 +126,8 @@ for (let pageAction of ["chapter", "statement", "comment"]) document.getElementB
     for (let gap of document.querySelectorAll(".newpagein")) gap.setAttribute("placeholder", "new " + pageAction);
 });
 
-// editor parts
-let root, pageLinks = {}, worker,  workerFunctions = {log: console.log}, loadingScreen;
-scrmljs.lockedPageFocus = false, bothInitialized = {editor: false, worker: false};
-
 // functions to be initialized
 let getLinkFromElement;
-
-let start = function start() {
-    getLinkFromElement = guiWorkerLink.types.page.getLinkFromEvent;
-    // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
-    
-    let activityTimer = scrmljs.newTimer(onInactivity, 10000);
-    
-    loadingScreen = gui.loadingScreen(editor);
-    loadingScreen.loadingTitle.nodeValue = "Working...";
-    
-    workerFunctions.setLoadingScreen = function(message) {
-        loadingScreen.openLoadingScreen(message);
-        activityTimer.restart();
-    }
-    
-    workerFunctions.closeLoadingScreen = function() {
-        loadingScreen.closeLoadingScreen();
-        activityTimer.restart();
-    }
-    
-    // start the worker
-    document.getElementById("errorout").textContent = "Loading worker ...";
-    worker = guiWorkerLink.worker = new Worker(filePrefix+"scripts/worker.js");
-    
-    // all messages start with the name of the response handler function then list the arguments to give that handler
-    worker.onmessage = function onmessage(e) {
-        //console.log("received message from worker " + e.data);
-        let line = e.data.toString();
-        try {
-            workerFunctions[e.data.shift()](...e.data);
-        } catch (x) {
-            document.getElementById("errorout").textContent = line + "\n" + x.message;
-            throw x;
-        }
-    }
-    
-    workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
-    
-    workerFunctions.start = function() {
-        bothInitialized.worker = true;
-        checkStartLoadingPages();
-    }
-    
-    // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
-    for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
-    for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
-    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
-        editor.setAttribute("pageaction", "new"+pageAction+"mode");
-        scrmljs.pageMode = pageAction;
-    }
-    
-    // make root chapter/saved pages
-    if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
-    bothInitialized.editor = true;
-    checkStartLoadingPages();
-    
-    function checkStartLoadingPages() {
-        if (bothInitialized.editor && bothInitialized.worker) loadPages();
-    }
-}
 
 let post = scrmljs.post = function post(functionName, ...args) {
     workerFunctions.setLoadingScreen(functionName + ": " + scrmljs.commaJoin(args));
@@ -146,151 +143,7 @@ let loadPages = function loadPages() {
     post("closePageProcess");
 }
 
-/*function newStatement(parentNumber = null, insertBefore = null, name = "Book") {
-    let pageNumber = pages.length;
-    newPage(pageNumber);
-    let page = getPage(pageNumber);
-    page.name = name;
-    page.pageType = "statement";
-    page.div.setAttribute("class", "statement");
-    post("newStatement", parentNumber, insertBefore, pageNumber, name);
-    return pageNumber;
-}
-
-function newComment(parentNumber = null, insertBefore = null, name = "Book") {
-    let pageNumber = pages.length;
-    newPage(pageNumber);
-    let page = getPage(pageNumber);
-    page.name = name;
-    page.pageType = "comment";
-    page.div.setAttribute("class", "comment");
-    page.div.setAttribute("texin", "false");
-    post("newComment", parentNumber, insertBefore, pageNumber, name);
-    page.texIn = gui.element("textarea", page.div, ["class", "texin"]);
-    page.texIn.addEventListener("blur", texOutFromEvent);
-    page.texIn.addEventListener("keypress", shiftEnterTexHandler);
-    page.texOut = gui.element("p", page.div, ["class", "texout"]);
-    page.texOut.addEventListener("click", texInFromEvent);
-    return pageNumber;
-}
-*/
 workerFunctions.pseudoPost = post;
-
-let fetchTypes = {};
-
-workerFunctions.fetched = function fetched(typeName, id, dataName, ...data) {
-    //console.log("fetched " + typeName + " " + id + " " + dataName + " " + data);
-    
-    fetchTypes[typeName][dataName](id, ...data);
-    
-    /*if (1<0) {
-        switch (dataName) {
-            /*move/ case "parent": // data is [parentNumber, insertBefore]
-                if (data[0] == null) {
-                    // this case is only for adding the root page (page 0) to the editor
-                    if (pageNumber != 0) throw Error("only page 0 can be the root, not page " + pageNumber);
-                    editor.appendChild(page.div);
-                    newPageHeight = page.div.getBoundingClientRect().height;
-                } else {
-                    let newParent = getPage(data[0]), insertBefore = data[1] == null? null: getPage(data[1]), templateGapBBox = newParent.div.firstChild.nextElementSibling.getBoundingClientRect();
-                    if (page.div.parentElement) {
-                        // existing page (actual move)
-                        let gapSpot, pageSpot, newGap = newPageGap();
-                        if (page.div.getBoundingClientRect().y < (insertBefore? insertBefore.div.getBoundingClientRect().y: newParent.div.getBoundingClientRect().y+newParent.div.getBoundingClientRect().height)) {
-                            // moving down
-                            gui.smoothErase(page.div.previousElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
-                            gapSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null);
-                            pageSpot = gui.element("div", newParent.div, [], gapSpot);
-                        } else {
-                            // moving up
-                            gui.smoothErase(page.div.nextElementSibling, {duration: smoothDuration, doSmoothly: doSmoothly});
-                            pageSpot = gui.element("div", newParent.div, [], insertBefore? insertBefore.div.previousElementSibling: newParent.div.lastElementChild);
-                            gapSpot = gui.element("div", newParent.div, [], pageSpot);
-                        }
-                        gui.smoothInsert(newGap, newParent.div, gapSpot, {
-                            onEnd: function() {newParent.div.removeChild(gapSpot)},
-                            width: templateGapBBox.width,
-                            height: templateGapBBox.height,
-                            duration: smoothDuration,
-                            doSmoothly: doSmoothly
-                        });
-                        gui.smoothMove(page.div, pageSpot, {
-                            onEnd: function() {newParent.div.removeChild(pageSpot)},
-                            width: templateGapBBox.width,
-                            duration: smoothDuration,
-                            doSmoothly: doSmoothly
-                        });
-                    } else {
-                        // new page (birth move)
-                        let deleteMe2 = gui.element("div", newParent.div, [], insertBefore? insertBefore.div: null), deleteMe1 = gui.element("div", newParent.div, [], deleteMe2);
-                        gui.smoothInsert(page.div, newParent.div, deleteMe1, {
-                            onEnd: function() {deleteMe1.parentElement.removeChild(deleteMe1)},
-                            width: templateGapBBox.width,
-                            height: newPageHeight,
-                            duration: smoothDuration,
-                            doSmoothly: doSmoothly
-                        });
-                        gui.smoothInsert(newPageGap(newParent, insertBefore, false), newParent.div, deleteMe2, {
-                            onEnd: function() {deleteMe2.parentElement.removeChild(deleteMe2)},
-                            width: templateGapBBox.width,
-                            height: templateGapBBox.height,
-                            duration: smoothDuration,
-                            doSmoothly: doSmoothly
-                        });
-                    }
-                }
-            break; /*set nickname/ case "nickname": // data is [nickname]
-                if (page.nicknameSpan.hasAttribute("messagerevertto")) page.nicknameSpan.setAttribute("messagerevertto", data[0]);
-                else page.nicknameSpan.value = data[0];
-                page.nicknameSpan.setAttribute("value", data[0]);
-            break; /*set pageNumber/ case "siblingNumber": // data is [siblingNumber]
-                page.siblingNumberText.nodeValue = data[0];
-            break; /*set fullPageNumber/ case "fullPageNumber": // data is [fullPageNumber]
-                page.fullPageNumberText.nodeValue = data[0];
-            break; /*set fullName/ case "fullName": // data is [fullName]
-                page.fullNameText.nodeValue = data[0];
-            break; /*show or hide delete button/ case "isInUse": // data is [isInUse]
-                page.div.setAttribute("isinuse", data[0]);
-                if (page == isFocused) {
-                    deleteBundleReset();
-                    deleteBundleReset = data[0]? gui.disable(scrmljs.pageTools.deleteBundle.deleteLaunch): emptyFunction;
-                }
-            break; /*set comment's tex/ case "tex": // data is [tex]
-                page.texIn.value = data[0];
-                //page.texOut.innerHTML = texAttToInnerHTML(data[0]);
-                typeset(function() {
-                    page.texOut.innerHTML = texAttToInnerHTML(data[0]);
-                    return [page.texOut];
-                });
-            break; default: console.log("do not recognize fetched type " + dataName);
-        }
-    }*/
-}
-
-fetchTypes.page = {};
-
-fetchTypes.page.name = function setName(linkId, name) {
-    let page = getPageFromLinkId(linkId);
-    if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
-    else {
-        page.nameSpan.value = name;
-        page.nameSpan.removeAttribute("disabled");
-        page.nameSpan.blur();
-    }
-    page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
-}
-
-fetchTypes.page.nickname = function setNickname(linkId, nickname) {
-    getPageFromLinkId(linkId).nicknameSpan.value = nickname;
-}
-
-fetchTypes.page.fullName = function setFullName(linkId, fullName) {
-    getPageFromLinkId(linkId).fullNameText.nodeValue = fullName;
-}
-
-fetchTypes.page.setOpen = function setOpen(linkId, open) {
-    getPageFromLinkId(linkId).setOpen(open);
-}
 
 workerFunctions.changeLinkId = function changeLinkId(oldId, newId) {
     guiWorkerLink.links[oldId].setLinkId(newId);
@@ -302,46 +155,16 @@ let getPageFromLinkId = function getPageFromLinkId(linkId) {
     return page;
 }
 
-workerFunctions.pageNameCheckFail = function pageNameCheckFail(linkId, line) {
-    getPageFromLinkId(linkId).newNameFail(line);
-}
-
-workerFunctions.newPageNameCheckFail = function newPageNameCheckFail(parentLinkId) {
-    if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
-    gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
-}
-
-workerFunctions.clearPageGap = function clearPageGap() {
-    if (!scrmljs.focusedPageGap) return;
-    guiWorkerLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
-    scrmljs.focusedPageGap = false;
-}
-
 workerFunctions.smoothMode = function smoothMode(smoothMode) {
     scrmljs.doSmoothly = smoothMode;
 }
 
-workerFunctions.movePage = function movePage(linkId, parentId, insertBeforeId, doSmoothly) {
-    getPageFromLinkId(linkId).movePage(getPageFromLinkId(parentId), insertBeforeId == +insertBeforeId? getPageFromLinkId(insertBeforeId): null, doSmoothly);
-}
-
-workerFunctions.save = function save(pageId, line) {
+workerFunctions.savePage = function save(pageId, line) {
     storage.store("page " + pageId, line);
-}
-
-workerFunctions.canAcceptMove = function canAcceptMove(linkId, accept) {
-    getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
 }
 
 workerFunctions.eraseLink = function eraseLink(linkId) {
     guiWorkerLink.links[linkId].erase();
-}
-
-workerFunctions.canDelete = function canDelete(linkId, can) {
-    let item = guiWorkerLink.links[linkId];
-    if (item.isPage) {
-        item.canDelete(can);
-    }
 }
 
 workerFunctions.deleteAutosaveEntry = function deleteAutosaveEntry(pageId) {
@@ -352,60 +175,6 @@ workerFunctions.errorOut = function errorOut(message) {
     document.getElementById("errorout").textContent = message;
 }
 
-/*let focusLocked = false, isFocused, deleteBundleReset = emptyFunction;
-
-function pageFocusInFromEvent(e) {pageFocusIn(getPage(getPageNumberFromEvent(e)))}
-function pageFocusIn(page) {
-    if (!lockedPageFocus && isFocused != page) {
-        isFocused = page;
-        page.pageHead.appendChild(scrmljs.pageTools);
-        scrmljs.pageTools.deleteBundle.resetBundle();
-        deleteBundleReset();
-        deleteBundleReset = page.div.getAttribute("isInUse") == "true"? gui.disable(scrmljs.pageTools.deleteBundle.deleteLaunch): emptyFunction;
-    }
-}
-
-function nameProcessorFromEvent(e) {return nameProcessor(getPageNumberFromEvent(e), e)}
-function nameProcessor(pageNumber, event) {
-    let page = getPage(pageNumber);
-    if (nicknameModeButton.checked) return post("setNickname", pageNumber, page.nicknameSpan.value);
-    if (!gui.nodeNameScreen(page.nameSpan.value)) return gui.inputOutput.inputText(page.nameSpan, "invalid nodeName");
-    post("setName", pageNumber, page.nameSpan.value);
-}
-
-function nameBlurredFromEvent(e) {return nameBlurred(getPageNumberFromEvent(e))}
-function nameBlurred(pageNumber) {
-    post("resetName", pageNumber);
-}
-
-function openDetailsFromEvent(e) {openDetails(getPageNumberFromEvent(e))}
-function openDetails(pageNumber, open = getPage(pageNumber).div.hasAttribute("open")) {
-    post("openDetails", pageNumber, open);
-}
-
-function texOutFromEvent(e) {texOut(getPageNumberFromEvent(e))}
-function texOut(pageNumber) {
-    let page = getPage(pageNumber);
-    page.div.setAttribute("texin", "false");
-    post("setTex", pageNumber, page.texIn.value);
-}
-function shiftEnterTexHandler(e) {if (e.key == "Enter" && e.shiftKey) texOutFromEvent(e)}
-function texInFromEvent(e) {texIn(getPageNumberFromEvent(e))}
-function texIn(pageNumber) {
-    let page = getPage(pageNumber);
-    page.div.setAttribute("texin", "true");
-    page.texIn.focus();
-}
-
-function deletePage(page) {
-    page.div.parentElement.removeChild(page.div.nextElementSibling);
-    page.div.parentElement.removeChild(page.div);
-    pages[page.pageNumber] = "skipped";
-    storage.store(page.pageNumber, "skipped");
-    storage.erase("tex " + page.pageNumber);
-    post("deletePage", page.pageNumber);
-}
-*/
 let onInactivity = function onInactivity() {
 
 }

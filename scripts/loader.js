@@ -174,6 +174,8 @@ Loader.protoModel.process = function process() {
     for (let itemName in this.items) {
         let item = this.items[itemName];
         if (item.isReady[tier.name] && !item.isComplete[tier.name] && !item.isProcessing[tier.name]) {
+            Loader.log(tier.name + " processing " + item.name);
+            item.isProcessing[tier.name] = true;
             tier.processor(item);
             if (!item.isComplete[tier.name]) {
                 this.isHung = true;
@@ -271,12 +273,11 @@ Loader.tiers = {}
 // js with XMLHttpRequest only
 {
     let tierName = "js", processor = function(item) {
-        Loader.log("jsw processing " + item.name);
-        if (item.isComplete.js || item.isProcessing.js || !item.isReady.js) throw Error("cannot process item " + item.name);
-        item.isProcessing.js = true;
-        scrmljs.importScript(item.data.js, function() {item.loader.markComplete(item, item.loader.jsTier)});
+        scrmljs.importScript(item.data.js, function() {
+            item.loader.markComplete(item, item.loader.jsTier);
+        });
     }
-    let ensureJS = function ensureJS(name, dependencies = [], location = "../scripts/"+name+".js") {
+    let ensureJS = function ensureJS(name, dependencies = [], location = filePrefix+"scripts/"+name+".js") {
         if (name in this.items) return;
         let d = {};
         for (let x of dependencies) d[x] = undefined;
@@ -285,5 +286,16 @@ Loader.tiers = {}
     Loader.tiers.js = function addJsAJAXTier(loader) {
         loader.jsTier = loader.newTier(tierName, processor);
         loader.ensureJS = ensureJS;
+    }
+}
+
+{
+    let tierName = "initialize", processor = function(item) {
+        if (item.data.initialize) item.data.initialize();
+        item.loader.markComplete(item, item.loader.initializeTier);
+    }
+    
+    Loader.tiers.initialize = function initializationTier(loader) {
+        loader.initializeTier = loader.newTier(tierName, processor);
     }
 }

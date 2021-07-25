@@ -4,7 +4,7 @@ scrmljs.importScript = function importScript(location, finished) {
         try {Function("{"+req.responseText+"\r\n}")()}
         catch (e) {
             console.log("error with imported script " + location);
-            console.log(req.responseText);
+            //console.log(req.responseText);
             throw e;
         }
         finished();
@@ -19,6 +19,7 @@ let scriptLocations = scrmljs.scriptLocations, scripts = scrmljs.scripts, filePr
 scrmljs.importScript(filePrefix + "scripts/loader.js", function() {
     let Loader = scrmljs.Loader, scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
     Loader.tiers.js(scriptLoader);
+    Loader.tiers.initialize(scriptLoader);
     
     // add items
     function addScript(name) {

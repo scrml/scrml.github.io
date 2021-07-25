@@ -1,4 +1,4 @@
-let pageTickets, guiLinkTickets, pages, guiLinks, functions = {}, scrmljs = {
+let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
@@ -6,7 +6,7 @@ let pageTickets, guiLinkTickets, pages, guiLinks, functions = {}, scrmljs = {
         idManager: "scripts/idManager.js",
         overloadManager: "scripts/overloadManager.js",
         guiWorkerLink: "scripts/guiWorkerLink.js",
-        //page: "scripts/guiLinks/page.js"
+        page: "scripts/guiLinks/page.js"
     },
     scripts: {
         generalFunctions: [],
@@ -14,14 +14,14 @@ let pageTickets, guiLinkTickets, pages, guiLinks, functions = {}, scrmljs = {
         idManager: ["generalFunctions"],
         overloadManager: [],
         guiWorkerLink: ["varManager", "idManager", "overloadManager"],
-        //page: ["guiWorkerLink"]
+        page: ["guiWorkerLink"]
     },
     emptyFunction: function emptyFunction() {},
-        isEmpty: function isEmpty(obj) {
+    isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
     }
-}
+}, emptyFunction = scrmljs.emptyFunction, isEmpty = scrmljs.isEmpty;
 
 scrmljs.importScript = function importScript(location, finished) {
     let req = new XMLHttpRequest();
@@ -29,7 +29,7 @@ scrmljs.importScript = function importScript(location, finished) {
         try {Function("{"+req.responseText+"\r\n}")()}
         catch (e) {
             console.log("error with imported script " + location);
-            console.log(req.responseText);
+            //console.log(req.responseText);
             throw e;
         }
         finished();
@@ -40,149 +40,39 @@ scrmljs.importScript = function importScript(location, finished) {
     req.send();
 }
 
-{
-    let scriptLocations = scrmljs.scriptLocations,
-        scripts = scrmljs.scripts,
-        filePrefix = scrmljs.filePrefix;
-    scrmljs.importScript(filePrefix + "scripts/loader.js", function() {
-        let Loader = scrmljs.Loader,
-            scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
-        Loader.tiers.js(scriptLoader);
-        
-        // add items
-        function addScript(name) {
-            if (name in scriptLoader.items) return;
-            let dependencies = scripts[name].length === 0? {}: {js: {}};
-            for (let subscript of scripts[name]) {
-                addScript(subscript);
-                dependencies.js[subscript] = undefined;
-            }
-            scriptLoader.addItem(name, dependencies, {js: filePrefix+scriptLocations[name]});
+scrmljs.importScript(scrmljs.filePrefix + "scripts/loader.js", function() {
+    let Loader = scrmljs.Loader, scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
+    Loader.tiers.js(scriptLoader);
+    Loader.tiers.initialize(scriptLoader);
+
+    // add items
+    function addScript(name) {
+        if (name in scriptLoader.items) return;
+        let dependencies = scrmljs.scripts[name].length === 0? {}: {js: {}};
+        for (let subscript of scrmljs.scripts[name]) {
+            addScript(subscript);
+            dependencies.js[subscript] = undefined;
         }
-        for (let script in scripts) addScript(script);
-        scriptLoader.addEphemeralListener(function() {
-            {
-                scrmljs.mainLink = scrmljs.guiWorkerLink.openGuiWorkerLink(functions, "worker");
-                console.log("main link");
-                console.log(scrmljs.mainLink);
-                
-                
-                
-                
-                let overloadProto = scrmljs.overloadManager.protoModel;
-                pageTickets = scrmljs.overloadManager.newOverloadManager();
-                pageTickets.name = "page tickets";
-                pageTickets.saveTheseObject = {};
-                
-                pageTickets.addTicketFunction("save", function(pageId) {
-                    pageTickets.saveTheseObject[pageId] = undefined;
-                });
-                
-                pageTickets.addTicketFunction("smoothMode", function(pageId, smoothMode){
-                    postMessage(["smoothMode", smoothMode]);
-                });
-                
-                pageTickets.addTicket = function addTicket(pageId, ticketFunction, ...data) {
-                    postMessage(["setLoadingScreen", pages.items[pageId].name + " " + ticketFunction + " " + data]);
-                    overloadProto.addTicket.call(this, pageId, ticketFunction, ...data);
-                }
-                
-                pageTickets.openProcess = function openProcess() {
-                    // postMessage(["openLoadingScreen"]);
-                    overloadProto.openProcess.call(this);
-                }
-                
-                pageTickets.closeProcessHook = function closeProcessHook() {
-                    this.save();
-                    postMessage(["closeLoadingScreen"]);
-                }
-                
-                pageTickets.save = function save() {
-                    for (let pageId in this.saveTheseObject) postMessage(["save", pageId, pages.items[pageId].saveToString()]);
-                    this.saveTheseObject = {};
-                }
-                
-                guiLinkTickets = scrmljs.overloadManager.newOverloadManager();
-                guiLinkTickets.name = "guiLink tickets";
-                
-                guiLinkTickets.addTicket = function addTicket(linkId, ticketFunction, ...data) {
-                    postMessage(["setLoadingScreen", getPageFromLinkId(linkId).name + " " + ticketFunction + " " + data]);
-                    overloadProto.addTicket.call(this, linkId, ticketFunction, ...data);
-                }
-                
-                guiLinkTickets.openProcess = function openProcess() {
-                    pageTickets.openProcess();
-                    overloadProto.openProcess.call(this);
-                }
-                
-                guiLinkTickets.closeProcessHook = function closeProcessHook() {
-                    pageTickets.closeProcess();
-                }
-                
-                guiLinkTickets.addTicketFunction("name", function(linkId, name) {
-                    fetched("page", linkId, "name", name);
-                });
-                
-                guiLinkTickets.addTicketFunction("nickname", function(linkId, nickname) {
-                    fetched("page", linkId, "nickname", nickname);
-                });
-                
-                guiLinkTickets.addTicketFunction("fullName", function(linkId, fullName) {
-                    fetched("page", linkId, "fullName", fullName);
-                });
-                
-                guiLinkTickets.addTicketFunction("pageNameCheckFail", function(pageId, proposedValue) {
-                    postMessage(["pageNameCheckFail", pageId, proposedValue]);
-                });
-                
-                guiLinkTickets.addTicketFunction("siblingNumber", function(pageNumber, siblingNumber) {
-                    fetched(pageNumber, "siblingNumber", siblingNumber);
-                });
-                
-                guiLinkTickets.addTicketFunction("fullPageNumber", function(pageNumber, fullPageNumber) {
-                    fetched(pageNumber, "fullPageNumber", fullPageNumber);
-                });
-                
-                guiLinkTickets.addTicketFunction("setOpen", function(linkId, open) {
-                    fetched("page", linkId, "setOpen", open);
-                });
-                
-                guiLinkTickets.addTicketFunction("moveTo", function(linkId, parentId, insertBeforeId, doSmoothly) {
-                    postMessage(["movePage", linkId, parentId, insertBeforeId, doSmoothly]);
-                });
-                
-                guiLinkTickets.addTicketFunction("moveModeOff", function() {
-                    postMessage(["moveModeOff"]);
-                });
-                
-                guiLinkTickets.addTicketFunction("newPageNameCheckFail", function(linkId) {
-                    postMessage(["newPageNameCheckFail", linkId]);
-                });
-                
-                guiLinkTickets.addTicketFunction("clearPageGap", function() {
-                    postMessage(["clearPageGap"]);
-                });
-                
-                guiLinkTickets.addTicketFunction("canDelete", function(linkId) {
-                    postMessage(["canDelete", linkId]);
-                });
-                pages = scrmljs.idManager.newManager("pageId");
-                
-                pages.eraseItemHook = function(id) {
-                    delete pageTickets.items[id];
-                    postMessage(["deleteAutosaveEntry", id]);
-                }
-                
-                guiLinks = scrmljs.idManager.newManager("linkId");
-                
-                guiLinks.eraseItemHook = function(id) {
-                    delete guiLinkTickets.items[id];
-                }
-                
-                postMessage(["start"]);
-            }
-        })
+        scriptLoader.addItem(name, dependencies, {js: scrmljs.filePrefix+scrmljs.scriptLocations[name]});
+    }
+    for (let script in scrmljs.scripts) addScript(script);
+    scriptLoader.items.idManager.addEphemeralListener("js", function() {
+        idManager = scrmljs.idManager;
+        pages = idManager.newManager("pageId");
     });
+    scriptLoader.items.overloadManager.addEphemeralListener("js", function() {overloadManager = scrmljs.overloadManager});
+    scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
+        mainLink = scrmljs.mainLink = scrmljs.guiWorkerLink.openGuiWorkerLink(functions, "worker", function(...args) {postMessage(args)});
+        mainLink.links = idManager.newManager("linkId");
+    });
+    scriptLoader.addEphemeralListener(start);
+});
+
+function start() {
+    pageTickets = overloadManager.newOverloadManager();
+    pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
+    pageTickets.closeProcessHook = function() {postMessage(["closeLoadingScreen"])};
+    postMessage(["start"]);
 }
 
 /*
@@ -194,9 +84,9 @@ onmessage = function onmessage(e) {
     let line = e.data.toString();
     try {
         let line = e.data.toString();
-        guiLinkTickets.openProcess();
+        pageTickets.openProcess(line);
         functions[e.data.shift()](...e.data);
-        guiLinkTickets.closeProcess();
+        pageTickets.closeProcess();
     } catch (x) {
         postMessage(["errorOut", "worker error " + line + "\n" + x.message]);
         throw x;
@@ -205,10 +95,14 @@ onmessage = function onmessage(e) {
 
 function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id, dataName, ...data])}
 
+function getPageFromPageId(pageId) {
+    return pages.items[pageId];
+}
+
 function getPageFromLinkId(linkId) {
-    let returner = guiLinks.items[linkId];
+    let returner = mainLink.links.items[linkId];
     if (!returner || !returner.isPage) throw Error("link " + linkId + " is not a page");
-    return returner;
+    return returner.page;
 }
 
 let pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), movingPage = false, guiLinkSetups = {};
@@ -246,8 +140,7 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
     returner.isOpen = false;
-    returner.isVisible = false;
-    returner.guiUnlinks = [];
+    returner.guiLink = false;
     returner.preSave();
     return returner;
 }
@@ -295,33 +188,13 @@ function movePage(page, parent, insertBefore) {
     parent.preSave();
     
     // if this is visible, message that the icon needs to move
-    if (page.isVisible) guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
+    //if (page.guiLink) guiLinkTickets.addTicket(page.linkId, "moveTo", parent.linkId, insertBefore? insertBefore.linkId: null);
 }
 
 functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
     let chapter = newChapter(name);
     chapter.moveTo(parentId, insertBeforeId);
-    if (visible) guiLinkSetups.chapter(chapter);
-}
-
-guiLinkSetups.chapter = function setupChapterGuiLink(chapter) {
-    if (chapter.isVisible) throw Error("gui link already set up for chapter id " + chapter.pageId);
-    chapter.isVisible = true;
-    guiLinks.addItem(chapter);
-    chapter.manager.setVarValue("linkId", chapter.linkId);
-    chapter.manager.linkProperty("linkId", chapter);
-    postMessage(["showChapter", chapter.linkId, chapter.name]);
-    if (chapter.parent) guiLinkTickets.addTicket(chapter.linkId, "moveTo", chapter.parent.linkId, chapter.nextPage? chapter.nextPage.linkId: null, false);
-    chapter.guiUnlinks.push(chapter.manager.linkListener("name", function(name) {
-        guiLinkTickets.addTicket(chapter.linkId, "name", name);
-    }, true));
-    chapter.guiUnlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
-        guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
-    }, true));
-    chapter.guiUnlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
-        guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
-    }, true));
-    if (chapter.isOpen) chapter.showToggle();
+    //if (visible) guiWorkerLink.types.page.createLink(chapter);
 }
 
 let preLoaders = [];
@@ -350,8 +223,8 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // set toggles
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] == "o");
     // set up guiLinks for visible pages
-    guiLinkSetups.chapter(pages.items[0]);
-    pageTickets.addTicket(0, "smoothMode", "true");
+    mainLink.types.page.createLink(getPageFromPageId(0));
+    postMessage(["smoothMode", true]);
 }
 
 functions.fetch = function fetch(type, linkId, dataName) {
@@ -367,20 +240,6 @@ functions.fetch = function fetch(type, linkId, dataName) {
         break; default: throw Error("do not recognize type " + type);
     }
     fetched(type, linkId, dataName, ...data);
-}
-
-functions.ask = function ask(type, linkId, questionType, proposedValue) {
-    let idItem;
-    switch (type) {
-        case "page":
-            idItem = getPageFromLinkId(linkId);
-            switch (questionType) {
-                case "name": idItem.tryChangePageName(proposedValue);
-                break; case "canDelete": idItem.checkCanDelete();
-                break; default: throw Error("do not recognize dataName " + questionType);
-            }
-        break; default: throw Error("do not recognize type " + type);
-    }
 }
 
 functions.togglePage = function togglePage(linkId, open) {
@@ -567,7 +426,6 @@ chapterProto.canDelete = function canDelete() {
     return this.childPages.length === 0;
 }
 
-function emptyFunction() {}
 function trueFunction() {return true}
 
 postMessage(["errorOut", ""]);

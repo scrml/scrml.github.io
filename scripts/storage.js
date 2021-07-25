@@ -1,11 +1,11 @@
 let storage = scrmljs.storage = {
-    deactivated: false,
+    deactivated: "read only",
     logAction: scrmljs.emptyFunction,
     storageObject: window.localStorage
 }
 
 storage.fetch = function fetch(name) {
-    if (storage.deactivated) return;
+    if (storage.deactivated && storage.deactivated !== "read only") return;
     storage.logAction("fetching " + name);
     storage.logAction(storage.storageObject.getItem(name));
     return storage.storageObject.getItem(name);

@@ -1,31 +1,21 @@
-let scriptLoader = scrmljs.scriptLoader,
-    gui = scrmljs.gui,
-    guiWorkerLink = scrmljs.guiWorkerLink;
-scriptLoader.ensureJS("guiWorkerLink");
+let scriptLoader = scrmljs.scriptLoader, gui = scrmljs.gui, idManager = scrmljs.idManager, mainLink = scrmljs.mainLink, pageType = scrmljs.pageType = mainLink.newType("page");
 
-scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
-    let pageType = guiWorkerLink.types.page = {};
-    pageType.protoModel = Object.create(guiWorkerLink.linkProto);
-    pageType.protoModel.isType = function() {return "page"};
-    pageType.protoModel.isPage = true;
-    
-    pageType.protoModel.fetch = function fetch(dataName) {
-        guiWorkerLink.linkProto.fetch.call(this, "page", dataName);
-    }
-    
-    pageType.protoModel.askWorker = function askWorker(questionType, proposedValue) {
-        guiWorkerLink.linkProto.askWorker.call(this, "page", questionType, proposedValue);
-    }
-    
-    pageType.protoModel.setOpen = function setOpen(open) {
+scriptLoader.items.page.data.initialize = function() {
+    pageType.initializers[mainLink.side]();
+}
+
+pageType.initializers.host = function() {
+    let pageProto = pageType.linkProto;
+    pageProto.isPage = true;
+    pageProto.isType = "page";
+    pageProto.setOpen = function setOpen(open) {
         if (open) {
             this.div.setAttribute("open", "");
             if (!this.firstPageGap) this.firstPageGap = this.lastPageGap = chapterType.newPageGap(this.div);
         }
         else this.div.removeAttribute("open");
     }
-    
-    pageType.protoModel.movePage = function movePage(parent, insertBefore, doSmooth = scrmljs.doSmoothly) {
+    pageProto.movePage = function movePage(parent, insertBefore, doSmooth = scrmljs.doSmoothly) {
         let div = gui.element("div", this.div.parentElement, [], this.div);
         div.appendChild(div.previousSibling);
         div.appendChild(div.nextSibling);
@@ -36,34 +26,28 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
             }
         });
     }
-    
-    pageType.protoModel.setLinkId = function setLinkId(newId, oldId = this.linkId) {
-        guiWorkerLink.linkProto.setLinkId.call(this, newId, oldId);
+    pageProto.setLinkId = function setLinkId(newId, oldId = this.linkId) {
+        pageProto.prototype.setLinkId.call(this, newId, oldId);
         this.div.setAttribute("linkid", newId);
     }
-    
-    pageType.protoModel.canDelete = function canDelete(can) {
+    pageProto.canDelete = function canDelete(can) {
         this.div.setAttribute("candelete", can);
     }
-    
-    pageType.protoModel.newNameFail = function newNameFail(line) {
+    pageProto.newNameFail = function newNameFail(line) {
         this.nameSpan.value = line;
         gui.messages.inputText(this.nameSpan, "name conflict");
     }
-    
-    pageType.protoModel.erase = function erase() {
+    pageProto.erase = function erase() {
         gui.orphan(this.div.previousSibling); // erase the preceding page gap
         gui.orphan(this.div);
-        guiWorkerLink.linkProto.erase.call(this);
+        pageProto.prototype.erase.call(this);
     }
-    
-    pageType.protoModel.deletePage = function deletePage() {
+    pageProto.deletePage = function deletePage() {
         scrmljs.post("deletePage", this.linkId);
     }
-    
-    pageType.createUnit = function createUnit(linkId, loadHere, insertBefore, type = pageType) {
-        let page = guiWorkerLink.newLink(linkId, loadHere, type, insertBefore);
-        page.div = gui.element("details", loadHere, ["class", page.isType(), "linkid", linkId, "ispage", "", "candelete", "false"], insertBefore);
+    pageType.createLink = function createLink(linkId, type = pageType) {
+        let page = mainLink.newLink(type, linkId);
+        page.div = gui.element("details", scrmljs.editor, ["class", page.isType, "linkid", linkId, "ispage", "", "candelete", "false"]);
         page.div.addEventListener("toggle", type.toggleListener);
         page.div.addEventListener("mouseenter", type.focusListener);
         page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
@@ -89,55 +73,93 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         gui.shieldClicks(page.moveButton);
         page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
         // if this is not the first page then create a page gap before this page
-        if (linkId) chapterType.newPageGap(loadHere, page.div);
-        page.askWorker("canDelete");
+        if (linkId) chapterType.newPageGap(page.div.parentElement, page.div);
+        page.dm("canDelete");
         return page;
     }
-    
     pageType.climber = gui.basicClimber("[ispage]", editor);
-    
     pageType.getLinkFromEvent = function getLinkFromEvent(e) {
         e = pageType.climber(e);
-        return guiWorkerLink.links[e.getAttribute("linkid")];
+        return mainLink.links[e.getAttribute("linkid")];
     }
-    
+    pageType.getPageFromLinkId = function getPageFromLinkId(linkId) {
+        let page = mainLink.links[linkId];
+        if (!page.isPage) throw Error("link " + linkId + " is not a page");
+        return page;
+    }
     pageType.toggleListener = function(e) {
         e = pageType.getLinkFromEvent(e);
         if (scrmljs.lockedPageFocus && e !== scrmljs.lockedPageFocus && scrmljs.isAncestorOf(e.div, scrmljs.lockedPageFocus.div, "parentElement")) return e.div.setAttribute("open", "");
         scrmljs.post("togglePage", e.linkId, e.div.hasAttribute("open"));
     }
-    
     pageType.focusListener = function(e) {
         e = pageType.getLinkFromEvent(e);
-        e.askWorker("canDelete");
+        //e.askWorker("canDelete");
     }
-    
     pageType.nameProcessorListener = function(e) {
         e = pageType.getLinkFromEvent(e);
-        e.askWorker("name", e.nameSpan.value);
+        //e.askWorker("name", e.nameSpan.value);
     }
-    
     pageType.nameBlurredListener = function(e) {
         e = pageType.getLinkFromEvent(e);
-        e.fetch("name");
+        //e.fetch("name");
     }
-    
     pageType.moveModeAction = function(e) {
         if (scrmljs.editor.hasAttribute("movemode")) scrmljs.moveModeOff();
         else scrmljs.moveModeOn(pageType.getLinkFromEvent(e));
     }
-    
     pageType.deleteBundleAction = function(e) {
         e = pageType.getLinkFromEvent(e);
         e.deletePage();
+    }   
+}
+
+pageType.receivingFunctions.host = {
+    setName: function setName(linkId, name) {
+        let page = pageType.getPageFromLinkId(linkId);
+        if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
+        else {
+            page.nameSpan.value = name;
+            page.nameSpan.removeAttribute("disabled");
+            page.nameSpan.blur();
+        }
+        page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
+    }, setNickname: function setNickname(linkId, nickname) {
+        pageType.getPageFromLinkId(linkId).nicknameSpan.value = nickname;
+    }, setFullName: function setFullName(linkId, fullName) {
+        pageType.getPageFromLinkId(linkId).fullNameText.nodeValue = fullName;
+    }, setOpen: function setOpen(linkId, open) {
+        pageType.getPageFromLinkId(linkId).setOpen(open);
+    }, pageNameCheckFail: function pageNameCheckFail(linkId, line) {
+        pageType.getPageFromLinkId(linkId).newNameFail(line);
+    }, newPageNameCheckFail: function newPageNameCheckFail(parentLinkId) {
+        if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
+        gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
+    }, clearPageGap: function clearPageGap() {
+        if (!scrmljs.focusedPageGap) return;
+        mainLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
+        scrmljs.focusedPageGap = false;
+    }, movePage: function movePage(linkId, parentId, insertBeforeId, doSmoothly) {
+        pageType.getPageFromLinkId(linkId).movePage(pageType.getPageFromLinkId(parentId), insertBeforeId == +insertBeforeId? pageType.getPageFromLinkId(insertBeforeId): null, doSmoothly);
+    }, canAcceptMove: function canAcceptMove(linkId, accept) {
+        pageType.getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
+    }, canDelete: function canDelete(linkId, can) {
+        let item = mainLink.links[linkId];
+        if (item.isPage) {
+            item.canDelete(can);
+        }
+    }, showPage: function(linkId) {
+        pageType.createLink(linkId);
     }
+}
+
+if (1<0) {
+    // chapter stuff
     
-    let chapterType = guiWorkerLink.types.chapter = Object.create(pageType);
-    
-    chapterType.protoModel = Object.create(pageType.protoModel);
+    let chapterType = /*mainLink.types.chapter =*/ Object.create(pageType);
+    chapterType.protoModel = Object.create(pageProto);
     chapterType.protoModel.isType = function() {return "chapter"};
     chapterType.protoModel.isChapter = true;
-    
     // page gaps
     let gaps = chapterType.pageGaps = {};
     gaps.getPageGapFromEvent = function getPageGapFromEvent(event) {
@@ -145,11 +167,9 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         while (gap.className !== "pagegap") gap = gap.parentElement;
         return gap;
     }
-    
     gaps.pageGapFocus = function pageGapFocus(event) {
         scrmljs.focusedPageGap = gaps.getPageGapFromEvent(event);
     }
-    
     gaps.clearPageGap = function clearPageGap(event) {
         let gap = gaps.getPageGapFromEvent(event);
         for (let child of gap.querySelectorAll(".newpagein")) {
@@ -157,28 +177,23 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
             child.value = "";
         }
     }
-    
     gaps.getGapParentId = function getGapParentId(gap) {
         while (!gap.hasAttribute("linkid")) gap = gap.parentElement;
         return gap.getAttribute("linkid");
     }
-    
     gaps.getGapNextPageId = function getGapNextPageId(gap) {
         if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("linkid");
         else return null;
     }
-    
     gaps.newPageInChanged = function newPageInChanged(event) {
         let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
         if (!gui.nodeNameScreen(line)) return gui.messages.inputText(newPageIn, "invalid nodeName");
         scrmljs.post("newPageNameCheck", gap.parentElement.getAttribute("linkid"), line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
     }
-    
     gaps.doMove = function doMove(event) {
         let gap = gaps.getPageGapFromEvent(event);
         scrmljs.post("movePage", editor.querySelector("[movingpage]").getAttribute("linkid"), gaps.getGapParentId(gap), gaps.getGapNextPageId(gap));
     }
-    
     chapterType.newPageGap = function newPageGap(loadHere, insertBefore = null) {
         let gap = gui.element("div", loadHere, ["class", "pagegap"], insertBefore);
         gap.addEventListener("focusin", gaps.pageGapFocus);
@@ -191,9 +206,39 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
         gap.moveHereButton.addEventListener("click", gaps.doMove);
         return gap;
     }
-    
-    guiWorkerLink.linkCreators.chapter = function openGuiChapter(linkId, name) {
-        let returner = pageType.createUnit(linkId, editor, null, chapterType);
-        return returner;
+}
+
+pageType.initializers.worker = function() {
+    let pageProto = pageType.linkProto;
+    pageProto.isPage = true;
+    pageProto.isType = "page";
+    pageType.createLink = function createLink(page, type = pageType) {
+        if (page.link) throw Error("gui link already set up for page id " + page.pageId);
+        let link = page.link = mainLink.newLink(type);
+        link.page = page;
+        page.manager.setVarValue("linkId", link.linkId);
+        page.manager.linkProperty("linkId", page);
+        link.dm("showPage", page.name);
+        if (1>0) return;
+        if (chapter.parent) guiLinkTickets.addTicket(chapter.linkId, "moveTo", chapter.parent.linkId, chapter.nextPage? chapter.nextPage.linkId: null, false);
+        chapter.guiUnlinks.push(chapter.manager.linkListener("name", function(name) {
+            guiLinkTickets.addTicket(chapter.linkId, "name", name);
+        }, true));
+        chapter.guiUnlinks.push(chapter.manager.linkListener("nickname", function(nickname) {
+            guiLinkTickets.addTicket(chapter.linkId, "nickname", nickname);
+        }, true));
+        chapter.guiUnlinks.push(chapter.manager.linkListener("fullName", function(fullName) {
+            guiLinkTickets.addTicket(chapter.linkId, "fullName", fullName);
+        }, true));
+        if (chapter.isOpen) chapter.showToggle();
     }
-});
+}
+
+pageType.receivingFunctions.worker = {
+    canDelete: function(linkId) {
+        let page = getPageFromLinkId(linkId);
+        page.link.dm("canDelete", page.canDelete());
+    }
+}
+
+pageType.initialize();

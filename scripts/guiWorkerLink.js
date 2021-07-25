@@ -1,43 +1,83 @@
-let guiWorkerLink = scrmljs.guiWorkerLink = {};
+let guiWorkerLink = scrmljs.guiWorkerLink = {}, emptyFunction = scrmljs.emptyFunction;
+let protoModel, typeProto, linkProto;
 
-guiWorkerLink.protoModel = {};
+protoModel = guiWorkerLink.protoModel = {};
 
-guiWorkerLink.openGuiWorkerLink = function openGuiWorkerLink(workerFunctions, whichSide) {
-    let returner = Object.create(guiWorkerLink.protoModel);
+guiWorkerLink.openGuiWorkerLink = function openGuiWorkerLink(workerFunctions, whichSide, workerOrPostMessage) {
+    let returner = Object.create(protoModel);
     returner.workerFunctions = workerFunctions;
+    returner.postMessage = postMessage;
     returner.side = whichSide;
+    if (whichSide === "host") {
+        returner.worker = workerOrPostMessage;
+        returner.postMessage = function(...args) {workerOrPostMessage.postMessage(args)};
+    } else if (whichSide === "worker") returner.postMessage = workerOrPostMessage;
+    else throw Error("side is " + whichSide + ", not host or worker");
+    returner.types = {};
+    returner.overloadManager = scrmljs.overloadManager.newOverloadManager();
+    returner.links = {};
     return returner;
 }
 
-guiWorkerLink.linkProto = {};
+protoModel.dm = function dm(typeName, functionName, linkId, ...args) {
+    this.overloadManager.addTicket(linkId, typeName + " " + functionName, ...args);
+}
 
-guiWorkerLink.newLink = function newLink(linkId, loadHere, type, insertBefore = null) {
-    let returner = Object.create(type.protoModel);
-    returner.linkId = linkId;
-    guiWorkerLink.links[linkId] = returner;
+protoModel.openProcess = function openProcess() {
+    this.overloadManager.openProcess();
+}
+
+protoModel.closeProcess = function closeProcess() {
+    this.overloadManager.closeProcess();
+}
+
+typeProto = guiWorkerLink.typeProto = {};
+
+protoModel.newType = function newType(name, protoModel = typeProto) {
+    if (name in this.types) throw Error(name + " is already a type");
+    let returner = this.types[name] = Object.create(protoModel);
+    returner.name = name;
+    returner.mainLink = this;
+    let myLinkProto = returner.linkProto = Object.create(linkProto);
+    myLinkProto.typeName = name;
+    myLinkProto.type = returner;
+    returner.initializers = {host: emptyFunction, worker: emptyFunction};
+    returner.receivingFunctions = {host: {}, worker: {}};
+    // returner.links should be an idManager for the side which controls the links, but it defaults to a holder object
+    returner.links = {};
     return returner;
 }
 
-guiWorkerLink.linkProto.fetch = function fetch(type, dataName) {
-    scrmljs.post("fetch", type, this.linkId, dataName);
+typeProto.initialize = function initialize() {
+    this.initializers[this.mainLink.side]();
+    let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, dmPosters = me.receivingFunctions[side === "host"? "worker": "host"];
+    for (let functionName in dmPosters) mainLink.overloadManager.addTicketFunction(name + " " + functionName, function(linkId, ...data) {
+        mainLink.postMessage(name + " " + functionName, linkId, ...data);
+    });
+    for (let functionName in me.receivingFunctions[side]) {
+        mainLink.workerFunctions[name + " " + functionName] = function(...args) {
+            me.receivingFunctions[side][functionName](...args);
+        }
+    }
 }
 
-guiWorkerLink.linkProto.askWorker = function askWorker(type, questionType, proposedValue) {
-    scrmljs.post("ask", type, this.linkId, questionType, proposedValue);
+typeProto.dm = function dm(...args) {this.mainLink.dm(this.name, ...args)}
+
+linkProto = guiWorkerLink.linkProto = {};
+
+protoModel.newLink = function newLink(type, linkId) {
+    let returner = Object.create(type.linkProto);
+    if (typeof linkId === "undefined") {
+        if (this.links.isIdManager) this.links.addItem(returner);
+        else throw Error("trying to make a link without a link id");
+    } else {
+        if (this.links.isIdManager) throw Error("trying to specify a linkId when a manager is present");
+        this.links[linkId] = returner;
+        returner.linkId = linkId;
+    }
+    return returner;
 }
 
-guiWorkerLink.linkProto.setLinkId = function setLinkId(newLinkId, oldLinkId = this.linkId) {
-    this.linkId = newLinkId;
-    delete guiWorkerLink.links[oldLinkId];
-    guiWorkerLink.links[newLinkId] = this;
+linkProto.dm = function dm(functionName, ...args) {
+    this.type.dm(functionName, this.linkId, ...args);
 }
-
-guiWorkerLink.linkProto.erase = function erase() {
-    delete guiWorkerLink.links[this.linkId];
-}
-
-guiWorkerLink.types = {};
-
-guiWorkerLink.linkCreators = {};
-
-guiWorkerLink.links = {};
