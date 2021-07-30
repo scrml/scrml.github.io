@@ -39,7 +39,7 @@ pageType.initializers.host = function() {
         linkProto.eraseLink.call(this);
     }
     pageProto.deletePage = function deletePage() {
-        scrmljs.post("deletePage", this.linkId);
+        this.dm("deletePage");
     }
     pageType.createLink = function createLink(linkId, type = pageType) {
         let page = mainLink.newLink(type, linkId);
@@ -204,5 +204,8 @@ pageType.receivingFunctions.worker = {
         page.moveTo(getPageFromLinkId(parentId), getPageFromLinkId(insertBeforeId), doSmoothly);
     }, closeMoveMode: function() {
         scrmljs.moveMode = false;
+    }, deletePage: function(linkId) {
+        let page = getPageFromLinkId(linkId);
+        page.deletePage();
     }
 }

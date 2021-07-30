@@ -163,6 +163,10 @@ workerFunctions.savePage = function save(pageId, line) {
     storage.store("page " + pageId, line);
 }
 
+workerFunctions.moveAutosaveEntry = function moveAutosaveEntry(oldPageId, newPageId) {
+    storage.move("page " + oldPageId, "page " + newPageId);
+}
+
 workerFunctions.deleteAutosaveEntry = function deleteAutosaveEntry(pageId) {
     storage.erase("page " + pageId);
 }

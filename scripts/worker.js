@@ -72,6 +72,7 @@ scrmljs.importScript(scrmljs.filePrefix + "scripts/loader.js", function() {
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
         pageTickets.closeProcessHook = function() {
             mainLink.flushErase();
+            pages.flushErase();
             postMessage(["closeLoadingScreen"]);
         };
         postMessage(["start"]);
@@ -202,24 +203,6 @@ functions.openPageProcess = function openPageProcess() {pageTickets.openProcess(
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
-/*functions.deletePage = function deletePage(linkId) {
-    let page = getPageFromLinkId(linkId);
-    if (!page.canDelete()) throw Error("page " + linkId + " is still in use");
-    // erase gui link
-    page.makeInvisible();
-    // remove from family tree
-    let prev = page.previousPage, next = page.nextPage;
-    if (prev) {
-        prev.nextPage = next;
-        prev.manager.setVarValue("siblingNumber", prev.siblingNumber);
-    } else if (next) next.manager.setVarValue("siblingNumber", page.siblingNumber);
-    if (next) next.previousPage = prev;
-    page.parent.childPages.splice(page.siblingNumber - 1, 1);
-    page.parent.preSave();
-    // remove from list of all pages
-    pages.eraseItem(page.pageId);
-}*/
-
 pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
     if (this.parent) {
         if (this.parent.parent) return this.parent.fullPageNumber + "." + siblingNumber;
@@ -259,12 +242,13 @@ pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = f
         if (next) next.previousPage = prev;
         oldParent.childPages.splice(sn - 1, 1);
         if (next) next.manager.setVarValue("siblingNumber", next.siblingNumber - 1);
+        if (oldParent.isVisible) oldParent.guiLink.dm("canDelete", oldParent.canDelete());
         oldParent.preSave();
     }
     
     // move to new parent
     this.parent = parent;
-    if (insertBefore >= 0) {
+    if (insertBefore !== "none") {
         this.nextPage = insertBefore;
         this.previousPage = insertBefore.previousPage;
         if (this.previousPage) this.previousPage.nextPage = this;
@@ -278,6 +262,7 @@ pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = f
         if (prev) prev.nextPage = this;
         this.manager.setVarValue("siblingNumber", parent.childPages.length);
     }
+    if (parent.isVisible) parent.guiLink.dm("canDelete", parent.canDelete());
     parent.preSave();
     
     // if this is visible, message that the icon needs to move
@@ -295,6 +280,8 @@ pageProto.setPageId = function setPageId(newPageId) {
     if (oldPageId == newPageId) return;
     this.pageId = newPageId;
     if (oldPageId == undefined) return;
+    console.log(pageTickets);
+    postMessage(["moveAutosaveEntry", oldPageId, newPageId]);
     pageTickets.items[newPageId] = pageTickets.items[oldPageId];
     delete pageTickets.items[oldPageId];
     this.preSave();
@@ -309,6 +296,25 @@ pageProto.setLinkId = function setLinkId(newLinkId) {
     postMessage(["changeLinkId", oldLinkId, newLinkId]);
     guiLinkTickets.items[newLinkId] = guiLinkTickets.items[oldLinkId];
     delete guiLinkTickets.items[oldLinkId];
+}
+
+pageProto.deletePage = function deletePage() {
+    if (!this.canDelete()) throw Error("page " + this.pageId + " is still in use");
+    // erase gui link
+    this.showPage(false);
+    // remove from family tree
+    let prev = this.previousPage, next = this.nextPage;
+    if (prev) {
+        prev.nextPage = next;
+        prev.manager.setVarValue("siblingNumber", prev.siblingNumber);
+    } else if (next) next.manager.setVarValue("siblingNumber", this.siblingNumber);
+    if (next) next.previousPage = prev;
+    this.parent.childPages.splice(this.siblingNumber - 1, 1);
+    this.parent.preSave();
+    if (this.parent.isVisible) this.parent.guiLink.dm("canDelete", this.parent.canDelete());
+    // remove from list of all pages
+    pages.preErase(this.pageId);
+    postMessage(["deleteAutosaveEntry", this.pageId]);
 }
 
 pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
@@ -360,12 +366,6 @@ chapterProto.saveToString = function saveToString() {
 }
 
 pageProto.canDelete = trueFunction;
-
-pageProto.checkCanDelete = function checkCanDelete() {
-    if (!this.isVisible) throw Error("checking if an invisible page can be deleted");
-    if (!this.canDelete()) return;
-    guiLinkTickets.addTicket(this.linkId, "canDelete");
-}
 
 chapterProto.canDelete = function canDelete() {
     return this.childPages.length === 0;
