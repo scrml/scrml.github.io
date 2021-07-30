@@ -11,11 +11,11 @@ pageType.initializers.host = function() {
         if (open) this.div.setAttribute("open", "");
         else this.div.removeAttribute("open");
     }
-    pageProto.movePage = function movePage(parent, insertBefore, doSmooth = scrmljs.doSmoothly) {
+    pageProto.movePage = function movePage(parent, insertBefore = "none", doSmooth = scrmljs.doSmoothly) {
         let div = gui.element("div", this.div.parentElement, [], this.div);
         div.appendChild(div.previousSibling);
         div.appendChild(div.nextSibling);
-        gui.smoothMove(div, parent.div, insertBefore? insertBefore.div.previousSibling: parent.div.lastChild, {
+        gui.smoothMove(div, parent.div, insertBefore === "none"? parent.div.lastChild: insertBefore.div.previousSibling, {
             doSmoothly: doSmooth,
             onEnd: function() {
                 gui.removeLayer(div);
@@ -103,8 +103,19 @@ pageType.initializers.host = function() {
         e.dm("getName");
     }
     pageType.moveModeAction = function(e) {
-        if (editor.hasAttribute("movemode")) scrmljs.moveModeOff();
-        else scrmljs.moveModeOn(pageType.getLinkFromEvent(e));
+        e = pageType.getLinkFromEvent(e);
+        if (editor.hasAttribute("movemode")) {
+            scrmljs.lockedPageFocus = false;
+            editor.removeAttribute("movemode");
+            e.div.removeAttribute("movingPage");
+            for (let page of editor.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
+            e.dm("closeMoveMode");
+        } else {
+            scrmljs.lockedPageFocus = e;
+            editor.setAttribute("movemode", "");
+            e.div.setAttribute("movingpage", "");
+            e.dm("startMoveModeChecks");
+        }
     }
     pageType.deleteBundleAction = function(e) {
         e = pageType.getLinkFromEvent(e);
@@ -130,19 +141,8 @@ pageType.receivingFunctions.host = {
         pageType.getPageFromLinkId(linkId).togglePage(open);
     }, pageNameCheckFail: function pageNameCheckFail(linkId, line) {
         pageType.getPageFromLinkId(linkId).newNameFail(line);
-    }, newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
-        console.log("marking fail");
-        if (1>0) return;
-        if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
-        gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
-    }, clearPageGap: function clearPageGap() {
-        if (!scrmljs.focusedPageGap) return;
-        mainLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
-        scrmljs.focusedPageGap = false;
-    }, movePage: function movePage(linkId, parentId, insertBeforeId, doSmoothly) {
-        pageType.getPageFromLinkId(linkId).movePage(pageType.getPageFromLinkId(parentId), insertBeforeId == +insertBeforeId? pageType.getPageFromLinkId(insertBeforeId): null, doSmoothly);
-    }, canAcceptMove: function canAcceptMove(linkId, accept) {
-        pageType.getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
+    }, movePage: function movePage(linkId, parentId, insertBeforeId = "none", doSmoothly = false) {
+        pageType.getPageFromLinkId(linkId).movePage(pageType.getPageFromLinkId(parentId), insertBeforeId === "none"? "none": pageType.getPageFromLinkId(insertBeforeId), doSmoothly);
     }, canDelete: function canDelete(linkId, can) {
         let item = mainLink.links[linkId];
         if (item.isPage) {
@@ -169,7 +169,7 @@ pageType.initializers.worker = function() {
         link.unlinks = [];
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.dm("canDelete", page.canDelete());
-        if (page.parent) link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: null, false);
+        if (page.parent) link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: "none", false);
         link.togglePage(page.isOpen);
     }
     pageProto.togglePage = function togglePage(open) {
@@ -199,11 +199,10 @@ pageType.receivingFunctions.worker = {
         let page = getPageFromLinkId(linkId);
         if (page.canChangeName(newName)) page.manager.setVarValue("name", newName);
         else page.guiLink.dm("pageNameCheckFail", newName);
-    }, tryNewPage: function tryNewPage(linkId, newName, insertBeforeId, pageMode) {
-        let parent = getPageFromLinkId(linkId);
-        for (let child of parent.childPages) if (child.name === newName) return parent.guiLink.dm("newPageFail", newName, insertBeforeId);
-        let page = newPageByType[pageMode](newName);
-        page.showPage(true);
-        page.moveTo(parent.pageId, getPageFromLinkId(insertBeforeId));
+    }, moveTo: function moveTo(linkId, parentId, insertBeforeId, doSmoothly) {
+        let page = getPageFromLinkId(linkId);
+        page.moveTo(getPageFromLinkId(parentId), getPageFromLinkId(insertBeforeId), doSmoothly);
+    }, closeMoveMode: function() {
+        scrmljs.moveMode = false;
     }
 }

@@ -99,9 +99,9 @@ function getPageFromPageId(pageId) {
 }
 
 function getPageFromLinkId(linkId) {
+    if (linkId === "none") return "none";
     let returner = mainLink.links.items[linkId];
-    if (!returner) return false;
-    if (!returner.isPage) throw Error("link " + linkId + " is not a page");
+    if (!returner || !returner.isPage) throw Error("link " + linkId + " is not a page");
     return returner.page;
 }
 
@@ -141,6 +141,7 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager.linkProperty("fullName", returner);
     returner.isOpen = false;
     returner.guiLink = false;
+    returner.isVisible = false;
     returner.preSave();
     return returner;
 }
@@ -189,27 +190,13 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     }
     // set parent/child relationships
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId] === "skip") continue;
-    else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pageId);
+    else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
     // set toggles
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] == "o");
     // set up guiLinks for visible pages
     getPageFromPageId(0).showPage(true);
     postMessage(["smoothMode", true]);
 }
-
-/*functions.startMoveModeChecks = function startMoveModeChecks(linkId) {
-    movingPage = getPageFromLinkId(linkId);
-    for (let page of guiLinks.items) if (page.isChapter) postMessage(["canAcceptMove", page.linkId, page.canAcceptMove(movingPage)]);
-}
-
-functions.endMoveMode = function endMoveMode() {
-    movingPage = false;
-}
-
-functions.movePage = function movePageTranslation(movingPageLinkId, parentLinkId, insertBeforeLinkId) {
-    movePage(getPageFromLinkId(movingPageLinkId), getPageFromLinkId(parentLinkId), insertBeforeLinkId == +insertBeforeLinkId? getPageFromLinkId(insertBeforeLinkId): null);
-    guiLinkTickets.addTicket(movingPageLinkId, "moveModeOff");
-}*/
 
 functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
 
@@ -258,13 +245,11 @@ pageProto.tryChangePageName = function tryChangePageName(proposedName) {
     this.manager.setVarValue("name", proposedName);
 }
 
-pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
-    let parent = pages.items[parentId];
-    if (insertBefore >= 0) insertBefore = pages.items[insertBefore];
+pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
     // some moves result in no change, so return if this is the case
     if (this === insertBefore) return;
-    if (insertBefore && this.nextPage === insertBefore) return;
-    if (this.parent && this.parent === parent && !insertBefore && !this.nextPage) return;
+    if (this.nextPage === insertBefore) return;
+    if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextPage) return;
     
     // notify the old parent of the move
     if (this.parent) {
@@ -279,7 +264,7 @@ pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
     
     // move to new parent
     this.parent = parent;
-    if (insertBefore) {
+    if (insertBefore >= 0) {
         this.nextPage = insertBefore;
         this.previousPage = insertBefore.previousPage;
         if (this.previousPage) this.previousPage.nextPage = this;
@@ -296,14 +281,13 @@ pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
     parent.preSave();
     
     // if this is visible, message that the icon needs to move
-    if (this.isVisible) this.guiLink.dm("movePage", parent.linkId, insertBefore? insertBefore.linkId: null);
+    if (this.isVisible) this.guiLink.dm("movePage", parent.linkId, insertBefore === "none"? "none": insertBefore.linkId, doSmoothly);
 }
 
 pageProto.togglePage = function togglePage(open = false) {
     if (this.isOpen === open) return;
     this.isOpen = open;
     this.preSave();
-    //if (open && movingPage) postMessage(["canAcceptMove", this.linkId, this.canAcceptMove(movingPage)]);
 }
 
 pageProto.setPageId = function setPageId(newPageId) {

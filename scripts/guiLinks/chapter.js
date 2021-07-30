@@ -1,4 +1,4 @@
-let pageType = scrmljs.mainLink.types.page, gui = scrmljs.gui;
+let pageType = scrmljs.mainLink.types.page, gui = scrmljs.gui, editor = scrmljs.editor;
 
 let hostInitializer = function hostInitializer() {
     let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
@@ -30,7 +30,7 @@ let hostInitializer = function hostInitializer() {
     }
     gaps.getGapNextPageId = function getGapNextPageId(gap) {
         if (gap.nextElementSibling) return gap.nextElementSibling.getAttribute("linkid");
-        else return null;
+        else return "none";
     }
     gaps.newPageInChanged = function newPageInChanged(event) {
         let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
@@ -40,7 +40,15 @@ let hostInitializer = function hostInitializer() {
     }
     gaps.doMove = function doMove(event) {
         let gap = gaps.getPageGapFromEvent(event);
-        scrmljs.post("movePage", editor.querySelector("[movingpage]").getAttribute("linkid"), gaps.getGapParentId(gap), gaps.getGapNextPageId(gap));
+        scrmljs.lockedPageFocus.dm("moveTo", gaps.getGapParentId(gap), gaps.getGapNextPageId(gap), true);
+        editor.removeAttribute("movemode");
+        for (let div of editor.querySelectorAll("[canacceptmove]")) div.removeAttribute("canacceptmove");
+        //scrmljs.post("movePage", editor.querySelector("[movingpage]").getAttribute("linkid"), gaps.getGapParentId(gap), gaps.getGapNextPageId(gap));
+        /*let doMove = function doMove(e) {
+            let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingpage]").getAttribute("pagenumber"));
+            post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
+            scrmljs.moveModeOff();
+        }*/
     }
     extension.newPageGap = function newPageGap(loadHere, insertBefore = null) {
         let gap = gui.element("div", loadHere, ["class", "pagegap"], insertBefore);
@@ -64,6 +72,7 @@ let workerInitializer = function workerInitializer() {
     extension.chapterType.linkProto = chapterProto;
     extension.createLink = function createLink(page, type = extension.chapterType) {
         pageType.createLink(page, type);
+        if (scrmljs.moveMode) page.guiLink.dm("canAcceptMove", page.canAcceptMove(scrmljs.moveMode));
     }
     chapterProto.togglePage = function togglePage(open) {
         pageType.linkProto.togglePage.call(this, open);
@@ -79,5 +88,31 @@ pageType.extensions.chapter = {
     initializers: {
         host: hostInitializer,
         worker: workerInitializer
+    }, receivingFunctions: {
+        host: {
+            newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
+                console.log("marking fail");
+                if (1>0) return;
+                if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
+                gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
+            }, clearPageGap: function clearPageGap() {
+                if (!scrmljs.focusedPageGap) return;
+                mainLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
+                scrmljs.focusedPageGap = false;
+            }, canAcceptMove: function canAcceptMove(linkId, accept) {
+                pageType.getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
+            }
+        }, worker: {
+            tryNewPage: function tryNewPage(linkId, newName, insertBeforeId, pageMode) {
+                let parent = getPageFromLinkId(linkId);
+                for (let child of parent.childPages) if (child.name === newName) return parent.guiLink.dm("newPageFail", newName, insertBeforeId);
+                let page = newPageByType[pageMode](newName);
+                page.showPage(true);
+                page.moveTo(parent, getPageFromLinkId(insertBeforeId));
+            }, startMoveModeChecks: function startMoveModeChecks(linkId) {
+                let page = scrmljs.moveMode = getPageFromLinkId(linkId);
+                for (let link of mainLink.links.items) if (link.page.isChapter) link.dm("canAcceptMove", link.page.canAcceptMove(page));
+            }
+        }
     }
 }

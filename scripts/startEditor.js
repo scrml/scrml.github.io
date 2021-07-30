@@ -163,11 +163,6 @@ workerFunctions.savePage = function save(pageId, line) {
     storage.store("page " + pageId, line);
 }
 
-// move to page.js
-workerFunctions.eraseLink = function eraseLink(linkId) {
-    guiWorkerLink.links[linkId].erase();
-}
-
 workerFunctions.deleteAutosaveEntry = function deleteAutosaveEntry(pageId) {
     storage.erase("page " + pageId);
 }
@@ -178,34 +173,6 @@ workerFunctions.errorOut = function errorOut(message) {
 
 let onInactivity = function onInactivity() {
     
-}
-
-scrmljs.moveModeOn = function moveModeOn(page) {
-    if (editor.hasAttribute("movemode")) throw Error("already in move mode");
-    scrmljs.lockedPageFocus = page;
-    editor.setAttribute("movemode", "");
-    page.div.setAttribute("movingpage", "");
-    post("startMoveModeChecks", page.linkId);
-}
-
-scrmljs.moveModeOff = workerFunctions.moveModeOff = function moveModeOff() {
-    if (!editor.hasAttribute("movemode")) throw Error("cannot turn move mode off if not in move mode");
-    scrmljs.lockedPageFocus = false;
-    editor.removeAttribute("movemode");
-    document.querySelector("[movingpage]").removeAttribute("movingPage");
-    for (let page of document.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
-    post("endMoveMode");
-}
-
-let doMove = function doMove(e) {
-    let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingpage]").getAttribute("pagenumber"));
-    post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
-    scrmljs.moveModeOff();
-}
-
-let skipPageSpot = function skipPageSpot() {
-    pages.push("skipped");
-    post("skipPageSpot");
 }
 
 // processing of TeX in a node attribute to make it ready to display as the innerHTML of something

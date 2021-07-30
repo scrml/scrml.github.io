@@ -66,9 +66,13 @@ protoModel.newType = function newType(name, protoModel = typeProto) {
 }
 
 typeProto.initialize = function initialize() {
+    let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, otherSide = side === "host"? "worker": "host", dmPosters = me.receivingFunctions[otherSide];
     this.initializers[this.mainLink.side]();
-    for (let extension in this.extensions) this.extensions[extension].initializers[this.mainLink.side]();
-    let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, dmPosters = me.receivingFunctions[side === "host"? "worker": "host"];
+    for (let extension in this.extensions) {
+        for (let functionName in this.extensions[extension].receivingFunctions[side]) this.receivingFunctions[side][functionName] = this.extensions[extension].receivingFunctions[side][functionName];
+        for (let functionName in this.extensions[extension].receivingFunctions[otherSide]) this.receivingFunctions[otherSide][functionName] = this.extensions[extension].receivingFunctions[otherSide][functionName];
+        this.extensions[extension].initializers[this.mainLink.side]();
+    }
     for (let functionName in dmPosters) mainLink.overloadManager.addTicketFunction(name + " " + functionName, function(linkId, ...data) {
         mainLink.postMessage(name + " " + functionName, linkId, ...data);
     });
