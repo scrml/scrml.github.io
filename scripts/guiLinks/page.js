@@ -96,11 +96,11 @@ pageType.initializers.host = function() {
     }
     pageType.nameProcessorListener = function(e) {
         e = pageType.getLinkFromEvent(e);
-        //e.askWorker("name", e.nameSpan.value);
+        e.dm("tryChangeName", e.nameSpan.value);
     }
     pageType.nameBlurredListener = function(e) {
         e = pageType.getLinkFromEvent(e);
-        //e.fetch("name");
+        e.dm("getName");
     }
     pageType.moveModeAction = function(e) {
         if (editor.hasAttribute("movemode")) scrmljs.moveModeOff();
@@ -113,7 +113,7 @@ pageType.initializers.host = function() {
 }
 
 pageType.receivingFunctions.host = {
-    setName: function setName(linkId, name) {
+    getName: function getName(linkId, name) {
         let page = pageType.getPageFromLinkId(linkId);
         if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
         else {
@@ -122,7 +122,7 @@ pageType.receivingFunctions.host = {
             page.nameSpan.blur();
         }
         page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
-    }, setNickname: function setNickname(linkId, nickname) {
+    }, getNickname: function getNickname(linkId, nickname) {
         pageType.getPageFromLinkId(linkId).nicknameSpan.value = nickname;
     }, setFullName: function setFullName(linkId, fullName) {
         pageType.getPageFromLinkId(linkId).fullNameText.nodeValue = fullName;
@@ -164,7 +164,8 @@ pageType.initializers.worker = function() {
         page.manager.setVarValue("linkId", link.linkId);
         page.manager.linkProperty("linkId", page);
         link.dm("showPage", type.linkProto.isType);
-        link.dm("setName", page.name);
+        link.unlinks = [];
+        link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.dm("canDelete", page.canDelete());
         if (page.parent) link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: null, false);
         link.togglePage(page.isOpen);
@@ -173,23 +174,28 @@ pageType.initializers.worker = function() {
         this.dm("togglePage", open);
     }
     pageProto.eraseLink = function eraseLink() {
+        for (let unlink of this.unlinks) unlink();
         linkProto.eraseLink.call(this);
         this.dm("eraseLink");
     }
 }
 
 pageType.receivingFunctions.worker = {
-    setName: function(linkId) {
+    getName: function(linkId) {
         let page = getPageFromLinkId(linkId);
-        page.guiLink.dm("setName", page.name);
-    }, setNickname: function(linkId) {
+        page.guiLink.dm("getName", page.name);
+    }, getNickname: function(linkId) {
         let page = getPageFromLinkId(linkId);
-        page.guiLink.dm("setNickname", page.nickname);
+        page.guiLink.dm("getNickname", page.nickname);
     }, togglePage: function(linkId, open) {
         let page = getPageFromLinkId(linkId);
         page.togglePage(open);
     }, canDelete: function(linkId) {
         let page = getPageFromLinkId(linkId);
         page.guiLink.dm("canDelete", page.canDelete());
+    }, tryChangeName: function(linkId, newName) {
+        let page = getPageFromLinkId(linkId);
+        if (page.canChangeName(newName)) page.manager.setVarValue("name", newName);
+        else page.guiLink.dm("pageNameCheckFail", newName);
     }
 }

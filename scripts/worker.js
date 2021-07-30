@@ -146,12 +146,20 @@ function newPage(name, nickname = "", protoModel = pageProto) {
 
 pageProto.showPage = function showPage(show) {
     if (show === this.isVisible) return;
-    if (show) mainLink.types.page.extensions[this.isType].createLink(this);
+    if (show) mainLink.types.page.extensions[this.pageType].createLink(this);
     else {
         this.guiLink.eraseLink();
         delete this.guiLink;
     }
     this.isVisible = show;
+}
+
+pageProto.canChangeName = function canChangeName(newName) {
+    let sibling = this;
+    while (sibling = sibling.previousPage) if (sibling.name === newName) return false;
+    sibling = this;
+    while (sibling = sibling.nextPage) if (sibling.name === newName) return false;
+    return true;
 }
 
 /*functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
@@ -202,18 +210,6 @@ functions.endMoveMode = function endMoveMode() {
 functions.movePage = function movePageTranslation(movingPageLinkId, parentLinkId, insertBeforeLinkId) {
     movePage(getPageFromLinkId(movingPageLinkId), getPageFromLinkId(parentLinkId), insertBeforeLinkId == +insertBeforeLinkId? getPageFromLinkId(insertBeforeLinkId): null);
     guiLinkTickets.addTicket(movingPageLinkId, "moveModeOff");
-}
-
-functions.newPageNameCheck = function newPageNameCheck(parentLinkId, line, insertBeforeLinkId, pageMode) {
-    let parent = getPageFromLinkId(parentLinkId);
-    if (!parent.isChapter) throw Error("page " + parent.pageId + " is not a chapter");
-    for (let child of parent.childPages) if (child.name == line) return guiLinkTickets.addTicket(parentLinkId, "newPageNameCheckFail");
-    guiLinkTickets.addTicket(parentLinkId, "clearPageGap");
-    switch (pageMode) {
-        case "chapter":
-            functions.newChapter(parent.pageId, insertBeforeLinkId>=0? getPageFromLinkId(insertBeforeLinkId).pageId: null, line, true);
-        break; default: throw Error("do not recognize page mode " + pageMode);
-    }
 }*/
 
 functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
@@ -334,7 +330,7 @@ pageProto.setLinkId = function setLinkId(newLinkId) {
 
 pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
 
-chapterProto.isType = "chapter";
+chapterProto.pageType = "chapter";
 chapterProto.isChapter = true;
 
 function newChapter(name, nickname, protoModel = chapterProto) {

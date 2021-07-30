@@ -1,5 +1,5 @@
 let storage = scrmljs.storage = {
-    deactivated: "read only",
+    deactivated: false,
     logAction: scrmljs.emptyFunction,
     storageObject: window.localStorage
 }
