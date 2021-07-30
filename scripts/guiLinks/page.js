@@ -130,7 +130,9 @@ pageType.receivingFunctions.host = {
         pageType.getPageFromLinkId(linkId).togglePage(open);
     }, pageNameCheckFail: function pageNameCheckFail(linkId, line) {
         pageType.getPageFromLinkId(linkId).newNameFail(line);
-    }, newPageNameCheckFail: function newPageNameCheckFail(parentLinkId) {
+    }, newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
+        console.log("marking fail");
+        if (1>0) return;
         if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
         gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
     }, clearPageGap: function clearPageGap() {
@@ -197,5 +199,11 @@ pageType.receivingFunctions.worker = {
         let page = getPageFromLinkId(linkId);
         if (page.canChangeName(newName)) page.manager.setVarValue("name", newName);
         else page.guiLink.dm("pageNameCheckFail", newName);
+    }, tryNewPage: function tryNewPage(linkId, newName, insertBeforeId, pageMode) {
+        let parent = getPageFromLinkId(linkId);
+        for (let child of parent.childPages) if (child.name === newName) return parent.guiLink.dm("newPageFail", newName, insertBeforeId);
+        let page = newPageByType[pageMode](newName);
+        page.showPage(true);
+        page.moveTo(parent.pageId, getPageFromLinkId(insertBeforeId));
     }
 }

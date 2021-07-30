@@ -100,7 +100,8 @@ function getPageFromPageId(pageId) {
 
 function getPageFromLinkId(linkId) {
     let returner = mainLink.links.items[linkId];
-    if (!returner || !returner.isPage) throw Error("link " + linkId + " is not a page");
+    if (!returner) return false;
+    if (!returner.isPage) throw Error("link " + linkId + " is not a page");
     return returner.page;
 }
 
@@ -144,6 +145,10 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     return returner;
 }
 
+let newPageByType = {
+    chapter: newChapter
+}
+
 pageProto.showPage = function showPage(show) {
     if (show === this.isVisible) return;
     if (show) mainLink.types.page.extensions[this.pageType].createLink(this);
@@ -161,12 +166,6 @@ pageProto.canChangeName = function canChangeName(newName) {
     while (sibling = sibling.nextPage) if (sibling.name === newName) return false;
     return true;
 }
-
-/*functions.newChapter = function toldToMakeNewChapter(parentId, insertBeforeId, name, visible = false) {
-    let chapter = newChapter(name);
-    chapter.moveTo(parentId, insertBeforeId);
-    //if (visible) guiWorkerLink.types.page.createLink(chapter);
-}*/
 
 let preLoaders = [];
 
@@ -297,7 +296,7 @@ pageProto.moveTo = function moveTo(parentId, insertBefore = false) {
     parent.preSave();
     
     // if this is visible, message that the icon needs to move
-    if (this.isVisible) this.guiLink.moveTo(parent.linkId, insertBefore? insertBefore.linkId: null);
+    if (this.isVisible) this.guiLink.dm("movePage", parent.linkId, insertBefore? insertBefore.linkId: null);
 }
 
 pageProto.togglePage = function togglePage(open = false) {

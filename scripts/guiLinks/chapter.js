@@ -35,7 +35,8 @@ let hostInitializer = function hostInitializer() {
     gaps.newPageInChanged = function newPageInChanged(event) {
         let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
         if (!gui.nodeNameScreen(line)) return gui.messages.inputText(newPageIn, "invalid nodeName");
-        scrmljs.post("newPageNameCheck", gap.parentElement.getAttribute("linkid"), line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
+        let parentPage = mainLink.links[gaps.getGapParentId(gap)];
+        parentPage.dm("tryNewPage", line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
     }
     gaps.doMove = function doMove(event) {
         let gap = gaps.getPageGapFromEvent(event);
