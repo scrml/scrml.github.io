@@ -28,12 +28,16 @@ idManager.protoModel.preErase = function preErase(id) {
 }
 
 idManager.protoModel.flushErase = function flushErase() {
-    let keepIndexes = [];
-    for (let i = this.items.length - 1; this.eraseThese.length > keepIndexes.length; --i) if (!this.eraseThese.includes(i)) keepIndexes.push(i);
-    for (let i = 0; i < keepIndexes.length; ++i) {
-        this.items[this.eraseThese[i]] = this.items[keepIndexes[i]];
-        this.items[this.eraseThese[i]][this.setIdName](this.eraseThese[i]);
+    this.eraseThese.sort().reverse();
+    let replace, pullIndex = this.items.length - 1, numErased = this.eraseThese.length;
+    while (this.eraseThese.length > 0) {
+        replace = this.eraseThese.pop();
+        if (replace >= pullIndex) break;
+        while (this.eraseThese.includes(pullIndex)) --pullIndex;
+        this.items[replace] = this.items[pullIndex];
+        this.items[replace][this.setIdName](replace);
+        --pullIndex;
     }
-    this.items.splice(this.items.length - keepindexes.length, keepIndexes.length);
-    this.eraseThese = [];
+    this.items.splice(this.items.length - numErased);
+    this.eraseThese.splice(0);
 }

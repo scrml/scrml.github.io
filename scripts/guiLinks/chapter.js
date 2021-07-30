@@ -68,6 +68,10 @@ let workerInitializer = function workerInitializer() {
         pageType.linkProto.togglePage.call(this, open);
         for (let childPage of this.page.childPages) childPage.showPage(open);
     }
+    chapterProto.eraseLink = function eraseLink() {
+        pageType.linkProto.eraseLink.call(this);
+        for (let childPage of this.page.childPages) childPage.showPage(open);
+    }
 }
 
 pageType.extensions.chapter = {

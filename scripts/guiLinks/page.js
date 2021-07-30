@@ -1,4 +1,4 @@
-let scriptLoader = scrmljs.scriptLoader, editor = scrmljs.editor, gui = scrmljs.gui, idManager = scrmljs.idManager, mainLink = scrmljs.mainLink, emptyFunction = scrmljs.emptyFunction, pageType = scrmljs.pageType = mainLink.newType("page");
+let scriptLoader = scrmljs.scriptLoader, editor = scrmljs.editor, gui = scrmljs.gui, idManager = scrmljs.idManager, guiWorkerLink = scrmljs.guiWorkerLink, linkProto = guiWorkerLink.linkProto, mainLink = scrmljs.mainLink, emptyFunction = scrmljs.emptyFunction, pageType = scrmljs.pageType = mainLink.newType("page");
 
 scriptLoader.items.page.data.initialize = function() {pageType.initialize()}
 
@@ -36,7 +36,7 @@ pageType.initializers.host = function() {
     pageProto.eraseLink = function eraseLink() {
         gui.orphan(this.div.previousSibling); // erase the preceding page gap
         gui.orphan(this.div);
-        this.mainLink.linkProto.eraseLink.call(this);
+        linkProto.eraseLink.call(this);
     }
     pageProto.deletePage = function deletePage() {
         scrmljs.post("deletePage", this.linkId);
@@ -70,8 +70,6 @@ pageType.initializers.host = function() {
         page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
         // if this is not the first page then create a page gap before this page
         if (linkId) pageType.extensions.chapter.newPageGap(page.div.parentElement, page.div);
-        page.dm("setName");
-        page.dm("canDelete");
         type.createLinkHook(page);
         return page;
     }
@@ -83,7 +81,7 @@ pageType.initializers.host = function() {
     }
     pageType.getPageFromLinkId = function getPageFromLinkId(linkId) {
         let page = mainLink.links[linkId];
-        if (!page.isPage) throw Error("link " + linkId + " is not a page");
+        if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
         return page;
     }
     pageType.toggleListener = function(e) {
@@ -148,8 +146,10 @@ pageType.receivingFunctions.host = {
         if (item.isPage) {
             item.canDelete(can);
         }
-    }, showPage: function(linkId, extensionName) {
+    }, showPage: function showPage(linkId, extensionName) {
         pageType.createLink(linkId, pageType.extensions[extensionName].type);
+    }, eraseLink: function eraseLink(linkId) {
+        pageType.getPageFromLinkId(linkId).eraseLink();
     }
 }
 
@@ -164,13 +164,17 @@ pageType.initializers.worker = function() {
         page.manager.setVarValue("linkId", link.linkId);
         page.manager.linkProperty("linkId", page);
         link.dm("showPage", type.linkProto.isType);
-        if (page.parent) {
-            link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: null, false);
-        }
+        link.dm("setName", page.name);
+        link.dm("canDelete", page.canDelete());
+        if (page.parent) link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: null, false);
         link.togglePage(page.isOpen);
     }
     pageProto.togglePage = function togglePage(open) {
         this.dm("togglePage", open);
+    }
+    pageProto.eraseLink = function eraseLink() {
+        linkProto.eraseLink.call(this);
+        this.dm("eraseLink");
     }
 }
 

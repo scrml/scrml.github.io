@@ -22,7 +22,6 @@ guiWorkerLink.openGuiWorkerLink = function openGuiWorkerLink(workerFunctions, wh
 
 protoModel.getIdManagerForLinks = function getIdManagerForLinks(idName = "linkId") {
     this.links = idManager.newManager(idName);
-    this.linksErasingProcesses = 0;
     this.eraseLink = protoModel.eraseManagedLink;
 }
 
@@ -32,15 +31,10 @@ protoModel.eraseLink = function eraseLink(linkId) {
 
 protoModel.eraseManagedLink = function eraseManagedLink(linkId) {
     this.links.preErase(linkId);
-    if (this.linksErasingProcesses === 0) this.links.flushErase();
 }
 
-protoModel.openLinkErasingProcess = function openLinkErasingProcess() {
-    ++this.linksErasingProcesses;
-}
-
-protoModel.closeLinkErasingProcess = function closeLinkErasingProcess() {
-    if (--this.linksErasingProcesses === 0) this.links.flushErase();
+protoModel.flushErase = function flushErase() {
+    this.links.flushErase();
 }
 
 protoModel.dm = function dm(typeName, functionName, linkId, ...args) {
@@ -69,10 +63,6 @@ protoModel.newType = function newType(name, protoModel = typeProto) {
     returner.receivingFunctions = {host: {}, worker: {}};
     returner.extensions = {};
     return returner;
-}
-
-typeProto.getIdManager = function getIdManager(idName = "linkId") {
-    console.log("setting id manager");
 }
 
 typeProto.initialize = function initialize() {

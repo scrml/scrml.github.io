@@ -70,7 +70,10 @@ scrmljs.importScript(scrmljs.filePrefix + "scripts/loader.js", function() {
     scriptLoader.addEphemeralListener(function() {
         pageTickets = overloadManager.newOverloadManager();
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
-        pageTickets.closeProcessHook = function() {postMessage(["closeLoadingScreen"])};
+        pageTickets.closeProcessHook = function() {
+            mainLink.flushErase();
+            postMessage(["closeLoadingScreen"]);
+        };
         postMessage(["start"]);
     });
 });
@@ -106,7 +109,7 @@ let pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Ob
 functions.log = console.log;
 
 functions.printAll = function() {
-    console.log(pages);
+    console.log(scrmljs);
 };
 
 pageProto.isPage = true;
@@ -145,8 +148,8 @@ pageProto.showPage = function showPage(show) {
     if (show === this.isVisible) return;
     if (show) mainLink.types.page.extensions[this.isType].createLink(this);
     else {
-        console.log("need to remove guiLink");
-        console.log(this.guiLink);
+        this.guiLink.eraseLink();
+        delete this.guiLink;
     }
     this.isVisible = show;
 }
@@ -305,8 +308,6 @@ pageProto.togglePage = function togglePage(open = false) {
     if (this.isOpen === open) return;
     this.isOpen = open;
     this.preSave();
-    if (!this.isVisible) return;
-    if (open) console.log(this.guiLink);
     //if (open && movingPage) postMessage(["canAcceptMove", this.linkId, this.canAcceptMove(movingPage)]);
 }
 
@@ -364,7 +365,8 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
 chapterProto.togglePage = function togglePage(open = false) {
     if (open === this.isOpen) return;
     pageProto.togglePage.call(this, open);
-    if (this.isVisible) for (let childPage of this.childPages) childPage.showPage(open);
+    // add the children in reverse order so that nextPage already exists in gui
+    if (this.isVisible) for (let childPage of this.childPages.slice().reverse()) childPage.showPage(open);
 }
 
 pageProto.saveToString = function saveToString() {
