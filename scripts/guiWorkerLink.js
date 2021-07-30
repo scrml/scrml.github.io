@@ -1,4 +1,4 @@
-let guiWorkerLink = scrmljs.guiWorkerLink = {}, emptyFunction = scrmljs.emptyFunction;
+let guiWorkerLink = scrmljs.guiWorkerLink = {}, loader = scrmljs.scriptLoader, emptyFunction = scrmljs.emptyFunction;
 let protoModel, typeProto, linkProto;
 
 protoModel = guiWorkerLink.protoModel = {};
@@ -10,13 +10,37 @@ guiWorkerLink.openGuiWorkerLink = function openGuiWorkerLink(workerFunctions, wh
     returner.side = whichSide;
     if (whichSide === "host") {
         returner.worker = workerOrPostMessage;
-        returner.postMessage = function(...args) {workerOrPostMessage.postMessage(args)};
+        returner.postMessage = function(...args) {returner.worker.postMessage(args)};
     } else if (whichSide === "worker") returner.postMessage = workerOrPostMessage;
     else throw Error("side is " + whichSide + ", not host or worker");
     returner.types = {};
     returner.overloadManager = scrmljs.overloadManager.newOverloadManager();
+    // returner.links should be an idManager for the side which controls the links, but it defaults to a holder object
     returner.links = {};
     return returner;
+}
+
+protoModel.getIdManagerForLinks = function getIdManagerForLinks(idName = "linkId") {
+    this.links = idManager.newManager(idName);
+    this.linksErasingProcesses = 0;
+    this.eraseLink = protoModel.eraseManagedLink;
+}
+
+protoModel.eraseLink = function eraseLink(linkId) {
+    delete this.links[linkId];
+}
+
+protoModel.eraseManagedLink = function eraseManagedLink(linkId) {
+    this.links.preErase(linkId);
+    if (this.linksErasingProcesses === 0) this.links.flushErase();
+}
+
+protoModel.openLinkErasingProcess = function openLinkErasingProcess() {
+    ++this.linksErasingProcesses;
+}
+
+protoModel.closeLinkErasingProcess = function closeLinkErasingProcess() {
+    if (--this.linksErasingProcesses === 0) this.links.flushErase();
 }
 
 protoModel.dm = function dm(typeName, functionName, linkId, ...args) {
@@ -43,13 +67,17 @@ protoModel.newType = function newType(name, protoModel = typeProto) {
     myLinkProto.type = returner;
     returner.initializers = {host: emptyFunction, worker: emptyFunction};
     returner.receivingFunctions = {host: {}, worker: {}};
-    // returner.links should be an idManager for the side which controls the links, but it defaults to a holder object
-    returner.links = {};
+    returner.extensions = {};
     return returner;
+}
+
+typeProto.getIdManager = function getIdManager(idName = "linkId") {
+    console.log("setting id manager");
 }
 
 typeProto.initialize = function initialize() {
     this.initializers[this.mainLink.side]();
+    for (let extension in this.extensions) this.extensions[extension].initializers[this.mainLink.side]();
     let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, dmPosters = me.receivingFunctions[side === "host"? "worker": "host"];
     for (let functionName in dmPosters) mainLink.overloadManager.addTicketFunction(name + " " + functionName, function(linkId, ...data) {
         mainLink.postMessage(name + " " + functionName, linkId, ...data);
@@ -67,6 +95,7 @@ linkProto = guiWorkerLink.linkProto = {};
 
 protoModel.newLink = function newLink(type, linkId) {
     let returner = Object.create(type.linkProto);
+    returner.type = type;
     if (typeof linkId === "undefined") {
         if (this.links.isIdManager) this.links.addItem(returner);
         else throw Error("trying to make a link without a link id");
@@ -80,4 +109,8 @@ protoModel.newLink = function newLink(type, linkId) {
 
 linkProto.dm = function dm(functionName, ...args) {
     this.type.dm(functionName, this.linkId, ...args);
+}
+
+linkProto.eraseLink = function eraseLink() {
+    this.type.mainLink.eraseLink(this.linkId);
 }

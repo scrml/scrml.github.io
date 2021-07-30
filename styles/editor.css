@@ -10,17 +10,6 @@ body {
     overflow: hidden;
 }
 
-details.section, .chapter, .statement, .comment {
-    border: 3px inset rgb(210, 215, 239);
-    border-radius: .4em;
-    padding: .2em;
-    margin: .1em 0;
-}
-
-details[open].section summary {
-    border-bottom: 1px solid rgb(210, 215, 239);
-}
-
 .detailslist > details {
     background: rgb(160, 255, 180);
     border: 2px solid green;
@@ -33,23 +22,8 @@ details[open].section summary {
     background: rgba(160, 255, 180, .15);
 }
 
-.sample {
-    margin: 1em 0 .5em 0;
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-}
-
 textarea {
     width: 100%;
-}
-
-.chapterhead {
-    min-height: 1.5em;
-}
-
-.siblingnumber, .fullpagenumber {
-    margin-right: 1em;
 }
 
 [show] {
@@ -58,7 +32,9 @@ textarea {
     margin: .3ex;
 }
 
-#globaltools {
+.globaltools {
+    display: flex;
+    flex-direction: row;
     position: sticky;
     top: 0;
     z-index: 5;
@@ -68,128 +44,8 @@ textarea {
     padding: .3em;
 }
 
-.chapter {
-    background: rgb(245, 240, 245);
-}
-
-.statement {
-    background: rgb(245, 245, 240);
-}
-
-.comment {
-    background: rgb(240, 245, 245);
-}
-
-#editor[pagenumbermode="siblingnumber"] .fullpagenumber, #editor[pagenumbermode="fullpagenumber"] .siblingnumber {
-    display: none;
-}
-
-#editor[namemode="nodenamemode"] .fullname, #editor[namemode="nodenamemode"] .nickname, #editor[namemode="nicknamemode"] .fullname, #editor[namemode="nicknamemode"] .name, #editor[namemode="fullnamemode"] .name, #editor[namemode="fullnamemode"] .nickname {
-    display: none;
-}
-
-#editor[namemode="fullnamemode"] .siblingnumber, #editor[namemode="fullnamemode"] .fullpagenumber {
-    display: none;
-}
-
-#editor[namemode="fullnamemode"] #chapternumbermodes {
+.editor[namemode="fullnamemode"] .chapternumbermodes {
     visibility: hidden;
-}
-
-.pagetools {
-    float: right;
-    position: relative;
-    opacity: 20%;
-}
-
-.pagehead:hover > .pagetools {
-    opacity: 100%;
-}
-
-.pagehead:not(:hover) > .pagetools .missilelaunch {
-    opacity: 20%;
-}
-
-[candelete="false"] > summary > .pagetools > .missilelaunch {
-    display: none;
-}
-
-#editor[movemode] .chapter, #editor[movemode] .statement, #editor[movemode] .comment {
-    background: rgb(225, 220, 230);
-    border: 3px inset rgb(170, 190, 180);
-}
-
-#editor[movemode] .chapter[movingpage] {
-    background: rgb(245, 240, 250);
-    border-style: outset;
-}
-
-#editor[movemode] .newpagein {
-    display: none;
-}
-
-[linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
-    display: none;
-}
-
-.pagegap {
-    height: 1.3em;
-    width: 100%;
-    text-align: left;
-    border-radius: 4px;
-    margin: .3em 0;
-    background: rgb(220, 245, 245);
-}
-
-#editor:not([movemode]) .pagegap > *:not(:hover, :focus) {
-    opacity: 15%;
-}
-
-.pagegap input {
-    width: 100%;
-}
-
-#editor[movemode] .pagegap {
-    background: rgb(187, 145, 210);
-}
-
-#editor[movemode] .chapter:not([canacceptmove]) .pagegap::before {
-    content: "checking... please wait";
-}
-
-#editor[movemode] .chapter[canacceptmove] .pagegap::before {
-    content: none;
-}
-
-.movehere, .dontmovehere {
-    display: none;
-    width: 100%;
-    top: -.15em;
-    text-align: left;
-}
-
-.pagegap .movehere {
-    background: rgb(120, 245, 145);
-}
-
-.pagegap .dontmovehere {
-    background: rgb(245, 145, 120);
-}
-
-.chapter[canacceptmove="true"] > .pagegap .movehere, .chapter[canacceptmove="false"] > .pagegap .dontmovehere {
-    display: block;
-}
-
-.comment[texin="true"] > .texout, .comment[texin="false"] > .texin {
-    display: none;
-}
-
-.texout {
-    min-height: 1em;
-    background: rgb(230, 245, 245);
-    border: 1px solid lightgray;
-    border-radius: .2em;
-    padding: .2em;
 }
 
 .radiogroup {

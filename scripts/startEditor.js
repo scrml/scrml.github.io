@@ -23,10 +23,11 @@ scriptLoader.items.gui.addEphemeralListener("js", function() {
 scriptLoader.ensureJS("guiWorkerLink", ["gui", "overloadManager"]);
 scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
     guiWorkerLink = scrmljs.guiWorkerLink;
-    worker = guiWorkerLink.worker = new Worker(filePrefix+"scripts/worker.js");
+    worker = new Worker(filePrefix+"scripts/worker.js");
     mainLink = scrmljs.mainLink = guiWorkerLink.openGuiWorkerLink(workerFunctions, "host", worker);
 });
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
+scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapter.js");
 scriptLoader.ensureJS("jax");
 scriptLoader.addEphemeralListener(function start() {
     //getLinkFromElement = guiWorkerLink.types.page.getLinkFromEvent;
@@ -46,8 +47,6 @@ scriptLoader.addEphemeralListener(function start() {
         loadingScreen.closeLoadingScreen();
         activityTimer.restart();
     }
-    
-    mainLink = scrmljs.mainLink = guiWorkerLink.openGuiWorkerLink(workerFunctions, "host");
     
     // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
@@ -87,7 +86,7 @@ scriptLoader.addEphemeralListener(function start() {
 });
 
 // DOM elements
-let editor = scrmljs.editor = document.getElementById("editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
+let editor = scrmljs.editor = document.body.querySelector(".editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
 
 let setDebugAction = function setDebugAction(action) {
     debugButton.setAttribute("title", action.toString());
@@ -163,6 +162,7 @@ workerFunctions.savePage = function save(pageId, line) {
     storage.store("page " + pageId, line);
 }
 
+// move to page.js
 workerFunctions.eraseLink = function eraseLink(linkId) {
     guiWorkerLink.links[linkId].erase();
 }
@@ -176,7 +176,7 @@ workerFunctions.errorOut = function errorOut(message) {
 }
 
 let onInactivity = function onInactivity() {
-
+    
 }
 
 scrmljs.moveModeOn = function moveModeOn(page) {

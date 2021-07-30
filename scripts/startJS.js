@@ -1,3 +1,4 @@
+// could change back to <script> tags to help with debugging but this way block scopes the variables
 scrmljs.importScript = function importScript(location, finished) {
     let req = new XMLHttpRequest();
     req.onload = function(x) {

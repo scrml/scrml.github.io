@@ -1,0 +1,118 @@
+[ispage] {
+    border: 3px inset rgb(210, 215, 239);
+    border-radius: .4em;
+    padding: .2em;
+    margin: .1em 0;
+}
+
+.pagehead {
+    min-height: 1.5em;
+}
+
+.siblingnumber, .fullpagenumber {
+    margin-right: 1em;
+}
+
+[ispage] {
+    background: rgb(240, 242, 240);
+}
+
+.editor[pagenumbermode="siblingnumber"] .fullpagenumber, .editor[pagenumbermode="fullpagenumber"] .siblingnumber {
+    display: none;
+}
+
+.editor[namemode="nodenamemode"] .fullname, .editor[namemode="nodenamemode"] .nickname, .editor[namemode="nicknamemode"] .fullname, .editor[namemode="nicknamemode"] .name, .editor[namemode="fullnamemode"] .name, .editor[namemode="fullnamemode"] .nickname {
+    display: none;
+}
+
+.editor[namemode="fullnamemode"] .siblingnumber, .editor[namemode="fullnamemode"] .fullpagenumber {
+    display: none;
+}
+
+.pagetools {
+    float: right;
+    position: relative;
+    opacity: 20%;
+}
+
+.pagehead:hover > .pagetools {
+    opacity: 100%;
+}
+
+.pagehead:not(:hover) > .pagetools .missilelaunch {
+    opacity: 20%;
+}
+
+[candelete="false"] > summary > .pagetools > .missilelaunch {
+    display: none;
+}
+
+.editor[movemode] [ispage] {
+    background: rgb(225, 220, 230);
+    border: 3px inset rgb(170, 190, 180);
+}
+
+.editor[movemode] [ispage][movingpage] {
+    background: rgb(245, 240, 250);
+    border-style: outset;
+}
+
+.editor[movemode] .newpagein {
+    display: none;
+}
+
+[linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
+    display: none;
+}
+
+.pagegap {
+    height: 1.3em;
+    width: 100%;
+    text-align: left;
+    border-radius: 4px;
+    margin: .3em 0;
+    background: rgb(220, 245, 245);
+}
+
+.editor:not([movemode]) .pagegap:not(:hover) > * {
+    opacity: 10%;
+}
+
+.editor:not([movemode]) .pagegap:not(:hover) > *:focus {
+    opacity: 100%;
+}
+
+.pagegap input {
+    width: 100%;
+}
+
+.editor[movemode] .pagegap {
+    background: rgb(187, 145, 210);
+}
+
+.editor[movemode] [ispage]:not([canacceptmove]) .pagegap::before {
+    content: "checking... please wait";
+}
+
+.editor[movemode] [ispage][canacceptmove] .pagegap::before {
+    content: none;
+}
+
+.movehere, .dontmovehere {
+    display: none;
+    width: 100%;
+    top: -.15em;
+    text-align: left;
+}
+
+.pagegap .movehere {
+    background: rgb(120, 245, 145);
+}
+
+.pagegap .dontmovehere {
+    background: rgb(245, 145, 120);
+}
+
+[ispage][canacceptmove="true"] > .pagegap .movehere, [ispage][canacceptmove="false"] > .pagegap .dontmovehere {
+    display: block;
+}
