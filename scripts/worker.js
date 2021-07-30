@@ -389,5 +389,3 @@ chapterProto.canDelete = function canDelete() {
 }
 
 function trueFunction() {return true}
-
-postMessage(["errorOut", ""]);

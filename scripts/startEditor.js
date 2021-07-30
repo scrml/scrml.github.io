@@ -18,7 +18,7 @@ scriptLoader.ensureJS("gui", ["generalFunctions"]);
 scriptLoader.items.gui.addEphemeralListener("js", function() {
     gui = scrmljs.gui;
     document.getElementById("errorout").textContent = "Loading gui modules ...";
-    gui.ensureAllModules();
+    gui.ensureAllModules(function() {document.getElementById("errorout").textContent = "Modules loaded"});
 });
 scriptLoader.ensureJS("guiWorkerLink", ["gui", "overloadManager"]);
 scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
@@ -134,6 +134,7 @@ let post = scrmljs.post = function post(functionName, ...args) {
 }
 
 let loadPages = function loadPages() {
+    document.getElementById("errorout").textContent = "";
     post("openPageProcess");
     scrmljs.doSmoothly = false;
     let i = -1, line;
