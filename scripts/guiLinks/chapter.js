@@ -91,9 +91,7 @@ pageType.extensions.chapter = {
     }, receivingFunctions: {
         host: {
             newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
-                console.log("marking fail");
-                if (1>0) return;
-                if (parentLinkId != getLinkFromElement(scrmljs.focusedPageGap).linkId) throw Error("checking new page name message mismatch");
+                if (parentLinkId != pageType.extensions.chapter.pageGaps.getGapParentId(scrmljs.focusedPageGap)) throw Error("checking new page name message mismatch");
                 gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
             }, clearPageGap: function clearPageGap() {
                 if (!scrmljs.focusedPageGap) return;
