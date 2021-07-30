@@ -1,3 +1,5 @@
+let gui = scrmljs.gui;
+
 gui.option = function option(text, loadHere, atts, value = text) {
     let returner = gui.element("option", loadHere, atts);
     gui.text(text, returner);
@@ -12,7 +14,7 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts) {
     return returner;
 }
 
-function optionValue(options, defaultOptions, property) {
+/*function optionValue(options, defaultOptions, property) {
     if (property in options) if (options[property] !== undefined) return options[property];
     return defaultOptions[property];
-}
+}*/

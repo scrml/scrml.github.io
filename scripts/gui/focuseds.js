@@ -1,3 +1,5 @@
+let gui = scrmljs.gui;
+
 gui.focusedElement = function focusedElement(type, loadHere, atts, insertBefore) {
     let returner = gui.element(type, loadHere, atts, insertBefore);
     returner.tabIndex = 0;

@@ -1,3 +1,5 @@
+let gui = scrmljs.gui;
+
 gui.copyToClipboard = function copyToClipboard(e) {
     e.preventDefault();
     let input = e.target, wasInDesignMode = input.contentEditable;

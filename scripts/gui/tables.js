@@ -1,3 +1,5 @@
+let gui = scrmljs.gui;
+
 gui.table = {};
 
 gui.table.titleRow = function titleRow(table, lines) {
