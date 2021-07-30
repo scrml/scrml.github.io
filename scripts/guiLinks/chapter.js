@@ -21,7 +21,7 @@ let hostInitializer = function hostInitializer() {
         let gap = gaps.getPageGapFromEvent(event);
         for (let child of gap.querySelectorAll(".newpagein")) {
             child.blur();
-            child.value = "";
+            gui.messages.setInputValue(child, "");
         }
     }
     gaps.getGapParentId = function getGapParentId(gap) {

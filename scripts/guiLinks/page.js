@@ -126,12 +126,8 @@ pageType.initializers.host = function() {
 pageType.receivingFunctions.host = {
     getName: function getName(linkId, name) {
         let page = pageType.getPageFromLinkId(linkId);
-        if (page.nameSpan.hasAttribute("messagerevertto")) page.nameSpan.setAttribute("messagerevertto", name);
-        else {
-            page.nameSpan.value = name;
-            page.nameSpan.removeAttribute("disabled");
-            page.nameSpan.blur();
-        }
+        gui.messages.setInputValue(page.nameSpan, name);
+        page.nameSpan.removeAttribute("disabled");
         page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
     }, getNickname: function getNickname(linkId, nickname) {
         pageType.getPageFromLinkId(linkId).nicknameSpan.value = nickname;

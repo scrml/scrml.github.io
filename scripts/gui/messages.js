@@ -29,7 +29,14 @@ gui.messages.inputText = function inputText(input, message, time = 1000) {
         }
         document.head.removeChild(style);
         input.removeAttribute("min-width" + width);
+        // blur doesn't fire on a disabled input so trigger a blur if it lost focus while disabled
+        if (wasFocused && (input !== document.activeElement)) input.dispatchEvent(new Event("blur"));
     }, time);
+}
+
+gui.messages.setInputValue = function setInputValue(input, value) {
+    if (input.hasAttribute("messagerevertto")) input.setAttribute("messagerevertto", value);
+    else input.value = value;
 }
 
 gui.messages.button = function button(button, message, time) {
