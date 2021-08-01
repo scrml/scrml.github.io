@@ -1,14 +1,13 @@
-// could change back to <script> tags to help with debugging but this way block scopes the variables
-scrmljs.importScript = function importScript(location, finished) {
+// the file thing is to block scope all the scripts to avoid variable name conflicts
+scrmljs.importScript = function importScript(name, location, finished) {
     let req = new XMLHttpRequest();
     req.onload = function(x) {
-        try {Function("{"+req.responseText+"\r\n}")()}
-        catch (e) {
-            console.log("error with imported script " + location);
-            //console.log(req.responseText);
-            throw e;
-        }
-        finished();
+        let file = new File(["{"+req.responseText+"\r\n}"], location.replaceAll(/\.\.\//g, ""), {type: "text/js"});
+        let url = URL.createObjectURL(file);
+        let script = document.createElement("script");
+        script.setAttribute("src", url);
+        script.addEventListener("load", finished);
+        document.head.appendChild(script);
     };
     req.onerror = function(x) {alert("failed to load script " + location)};
     req.open("get", location);
@@ -17,7 +16,7 @@ scrmljs.importScript = function importScript(location, finished) {
 }
 
 let scriptLocations = scrmljs.scriptLocations, scripts = scrmljs.scripts, filePrefix = scrmljs.filePrefix;
-scrmljs.importScript(filePrefix + "scripts/loader.js", function() {
+scrmljs.importScript("Loader", filePrefix + "scripts/loader.js", function() {
     let Loader = scrmljs.Loader, scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
     Loader.tiers.js(scriptLoader);
     Loader.tiers.initialize(scriptLoader);

@@ -246,34 +246,9 @@ Loader.protoModel.setDependencies = function setDependencies(itemName, dependenc
 
 Loader.tiers = {}
 
-/*
-// js with dom access
 {
     let tierName = "js", processor = function(item) {
-        Loader.log("js processing " + item.name);
-        if (item.isComplete.js || item.isProcessing.js || !item.isReady.js) throw Error("cannot process item " + item.name);
-        item.isProcessing.js = true;
-        let script = document.createElement("script");
-        script.setAttribute("src", item.data.js);
-        document.head.appendChild(script);
-        script.addEventListener("load", function() {item.loader.markComplete(item, item.loader.jsTier)});
-    }
-    let ensureJS = function ensureJS(name, dependencies = [], location = "../scripts/"+name+".js") {
-        if (name in this.items) return;
-        let d = {};
-        for (let x of dependencies) d[x] = undefined;
-        this.addItem(name, {js: d}, {js: location});
-    }
-    Loader.tiers.js = function addJSTier(loader) {
-        loader.jsTier = loader.newTier(tierName, processor);
-        loader.ensureJS = ensureJS;
-    }
-}*/
-
-// js with XMLHttpRequest only
-{
-    let tierName = "js", processor = function(item) {
-        scrmljs.importScript(item.data.js, function() {
+        scrmljs.importScript(item.name, item.data.js, function() {
             item.loader.markComplete(item, item.loader.jsTier);
         });
     }

@@ -1,146 +1,176 @@
 // First we create plain graphs. Structure consists of ui (universal identifier), typed members, named edges, and ancestry.
-var Graph = {};
+let Graph = scrmljs.Graph = {}, idManager = scrmljs.idManager, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction;
 
-// Repository of all graphs stored by ui
-Graph.universe = {};
+Graph.allGraphs = [];
 
-Graph.protoModel = {thisIs: "graph"};// object to be used as prototype of instances of graph
+Graph.protoModel = {thisIs: "Graph"};// object to be used as prototype of instances of graph
     
-Graph.newGraph = function newGraph(ui, protoModel = Graph.protoModel) {
-    if (ui in Graph.universe) throw Error(ui + " is already a graph");
+Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     let returner = Object.create(protoModel);
-    Graph.universe[ui] = returner;
-    returner.ui = ui;
-    returner.members = {};// members are stored by id in this members object
-    returner.memberOrder = [];// remembers the order in which members were added
+    returner.ui = Graph.allGraphs.length;
+    Graph.allGraphs.push(returner);
+    returner.members = idManager.newManager();
+    if (Graph.universe) {
+        Graph.universe.addMember(returner.ui);
+        returner.updateUniverse();
+        Graph.universe.member(returner.ui).setId = Graph.universeSetId;
+    } else returner.ui = 0;
+    //this.originalUi = this.ui;
     return returner;
 }
 
-// Adds a member to the graph, checking that there are no duplicate members, and sets up the member to have children, descendants, and ancestors
-// The only place a member is stored is in the graph's members object. Everywhere else members are referred to by id
-Graph.protoModel.addMember = function addMember(id, type) {
-    if (id in this.members) throw Error(id + " is already a member");
-    this.members[id] = {children: {}, ancestors: {}, descendants: {}, id: id, type: type};
-    this.memberOrder.push(id);
+Graph.protoModel.usesTypes = function usesTypes() {return Graph.universe.member(this.ui).descendants}
+Graph.protoModel.usedByTypes = function usedByTypes() {return Graph.universe.member(this.ui).ancestors}
+Graph.protoModel.usesType = function usesType(type) {return type in this.usesTypes()}
+
+Graph.protoModel.canDelete = function canDelete() {return isEmpty(this.usedByTypes())}
+Graph.protoModel.updateCanDelete = emptyFunction;
+
+Graph.protoModel.deleteGraph = function deleteGraph() {
+    if (!this.canDelete()) throw Error("cannot delete graph");
+    let graph;
+    Graph.universe.member(this.ui).deleteMember();
 }
 
-// Forges a relationship between two members, storing the child in the childName position in the parent's children object. Checks that this does not introduce a cycle and then updates the family registry with the new relationship.
+let memberProto = Graph.memberProto = {checkChildOrder: true};
+
+// The only place a member is stored is in the graph's members manager. Everywhere else members are referred to by id
+Graph.protoModel.addMember = function addMember(type, protoModel = memberProto) {
+    let member = Object.create(protoModel);
+    member.graph = this;
+    member.children = {};
+    member.ancestors = {};
+    member.descendants = {};
+    member.type = type;
+    // Update the universe if this member makes me depend on another graph. The universe does not depend on any graph and I am allowed to not depend on myself even if my first member is my own type. This is for the root of typed graphs.
+    if (this.ui && !((this.members.items.length === 0 && this.ui === type) || this.usesType(type))) {
+        Graph.universe.member(this.ui).setChild(type, type);
+        this.updateUniverse();
+    }
+    this.members.addItem(member);
+    member.originalId = member.id;
+    return member;
+}
+
+// Called any time Graph.universe is modified. It defaults to reset ancestry each time but putting it here on the prototype chain allows for overriding that behavior and postponing the universe reset ancestry until later.
+Graph.protoModel.updateUniverse = function updateUniverse() {Graph.universe.resetAncestry()}
+
 {
     let relate = function relate(members, old, young) {
-        if (old in members[young].descendants) throw Error("Graph must be acyclic");
-        if (old in members[young].ancestors) return;
-        members[old].descendants[young] = undefined;
-        members[young].ancestors[old] = undefined;
-        for (let younger in members[young].descendants) relate(members, old, younger);
-        for (let older in members[old].ancestors) relate(members, older, young);
+        let oldM = members[old], youngM = members[young], omd = oldM.descendants, oma = oldM.ancestors, ymd = youngM.descendants, yma = youngM.ancestors;
+        if (old in ymd) throw Error("Graph must be acyclic");
+        if (old in yma) return;
+        omd[young] = undefined;
+        yma[old] = undefined;
+        for (let younger in ymd) relate(members, old, younger);
+        for (let older in oma) relate(members, older, young);
     }
-    Graph.protoModel.setChild = function setChild(parent, childName, child) {
-        if (!((parent in this.members) && (child in this.members))) throw Error(parent + " or " + child + " is not a member");
-        if (childName in this.members[parent].children) throw Error(parent + " already has a child named " + childName);
-        this.members[parent].children[childName] = child;
-        relate(this.members, parent, child);
-    }
-}
-
-// Graph finalization overwrites the modification functions to throw errors
-Graph.throwFinalizedError = function () {throw Error("cannot modify a finalized graph")}
-Graph.protoModel.finalize = function finalize() {
-    this.addMember = this.setChild = this.finalize = Graph.throwFinalizedError;
-}
-/*
-// Read members and edges into a graph and store it in Graph's universe. Intended to be the base reader which further statement types can extend
-Graph.plainGraphReader = function plainGraphReader(node, ui, hook = Graph.readerHooks.plainGraph) {
-    node = xmlImporter.getRoot(node);
-    let returner = Graph.newGraph(ui, hook.protoModel);
-    let reqsNode = node.firstChild, statementsNode = reqsNode.nextSibling;
-    returner.definitionsKey = {}, returner.definitionsKeyReverse = {};// for translating between reference and external ui
-    // get external references
-    let reqName, reqUI;
-    for (let req of reqsNode.childNodes) {
-        reqName = req.getAttribute("id");
-        reqUI = req.firstChild.nodeValue;
-        returner.definitionsKey[reqName] = reqUI;
-        returner.definitionsKeyReverse[reqUI] = reqName;
-    }
-    // read statements
-    for (let statement of statementsNode.childNodes) {
-        if (!statement.hasAttribute("id")) throw Error("every member needs an id");
-        let id = statement.getAttribute("id"), type = statement.nodeName;
-        returner.addMember(id, returner.definitionsKey[type]);
-        let atts = {};
-        returner.members[id].attributesFromNode = atts;
-        for (let att of statement.attributes) atts[att.name] = att.value;
-        for (let child of statement.childNodes) returner.setChild(id, child.nodeName, child.firstChild.nodeValue);
-    }
-    return returner;
-}
-
-// Read the terms in a SCRML file. This involves checking which process to follow for each term, this is done with reader hooks. If a term desclares itself to be of some type, and if this compiler recognizes that type, it will follow that proces, otherwise it will do the default processing steps.
-
-// If a node declares itself as a particular statement type the reader hook will follow that
-Graph.readerHooks = {};
-Graph.readerHooks.plainGraph = {protoModel: Graph.protoModel, reader: Graph.plainGraphReader};
-
-// Decide if a hook is required and follow that hook, defaulting to plain graph
-Graph.readGraph = function readGraph(node, ui) {
-    let hook;
-    if (node.hasAttribute("statementType")) {
-        let statementType = node.getAttribute("statementType");
-        if (statementType in Graph.readerHooks) {
-            hook = Graph.readerHooks[statementType];
-        } else {
-            console.log("unrecognized statement type " + statementType + " in " + ui);
-            hook = Graph.readerHooks.plainGraph;
+    // this can probably be made orders of magnitude faster with a different algorithm
+    Graph.protoModel.resetAncestry = function resetAncestry() {
+        let members = this.members.items;
+        for (let member of members) {
+            member.ancestors = {};
+            member.descendants = {};
         }
-    } else hook = Graph.readerHooks.plainGraph;
-    return hook.reader(node, ui, hook);
-}
-*/
-// miscellaneous functions which have not been organized yet
-
-Graph.protoModel.listChildren = function listChildren(member) {
-    member = this.members[member];
-    let line = "";
-    if (!isEmpty(member.children)) {
-        line += ": ";
-        for (let child in member.children) line += child + " " + member.children[child] + ", ";
-        line = line.substring(0, line.length - 2);
+        for (let member of members) for (let childName in member.children) relate(members, member.id, member.children[childName]);
     }
+}
+
+// this is only called by Graph.universe's manager, it is here to be overridden in case the ui needs to be updated anywhere else
+Graph.protoModel.setUi = function setUi(ui) {this.ui = ui}
+Graph.protoModel.member = function member(id) {return this.members.items[id]}
+Graph.protoModel.eraseMember = function eraseMember(id) {this.member(id).deleteMember()}
+Graph.protoModel.flushEraseMember = function flushEraseMember() {this.members.flushErasePreserveOrder()}
+
+Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
+    let line = "";
+    line += this.members.items.length + "\n";
+    for (let member of this.members.items) line += "child " + member.id + ": " + member.saveToAutosaveString() + "\n";
     return line;
 }
 
-Graph.protoModel.toWords = function toWords(loadHere) {
-    let out = gui.element("div", loadHere, ["class", "graphWords"]);
-    for (let name of this.memberOrder) {
-        let member = this.members[name];
-        let line = member.type + " " + name + this.listChildren(name);
-        gui.text(line, gui.element("p", out));
-    }
+memberProto.setChild = function setChild(childName, child) {
+    //console.log("i am graph "+this.graph.ui + " member " + this.id + " setting child " + childName + " to " + child);
+    if (this.checkChildOrder && this.id <= child) throw Error("can only be parent of a lower member");
+    let members = this.graph.members.items;
+    if (!members[child]) throw Error(child + " is not a member of graph " + this.graph.ui);
+    if (childName in this.children) throw Error("already have a child named " + childName);
+    this.children[childName] = child;
+    this.graph.resetAncestry();
 }
 
-function Section(title, parent) {
-    this.title = title;
-    parent.items.push(this);
-    this.ui = function() {return parent.ui() + "/" + title};
+memberProto.unsetChild = function unsetChild(childName) {
+    if (!(childName in this.children)) throw Error("trying to unset a child which is not a child");
+    delete this.children[childName];
+    this.graph.resetAncestry();
 }
 
-Graph.readBook = function readBook(doc, ui, loadHere) {
-    xmlImporter.trim(doc);
-    let book = {};
-    book.ui = function() {return ui};
-    let node = xmlImporter.getRoot(doc);
-    node = node.firstChild;
-    book.items = [];
-    for (let item of node.childNodes) {
-        if (item.getAttribute("itemType") == "section") {
-            let section = new Section(item.getAttribute("title"), item.hasAttribute("parent")? book.items[item.getAttribute("parent")]: book);
-        } else {
-            let newItem = {};
-            book.items.push(newItem);
-            let statement = item.firstChild.firstChild;
-            if (!statement.hasAttribute("statementType")) statement.setAttribute("statementType", "definition");
-            newItem.graph = Graph.readGraph(statement, book.items[item.getAttribute("parent")].ui() + "/" + item.getAttribute("title"));
-            newItem.graph.toWords(loadHere);
+memberProto.canDelete = function canDelete() {return isEmpty(this.ancestors)}
+memberProto.updateCanDelete = emptyFunction;
+
+memberProto.deleteMember = function deleteMember() {
+    if (!this.canDelete()) throw Error("cannot delete member");
+    let graph = this.graph, members = graph.members, myType = this.type, inUse = false;
+    for (let d in this.descendants) delete graph.member(d).ancestors[this.ui];
+    for (let member of members.items) inUse = inUse || (member.type === myType && member.id !== this.id);
+    if (!inUse && this.graph.ui) Graph.universe.member(graph.ui).unsetChild(myType);
+    members.preErase(this.id);
+    graph.flushEraseMember();
+}
+
+// to be called by the idManager only
+memberProto.setId = function setId(newId) {
+    let oldId = this.id, graph = this.graph, members = graph.members.items;
+    this.id = newId;
+    if (typeof oldId === "undefined") return;
+    for (let member of members) {
+        for (let childName in member.children) if (member.children[childName] === oldId) member.children[childName] = newId;
+        if (oldId in member.ancestors) {
+            member.ancestors[newId] = undefined;
+            delete member.ancestors[oldId];
+        } else if (oldId in member.descendants) {
+            member.descendants[newId] = undefined;
+            delete member.descendants[oldId];
         }
     }
+}
+
+memberProto.saveToAutosaveString = function saveToAutosaveString() {
+    let line = "";
+    line += this.type + " ";
+    for (let child in this.children) line += "(" + child + " " + this.children[child] + ")";
+    line += "\t";
+    return line;
+}
+
+// this function is added to each member of Graph.universe to override memberProto.setId
+Graph.universeSetId = function setUi(newUi) {
+    let oldUi = this.id;
+    memberProto.setId.call(this, newUi);
+    if (typeof oldUi === "undefined") return;
+    for (let member of this.graph.members.items) if (oldUi in member.children) {
+        member.children[newUi] = member.children[oldUi];
+        delete member.children[oldUi];
+    }
+    Graph.allGraphs[newUi] = Graph.allGraphs[oldUi];
+    Graph.allGraphs[newUi].setUi(newUi);
+    for (let graph of Graph.allGraphs) for (let member of graph.members.items) if (member.type === oldUi) member.type = newUi;
+}
+
+Graph.universe = Graph.newGraph();
+Graph.universe.name = "universe";
+Graph.universe.addMember(0, memberProto);
+
+Graph.universe.members.flushErasePreserveOrder = function flushErasePreserveOrder() {
+    let eraseCount = this.eraseThese.length;
+    idManager.protoModel.flushErasePreserveOrder.call(this);
+    Graph.allGraphs.splice(Graph.allGraphs.length - eraseCount);
+}
+
+function printGraphs() {
+    for (let graph of Graph.allGraphs) {
+        console.log("graph " + graph.ui + ": " + graph.name);
+        console.log(graph.saveToAutosaveString());
+    }
+    console.log("_________________________________________________________________________");
 }

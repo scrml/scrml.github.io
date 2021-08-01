@@ -1,12 +1,16 @@
-let pageType = scrmljs.mainLink.types.page, gui = scrmljs.gui, editor = scrmljs.editor;
+let pageType = scrmljs.mainLink.types.page, chapterType, gui = scrmljs.gui, editor = scrmljs.editor;
 
 let hostInitializer = function hostInitializer() {
     let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
     chapterProto.isType = "chapter";
     chapterProto.isChapter = true;
-    extension.type = Object.create(pageType);
+    chapterType = extension.type = Object.create(pageType);
     extension.type.linkProto = chapterProto;
-    extension.type.createLinkHook = function(page) {extension.newPageGap(page.div)};
+    chapterType.createLink = function createLink(linkId, type = chapterType) {
+        let page = pageType.createLink(linkId, type);
+        extension.newPageGap(page.div);
+        if (scrmljs.moveMode) page.guiLink.dm("canAcceptMove", page.canAcceptMove(scrmljs.moveMode));
+    }
     // page gaps
     let gaps = extension.pageGaps = {};
     gaps.getPageGapFromEvent = function getPageGapFromEvent(event) {
@@ -68,7 +72,8 @@ let workerInitializer = function workerInitializer() {
     let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
     chapterProto.isType = "chapter";
     chapterProto.isChapter = true;
-    extension.chapterType = Object.create(pageType);
+    chapterType = extension.chapterType = Object.create(pageType);
+    chapterType.showPage = "showChapter";
     extension.chapterType.linkProto = chapterProto;
     extension.createLink = function createLink(page, type = extension.chapterType) {
         pageType.createLink(page, type);
@@ -90,7 +95,9 @@ pageType.extensions.chapter = {
         worker: workerInitializer
     }, receivingFunctions: {
         host: {
-            newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
+            showChapter: function(linkId) {
+                chapterType.createLink(linkId, chapterType);
+            }, newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
                 if (parentLinkId != pageType.extensions.chapter.pageGaps.getGapParentId(scrmljs.focusedPageGap)) throw Error("checking new page name message mismatch");
                 gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
             }, clearPageGap: function clearPageGap() {

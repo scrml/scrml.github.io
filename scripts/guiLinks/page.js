@@ -45,9 +45,7 @@ pageType.initializers.host = function() {
         let page = mainLink.newLink(type, linkId);
         page.div = gui.element("details", editor, ["class", page.isType, "linkid", linkId, "ispage", "", "candelete", "false"]);
         page.div.addEventListener("toggle", type.toggleListener);
-        page.div.addEventListener("mouseenter", type.focusListener);
         page.pageHead = gui.element("summary", page.div, ["class", "pagehead"]);
-        page.pageHead.addEventListener("mouseenter", type.focusListener);
         page.siblingNumberSpan = gui.element("span", page.pageHead, ["class", "siblingnumber"]);
         page.siblingNumberText = gui.text("", page.siblingNumberSpan);
         page.fullPageNumberSpan = gui.element("span", page.pageHead, ["class", "fullpagenumber"]);
@@ -70,7 +68,6 @@ pageType.initializers.host = function() {
         page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
         // if this is not the first page then create a page gap before this page
         if (linkId) pageType.extensions.chapter.newPageGap(page.div.parentElement, page.div);
-        type.createLinkHook(page);
         return page;
     }
     pageType.createLinkHook = emptyFunction;
@@ -89,10 +86,6 @@ pageType.initializers.host = function() {
         // override the toggle if it would hide the locked focus page
         if (scrmljs.lockedPageFocus && e !== scrmljs.lockedPageFocus && scrmljs.isAncestorOf(e.div, scrmljs.lockedPageFocus.div, "parentElement")) return e.div.setAttribute("open", "");
         e.dm("togglePage", e.div.hasAttribute("open"));
-    }
-    pageType.focusListener = function(e) {
-        e = pageType.getLinkFromEvent(e);
-        //e.askWorker("canDelete");
     }
     pageType.nameProcessorListener = function(e) {
         e = pageType.getLinkFromEvent(e);
@@ -129,6 +122,7 @@ pageType.receivingFunctions.host = {
         gui.messages.setInputValue(page.nameSpan, name);
         page.nameSpan.removeAttribute("disabled");
         page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
+        page.nameSpan.blur();
     }, getNickname: function getNickname(linkId, nickname) {
         pageType.getPageFromLinkId(linkId).nicknameSpan.value = nickname;
     }, setFullName: function setFullName(linkId, fullName) {
@@ -141,17 +135,14 @@ pageType.receivingFunctions.host = {
         pageType.getPageFromLinkId(linkId).movePage(pageType.getPageFromLinkId(parentId), insertBeforeId === "none"? "none": pageType.getPageFromLinkId(insertBeforeId), doSmoothly);
     }, canDelete: function canDelete(linkId, can) {
         let item = mainLink.links[linkId];
-        if (item.isPage) {
-            item.canDelete(can);
-        }
-    }, showPage: function showPage(linkId, extensionName) {
-        pageType.createLink(linkId, pageType.extensions[extensionName].type);
+        if (item.isPage) item.canDelete(can);
     }, eraseLink: function eraseLink(linkId) {
         pageType.getPageFromLinkId(linkId).eraseLink();
     }
 }
 
 pageType.initializers.worker = function() {
+    pageType.showPage = "showPage";
     let pageProto = pageType.linkProto;
     pageProto.isPage = true;
     pageProto.isType = "page";
@@ -161,7 +152,7 @@ pageType.initializers.worker = function() {
         link.page = page;
         page.manager.setVarValue("linkId", link.linkId);
         page.manager.linkProperty("linkId", page);
-        link.dm("showPage", type.linkProto.isType);
+        link.dm(type.showPage);
         link.unlinks = [];
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.dm("canDelete", page.canDelete());

@@ -28,16 +28,37 @@ idManager.protoModel.preErase = function preErase(id) {
 }
 
 idManager.protoModel.flushErase = function flushErase() {
-    this.eraseThese.sort().reverse();
-    let replace, pullIndex = this.items.length - 1, numErased = this.eraseThese.length;
-    while (this.eraseThese.length > 0) {
-        replace = this.eraseThese.pop();
+    if (this.eraseThese.length === 0) return;
+    let replace, items = this.items, erase = this.eraseThese, pullIndex = items.length - 1, numErased = erase.length, setIdName = this.setIdName;
+    erase.sort().reverse();
+    while (erase.length > 0) {
+        replace = erase.pop();
         if (replace >= pullIndex) break;
-        while (this.eraseThese.includes(pullIndex)) --pullIndex;
-        this.items[replace] = this.items[pullIndex];
-        this.items[replace][this.setIdName](replace);
+        while (erase.includes(pullIndex)) --pullIndex;
+        items[replace] = items[pullIndex];
+        items[replace][setIdName](replace);
         --pullIndex;
     }
-    this.items.splice(this.items.length - numErased);
-    this.eraseThese.splice(0);
+    items.splice(items.length - numErased);
+    erase.splice(0);
+}
+
+idManager.protoModel.flushErasePreserveOrder = function flushErasePreserveOrder() {
+    if (this.eraseThese.length === 0) return;
+    let eraseIndex = 0, itemIndex = 0, erases = this.eraseThese, items = this.items, length = items.length, setIdName = this.setIdName;
+    erases.sort();
+    while (itemIndex < length) {
+        if (erases[eraseIndex] === itemIndex) {
+            ++eraseIndex;
+            ++itemIndex;
+            continue;
+        }
+        if (eraseIndex !== 0) {
+            items[itemIndex][setIdName](itemIndex - eraseIndex);
+            items[itemIndex - eraseIndex] = items[itemIndex];
+        }
+        ++itemIndex;
+    }
+    items.splice(items.length - eraseIndex);
+    erases.splice(0);
 }

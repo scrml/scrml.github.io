@@ -1,5 +1,5 @@
 // script setup
-let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, functions = {}, scrmljs = {
+let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGraph, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
@@ -8,25 +8,28 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, function
         overloadManager: "scripts/overloadManager.js",
         guiWorkerLink: "scripts/guiWorkerLink.js",
         page: "scripts/guiLinks/page.js",
-        chapter: "scripts/guiLinks/chapter.js"
-    },
-    scripts: {
+        chapter: "scripts/guiLinks/chapter.js",
+        Graph: "scripts/Graph.js",
+        TypedGraph: "scripts/TypedGraph.js",
+        statement: "scripts/guiLinks/statement.js"
+    }, scripts: {
         generalFunctions: [],
         varManager: [],
         idManager: ["generalFunctions"],
         overloadManager: [],
         guiWorkerLink: ["varManager", "idManager", "overloadManager"],
         page: ["guiWorkerLink"],
-        chapter: ["page"]
-    },
-    emptyFunction: function emptyFunction() {},
-    isEmpty: function isEmpty(obj) {
+        chapter: ["page"],
+        Graph: ["varManager", "idManager", "generalFunctions"],
+        TypedGraph: ["Graph"],
+        statement: ["page"]
+    }, isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
-    }
+    }, emptyFunction: function emptyFunction() {}
 }, emptyFunction = scrmljs.emptyFunction, isEmpty = scrmljs.isEmpty;
 
-scrmljs.importScript = function importScript(location, finished) {
+scrmljs.importScript = function importScript(name, location, finished) {
     let req = new XMLHttpRequest();
     req.onload = function(x) {
         try {Function("{"+req.responseText+"\r\n}")()}
@@ -44,7 +47,7 @@ scrmljs.importScript = function importScript(location, finished) {
 }
 
 // load scripts and initialize script variables
-scrmljs.importScript(scrmljs.filePrefix + "scripts/loader.js", function() {
+scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", function() {
     let Loader = scrmljs.Loader, scriptLoader = scrmljs.scriptLoader = Loader.newLoader();
     Loader.tiers.js(scriptLoader);
     Loader.tiers.initialize(scriptLoader);
@@ -67,6 +70,7 @@ scrmljs.importScript(scrmljs.filePrefix + "scripts/loader.js", function() {
         mainLink = scrmljs.mainLink = scrmljs.guiWorkerLink.openGuiWorkerLink(functions, "worker", function(...args) {postMessage(args)});
         mainLink.getIdManagerForLinks("linkId");
     });
+    scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {TypedGraph = scrmljs.Graph.TypedGraph});
     scriptLoader.addEphemeralListener(function() {
         pageTickets = overloadManager.newOverloadManager();
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
@@ -148,7 +152,8 @@ function newPage(name, nickname = "", protoModel = pageProto) {
 }
 
 let newPageByType = {
-    chapter: newChapter
+    chapter: newChapter,
+    statement: newStatement
 }
 
 pageProto.showPage = function showPage(show) {
@@ -178,20 +183,17 @@ functions.preloadPageFromAutosave = function preloadPageFromAutosave(pageId, lin
 functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // create all pages
     for (let i = 0; i < preLoaders.length; ++i) {
-        if (preLoaders[i] === "skip") {
-            pages.skip();
-            continue;
-        }
         let lines = preLoaders[i] = preLoaders[i].split("\n");
         switch (lines[0]) {
             case "chapter":
                 newChapter(lines[1], lines[2]);
+            break; case "statement":
+                newStatement(lines[1], lines[2]);
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }
     // set parent/child relationships
-    for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId] === "skip") continue;
-    else for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
+    for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId][0] === "chapter") for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
     // set toggles
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] == "o");
     // set up guiLinks for visible pages
@@ -280,7 +282,6 @@ pageProto.setPageId = function setPageId(newPageId) {
     if (oldPageId == newPageId) return;
     this.pageId = newPageId;
     if (oldPageId == undefined) return;
-    console.log(pageTickets);
     postMessage(["moveAutosaveEntry", oldPageId, newPageId]);
     pageTickets.items[newPageId] = pageTickets.items[oldPageId];
     delete pageTickets.items[oldPageId];
@@ -369,6 +370,16 @@ pageProto.canDelete = trueFunction;
 
 chapterProto.canDelete = function canDelete() {
     return this.childPages.length === 0;
+}
+
+statementProto.pageType = "statement";
+statementProto.isStatement = true;
+statementProto.newGraph = function newGraph() {return TypedGraph.newGraph()}; // used in statement constructor to create blank graph
+
+function newStatement(name, nickname = "", protoModel = statementProto) {
+    let returner = newPage(name, nickname, protoModel);
+    returner.graph = protoModel.newGraph();
+    return returner;
 }
 
 function trueFunction() {return true}

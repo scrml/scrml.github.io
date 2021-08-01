@@ -28,9 +28,9 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
 });
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
 scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapter.js");
+scriptLoader.ensureJS("statement", ["page"], filePrefix + "scripts/guiLinks/statement.js");
 scriptLoader.ensureJS("jax");
 scriptLoader.addEphemeralListener(function start() {
-    //getLinkFromElement = guiWorkerLink.types.page.getLinkFromEvent;
     // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
     
     let activityTimer = scrmljs.newTimer(onInactivity, 10000);
