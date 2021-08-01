@@ -1,5 +1,5 @@
 // Typed graphs are the structures of statements as graphs. Added functionality over Graph is type matching and the root element
-let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, universe = Graph.universe, geneses = universe.geneses = {};
+let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, universe = Graph.universe, geneses = universe.geneses = {}, subset = scrmljs.subset;
 
 TypedGraph.protoModel = Object.create(Graph.protoModel);
 TypedGraph.protoModel.thisIs = "TypedGraph";
@@ -25,6 +25,23 @@ TypedGraph.protoModel.canModify = function canModify() {
     if (!this.canDelete()) return false;
     for (let genesis in geneses) if (genesis != this.ui) return true;
     return false;
+}
+
+TypedGraph.protoModel.maximalTerms = function maximalTerms() {
+    let returner = [];
+    for (let member of this.members.items) if (member.id && subset(member.ancestors, {"0": undefined})) returner.push(member);
+    return returner;
+}
+
+TypedGraph.protoModel.canFits = function canFits() {
+    let returner = {};
+    for (let graph of allGraphs) if (this.canFit(graph)) returner[graph.ui] = undefined;
+    return returner;
+}
+
+TypedGraph.protoModel.canFit = function canFit(graph) {
+    for (let required in graph.usesTypes()) if (!this.usesType(required)) return false;
+    return true;
 }
 
 TypedGraph.protoModel.isGenesis = function isGenesis() {return this.members.items.length === 1};

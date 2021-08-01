@@ -35,7 +35,8 @@ Graph.protoModel.deleteGraph = function deleteGraph() {
 let memberProto = Graph.memberProto = {checkChildOrder: true};
 
 // The only place a member is stored is in the graph's members manager. Everywhere else members are referred to by id
-Graph.protoModel.addMember = function addMember(type, protoModel = memberProto) {
+Graph.protoModel.addMember = function addMember(type, protoModel = this.memberProto) {
+    if (type == 0 && this.ui !== 0) throw Error("cannot use universe as the type of a member");
     let member = Object.create(protoModel);
     member.graph = this;
     member.children = {};
@@ -43,7 +44,7 @@ Graph.protoModel.addMember = function addMember(type, protoModel = memberProto) 
     member.descendants = {};
     member.type = type;
     // Update the universe if this member makes me depend on another graph. The universe does not depend on any graph and I am allowed to not depend on myself even if my first member is my own type. This is for the root of typed graphs.
-    if (this.ui && !((this.members.items.length === 0 && this.ui === type) || this.usesType(type))) {
+    if (this.ui && !((this.members.items.length == 0 && this.ui == type) || this.usesType(type))) {
         Graph.universe.member(this.ui).setChild(type, type);
         this.updateUniverse();
     }
@@ -60,7 +61,7 @@ Graph.protoModel.updateUniverse = function updateUniverse() {Graph.universe.rese
 {
     let relate = function relate(members, old, young) {
         let oldM = members[old], youngM = members[young], omd = oldM.descendants, oma = oldM.ancestors, ymd = youngM.descendants, yma = youngM.ancestors;
-        if (old in ymd) throw Error("Graph must be acyclic");
+        if (old in ymd) throw Error("graph must be acyclic");
         if (old in yma) return;
         omd[young] = undefined;
         yma[old] = undefined;
@@ -94,7 +95,7 @@ Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
 }
 
 memberProto.setName = function setName(name) {
-    if (name === this.name) return;
+    if (name == this.name) return;
     let byName = this.graph.membersByName;
     if (name in byName) throw Error("name " + name + " is already in use");
     delete byName[this.name];
@@ -103,7 +104,6 @@ memberProto.setName = function setName(name) {
 }
 
 memberProto.setChild = function setChild(childName, child) {
-    //console.log("i am graph "+this.graph.ui + " member " + this.id + " setting child " + childName + " to " + child);
     if (this.checkChildOrder && this.id <= child) throw Error("can only be parent of a lower member");
     let members = this.graph.members.items;
     if (!members[child]) throw Error(child + " is not a member of graph " + this.graph.ui);
@@ -125,7 +125,7 @@ memberProto.deleteMember = function deleteMember() {
     if (!this.canDelete()) throw Error("cannot delete member");
     let graph = this.graph, members = graph.members, myType = this.type, inUse = false;
     for (let d in this.descendants) delete graph.member(d).ancestors[this.ui];
-    for (let member of members.items) inUse = inUse || (member.type === myType && member.id !== this.id);
+    for (let member of members.items) inUse = inUse || (member.type == myType && member.id !== this.id);
     if (!inUse && this.graph.ui) Graph.universe.member(graph.ui).unsetChild(myType);
     members.preErase(this.id);
     graph.flushEraseMember();
@@ -135,9 +135,9 @@ memberProto.deleteMember = function deleteMember() {
 memberProto.setId = function setId(newId) {
     let oldId = this.id, graph = this.graph, members = graph.members.items;
     this.id = newId;
-    if (typeof oldId === "undefined") return;
+    if (typeof oldId == "undefined") return;
     for (let member of members) {
-        for (let childName in member.children) if (member.children[childName] === oldId) member.children[childName] = newId;
+        for (let childName in member.children) if (member.children[childName] == oldId) member.children[childName] = newId;
         if (oldId in member.ancestors) {
             member.ancestors[newId] = undefined;
             delete member.ancestors[oldId];
@@ -162,19 +162,26 @@ Graph.universeMemberProto.checkChildOrder = false;
 Graph.universeMemberProto.setId = function setUi(newUi) {
     let oldUi = this.id;
     memberProto.setId.call(this, newUi);
-    if (typeof oldUi === "undefined") return;
+    if (typeof oldUi == "undefined") return;
     for (let member of this.graph.members.items) if (oldUi in member.children) {
         member.children[newUi] = member.children[oldUi];
         delete member.children[oldUi];
     }
     Graph.allGraphs[newUi] = Graph.allGraphs[oldUi];
     Graph.allGraphs[newUi].setUi(newUi);
-    for (let graph of Graph.allGraphs) for (let member of graph.members.items) if (member.type === oldUi) member.type = newUi;
+    for (let graph of Graph.allGraphs) for (let member of graph.members.items) if (member.type == oldUi) member.type = newUi;
 }
 
 Graph.universe = Graph.newGraph();
 Graph.universe.name = "universe";
-Graph.universe.addMember(0, memberProto);
+Graph.universe.addMember = function addMember(type) {Graph.protoModel.addMember.call(this, type, Graph.universeMemberProto)};
+Graph.universeMemberProto.setChild = function setChild(name, id) {
+    try {memberProto.setChild.call(this, name, id)} catch (e) {
+        if (e.message == "can only be parent of a lower member" || e.message === "graph must be acyclic") throw Error("created cyclic definition");
+        else throw e;
+    }
+}
+Graph.universe.addMember(0);
 
 Graph.universe.members.flushErasePreserveOrder = function flushErasePreserveOrder() {
     let eraseCount = this.eraseThese.length;

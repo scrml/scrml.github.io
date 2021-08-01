@@ -13,24 +13,55 @@ let hostInitializer = function hostInitializer() {
         page.simple = gui.element("div", page.div, ["class", "simple", "canmodify", "false", "genesis", ""]);
         page.emptySpan = gui.textShell("This statement is empty (Genesis)", "p", page.simple, ["class", "genesis"]);
         page.members = gui.element("div", page.simple, ["class", "members"]);
-        page.newMemberType = gui.select(page.simple, ["new member type"], {atts: ["class", "newmemberbutton", "disguise", ""]});
+        page.newMemberType = gui.element("input", page.simple, ["class", "newmembertype", "type", "number", "min", "1", "disguise", ""]);
+        page.newMemberButton = gui.button("Create", page.simple, statementType.newMemberTypeChange, ["class", "newmembertype"]);
     }
     
-    statementProto.showMember = function showMember(line) {
-        console.log("page " + this.linkId + " showing member " + line);
+    statementType.newMemberTypeChange = function newMemberTypeChange(e) {
+        e = pageType.getLinkFromEvent(e);
+        e.dm("newMember", e.newMemberType.value);
+        e.newMemberType.value = "";
+    }
+    
+    statementProto.showMember = function showMember(memberId, memberType) {
         this.simple.removeAttribute("genesis");
+        let member = gui.element("div", this.members, ["class", "member", "memberid", memberId]);
+        gui.textShell("member " + memberId + " type " + memberType, "p", member, ["class", "membertitle"]);
+        gui.element("div", member, ["class", "children"]);
+    }
+    
+    statementProto.openChild = function openChild(memberId, name, type) {
+        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + " type " + type]).addEventListener("change", statementType.childNameListener);
+    }
+    
+    statementType.childNameListener = function childNameListener(e) {
+        let link = pageType.getLinkFromEvent(e);
+        link.dm("setChild", e.target.parentElement.getAttribute("memberid"), e.target.getAttribute("childname"), e.target.value);
+    }
+    
+    statementProto.setChild = function setChild(memberId, childName, childId) {
+        let input = this.members.querySelector("[memberid=\""+memberId+"\"] [childName=\""+childName+"\"]");
+        input.setAttribute("disabled", "");
+        input.setAttribute("disguise", "");
+        input.value = "child " + childName + " is " + childId;
     }
 }
 
 let hostReceivingFunctions = {
     showStatement: function showStatement(linkId) {
         statementType.createLink(linkId, statementType);
-    }, showMember: function showMember(linkId, line) {
+    }, showMember: function showMember(linkId, memberId, memberType) {
         let page = pageType.getPageFromLinkId(linkId);
-        page.showMember(line);
+        page.showMember(memberId, memberType);
     }, canModify: function canModify(linkId, can) {
         let page = pageType.getPageFromLinkId(linkId);
         page.simple.setAttribute("canmodify", can);
+    }, openChild: function openChild(linkId, memberId, name, type) {
+        let page = pageType.getPageFromLinkId(linkId);
+        page.openChild(memberId, name, type);
+    }, setChild: function setChild(linkId, memberId, childName, childId) {
+        let page = pageType.getPageFromLinkId(linkId);
+        page.setChild(memberId, childName, childId);
     }
 }
 
@@ -50,9 +81,13 @@ let workerInitializer = function workerInitializer() {
 }
 
 let workerReceivingFunctions = {
-    newMember: function newMember(linkId, name) {
+    newMember: function newMember(linkId, ui) {
         let page = getPageFromLinkId(linkId), graph = page.graph;
         // need to know type and prototype. prototype can probably come from type, but need to know type.
+        graph.addMember(ui);
+    }, setChild: function setChild(linkId, memberId, childName, childId) {
+        let page = getPageFromLinkId(linkId);
+        page.graph.member(memberId).setChild(childName, childId);
     }
 }
 

@@ -28,8 +28,8 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
     }, isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
-    }, emptyFunction: function emptyFunction() {}
-}, emptyFunction = scrmljs.emptyFunction, isEmpty = scrmljs.isEmpty, universe, allGraphs;
+    }, emptyFunction: function emptyFunction() {}, trueFunction: function() {return true}
+}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty, universe, allGraphs;
 
 scrmljs.importScript = function importScript(name, location, finished) {
     updateMessage("worker loading " + location);
@@ -85,12 +85,12 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
             overloadManager.protoModel.openProcess.call(this);
             updateMessage(line);
         }
-        pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
         pageTickets.closeProcessHook = function() {
             mainLink.flushErase();
             pages.flushErase();
             postMessage(["closeLoadingScreen"]);
         };
+        pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
         updateMessage = function updateMessage(line) {postMessage(["setLoadingScreen", line])};
         postMessage(["start"]);
     });
@@ -396,26 +396,34 @@ function newStatement(name, nickname = "", protoModel = statementProto) {
     return returner;
 }
 
-function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
-    let graphProto = pageTypeProto.graphProto = Object.create(protoModel);
-    
-    graphProto.isVisible = function isVisible() {
-        return this.page && this.page.isVisible;
-    }
-    
-    graphProto.markGenesis = function markGenesis(mark = true) {
-        let wasGenesis = this.ui in universe.geneses;
-        if (wasGenesis === mark) return;
-        protoModel.markGenesis.call(this, mark);
-        let keys = Object.keys(universe.geneses);
-        if (mark && keys.length === 2) allGraphs[keys[0] === this.ui? keys[1]: keys[0]].markCanModify();
-        else if (!mark && keys.length === 1) allGraphs[keys[0]].markCanModify();
-        if (this.isVisible()) this.page.guiLink.dm("markGenesis", mark);
-    }
-    
-    graphProto.markCanModify = function markCanModify() {
-        if (this.isVisible()) this.page.guiLink.dm("canModify", this.canModify());
-    }
+statementProto.showPage = function showPage(show) {
+    if (show === this.isVisible) return;
+    pageProto.showPage.call(this, show);
 }
 
-function trueFunction() {return true}
+statementProto.deletePage = function deletePage() {
+    pageProto.deletePage.call(this);
+    this.graph.deleteGraph();
+}
+
+function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
+    let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(TypedGraph.memberProto);
+    
+    graphProto.addMember = function addMember(type, memberProto = memberProtoModel) {
+        let member = protoModel.addMember.call(this, type, memberProto);
+        if (this.page && this.page.isVisible) {
+            this.page.guiLink.dm("showMember", member.id, type);
+            let def = allGraphs[type], maxs = def.maximalTerms();
+            for (let child of maxs) this.page.guiLink.dm("openChild", member.id, child.name, child.type); 
+        }
+        return member;
+    }
+    
+    memberProtoModel.setChild = function setChild(name, id) {
+        TypedGraph.memberProto.setChild.call(this, name, id);
+        let graph = this.graph;
+        if (graph.page && graph.page.isVisible) {
+            graph.page.guiLink.dm("setChild", this.id, name, id);
+        }
+    }
+}

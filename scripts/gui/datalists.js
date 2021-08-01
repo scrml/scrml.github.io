@@ -1,6 +1,6 @@
 let gui = scrmljs.gui, emptyFunction = scrmljs.emptyFunction, optionFetcher = scrmljs.optionFetcher;
 
-gui.option = function option(text, loadHere, atts, value = text) {
+gui.option = function option(text, loadHere, atts = [], value = text) {
     let returner = gui.element("option", loadHere, atts);
     gui.text(text, returner);
     returner.setAttribute("value", value);

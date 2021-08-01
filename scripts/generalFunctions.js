@@ -54,5 +54,10 @@ scrmljs.climbElementAncestryUntil = function climbElementAncestryUntil(elementOr
     return elementOrEvent;
 }
 
+scrmljs.subset = function subset(subset, superset) {
+    for (let prop in subset) if (!(prop in superset)) return false;
+    return true;
+}
+
 scrmljs.trueFunction = function trueFunction() {return true}
 scrmljs.identityFunction = function identityFunction(x) {return x}
