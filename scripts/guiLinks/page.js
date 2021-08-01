@@ -87,9 +87,9 @@ pageType.initializers.host = function() {
         if (scrmljs.lockedPageFocus && e !== scrmljs.lockedPageFocus && scrmljs.isAncestorOf(e.div, scrmljs.lockedPageFocus.div, "parentElement")) return e.div.setAttribute("open", "");
         e.dm("togglePage", e.div.hasAttribute("open"));
     }
-    pageType.nameProcessorListener = function(e) {
+    pageType.nameProcessorListener = function(line, e) {
         e = pageType.getLinkFromEvent(e);
-        e.dm("tryChangeName", e.nameSpan.value);
+        e.dm("tryChangeName", line);
     }
     pageType.nameBlurredListener = function(e) {
         e = pageType.getLinkFromEvent(e);

@@ -149,12 +149,6 @@ workerFunctions.changeLinkId = function changeLinkId(oldId, newId) {
     guiWorkerLink.links[oldId].setLinkId(newId);
 }
 
-let getPageFromLinkId = function getPageFromLinkId(linkId) {
-    let page = guiWorkerLink.links[linkId];
-    if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
-    return page;
-}
-
 workerFunctions.smoothMode = function smoothMode(smoothMode) {
     scrmljs.doSmoothly = smoothMode;
 }

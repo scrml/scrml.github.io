@@ -13,9 +13,14 @@ TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
 let memberProto = TypedGraph.memberProto = Object.create(Graph.memberProto);
 
 TypedGraph.protoModel.addMember = function addMember(type, protoModel = memberProto) {
+    if (!this.canDelete()) throw Error("cannot modify a typed graph which is in use");
     let member = Graph.protoModel.addMember.call(this, type, protoModel);
     if (member.id) this.member(0).setChild(member.id, member.id);
     return member;
+}
+
+TypedGraph.protoModel.canModify = function canModify() {
+    return isEmpty(this.usedByTypes());
 }
 
 // type is the definition graph, term is the term currently being checked in this graph, template is the corresponding term in the definition

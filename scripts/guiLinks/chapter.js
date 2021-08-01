@@ -1,6 +1,7 @@
 let pageType = scrmljs.mainLink.types.page, chapterType, gui = scrmljs.gui, editor = scrmljs.editor;
 
 let hostInitializer = function hostInitializer() {
+    scrmljs.loadCSS("styles/guiLinks/chapter.css");
     let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
     chapterProto.isType = "chapter";
     chapterProto.isChapter = true;
@@ -39,6 +40,7 @@ let hostInitializer = function hostInitializer() {
     gaps.newPageInChanged = function newPageInChanged(event) {
         let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
         if (!gui.nodeNameScreen(line)) return gui.messages.inputText(newPageIn, "invalid nodeName");
+        mainLink.postMessage("openPageProcess", "checking new page name");
         let parentPage = mainLink.links[gaps.getGapParentId(gap)];
         parentPage.dm("tryNewPage", line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
     }
@@ -110,10 +112,15 @@ pageType.extensions.chapter = {
         }, worker: {
             tryNewPage: function tryNewPage(linkId, newName, insertBeforeId, pageMode) {
                 let parent = getPageFromLinkId(linkId);
-                for (let child of parent.childPages) if (child.name === newName) return parent.guiLink.dm("newPageFail", newName, insertBeforeId);
+                for (let child of parent.childPages) if (child.name === newName) {
+                    parent.guiLink.dm("newPageFail", newName, insertBeforeId);
+                    scrmljs.pageTickets.closeProcess();
+                    return;
+                }
                 let page = newPageByType[pageMode](newName);
                 page.showPage(true);
                 page.moveTo(parent, getPageFromLinkId(insertBeforeId));
+                scrmljs.pageTickets.closeProcess();
             }, startMoveModeChecks: function startMoveModeChecks(linkId) {
                 let page = scrmljs.moveMode = getPageFromLinkId(linkId);
                 for (let link of mainLink.links.items) if (link.page.isChapter) link.dm("canAcceptMove", link.page.canAcceptMove(page));

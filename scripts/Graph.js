@@ -1,5 +1,5 @@
 // First we create plain graphs. Structure consists of ui (universal identifier), typed members, named edges, and ancestry.
-let Graph = scrmljs.Graph = {}, idManager = scrmljs.idManager, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction;
+let Graph = scrmljs.Graph = {}, idManager = scrmljs.idManager, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction;
 
 Graph.allGraphs = [];
 
@@ -10,10 +10,10 @@ Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     returner.ui = Graph.allGraphs.length;
     Graph.allGraphs.push(returner);
     returner.members = idManager.newManager();
+    returner.membersByName = {};
     if (Graph.universe) {
         Graph.universe.addMember(returner.ui);
         returner.updateUniverse();
-        Graph.universe.member(returner.ui).setId = Graph.universeSetId;
     } else returner.ui = 0;
     //this.originalUi = this.ui;
     return returner;
@@ -48,6 +48,8 @@ Graph.protoModel.addMember = function addMember(type, protoModel = memberProto) 
         this.updateUniverse();
     }
     this.members.addItem(member);
+    member.name = member.id;
+    this.membersByName[member.id] = member.id;
     member.originalId = member.id;
     return member;
 }
@@ -76,6 +78,8 @@ Graph.protoModel.updateUniverse = function updateUniverse() {Graph.universe.rese
     }
 }
 
+Graph.protoModel.canModify = trueFunction;
+
 // this is only called by Graph.universe's manager, it is here to be overridden in case the ui needs to be updated anywhere else
 Graph.protoModel.setUi = function setUi(ui) {this.ui = ui}
 Graph.protoModel.member = function member(id) {return this.members.items[id]}
@@ -87,6 +91,15 @@ Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
     line += this.members.items.length + "\n";
     for (let member of this.members.items) line += "child " + member.id + ": " + member.saveToAutosaveString() + "\n";
     return line;
+}
+
+memberProto.setName = function setName(name) {
+    if (name === this.name) return;
+    let byName = this.graph.membersByName;
+    if (name in byName) throw Error("name " + name + " is already in use");
+    delete byName[this.name];
+    byName[name] = this.id;
+    this.name = name;
 }
 
 memberProto.setChild = function setChild(childName, child) {
@@ -143,8 +156,10 @@ memberProto.saveToAutosaveString = function saveToAutosaveString() {
     return line;
 }
 
-// this function is added to each member of Graph.universe to override memberProto.setId
-Graph.universeSetId = function setUi(newUi) {
+Graph.universeMemberProto = Object.create(memberProto);
+Graph.universeMemberProto.checkChildOrder = false;
+
+Graph.universeMemberProto.setId = function setUi(newUi) {
     let oldUi = this.id;
     memberProto.setId.call(this, newUi);
     if (typeof oldUi === "undefined") return;

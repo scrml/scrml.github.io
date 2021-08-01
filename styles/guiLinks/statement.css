@@ -1,0 +1,12 @@
+.statement .simple {
+    border: 3px outset peru;
+    background: navajowhite;
+    border-radius: .4em;
+    display: inline-block;
+    font-size: small;
+    padding: .4em;
+}
+
+.genesis {
+    display: none;
+}

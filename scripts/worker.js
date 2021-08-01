@@ -70,9 +70,16 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
         mainLink = scrmljs.mainLink = scrmljs.guiWorkerLink.openGuiWorkerLink(functions, "worker", function(...args) {postMessage(args)});
         mainLink.getIdManagerForLinks("linkId");
     });
-    scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {TypedGraph = scrmljs.Graph.TypedGraph});
+    scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {
+        TypedGraph = scrmljs.Graph.TypedGraph;
+        initializeGraphProtoForWorker();
+    });
     scriptLoader.addEphemeralListener(function() {
-        pageTickets = overloadManager.newOverloadManager();
+        pageTickets = scrmljs.pageTickets = overloadManager.newOverloadManager();
+        pageTickets.openProcess = function openProcess(line) {
+            overloadManager.protoModel.openProcess.call(this);
+            postMessage(["setLoadingScreen", line]);
+        }
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
         pageTickets.closeProcessHook = function() {
             mainLink.flushErase();
@@ -201,7 +208,7 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     postMessage(["smoothMode", true]);
 }
 
-functions.openPageProcess = function openPageProcess() {pageTickets.openProcess()};
+functions.openPageProcess = function openPageProcess(line) {pageTickets.openProcess(line)};
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
@@ -374,12 +381,16 @@ chapterProto.canDelete = function canDelete() {
 
 statementProto.pageType = "statement";
 statementProto.isStatement = true;
-statementProto.newGraph = function newGraph() {return TypedGraph.newGraph()}; // used in statement constructor to create blank graph
+statementProto.newGraph = function newGraph() {return TypedGraph.newGraph(statementProto.graphProto)}; // used in statement constructor to create blank graph
 
 function newStatement(name, nickname = "", protoModel = statementProto) {
     let returner = newPage(name, nickname, protoModel);
     returner.graph = protoModel.newGraph();
     return returner;
+}
+
+function initializeGraphProtoForWorker(protoModel = TypedGraph.protoModel) {
+    statementProto.graphProto = Object.create(protoModel);
 }
 
 function trueFunction() {return true}

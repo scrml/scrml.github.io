@@ -22,7 +22,7 @@ gui.screenedInput = function screenedInput(loadHere, options = {}) {
     let screen = option("screen"), onchange = option("onchange"), failMessage = option("failMessage"), messageTime = option("messageTime");
     returner.addEventListener("change", function(e) {
         let line = returner.value;
-        if (screen(line)) onchange(e);
+        if (screen(line)) onchange(line, e);
         else gui.messages.inputText(returner, failMessage, messageTime)
     });
     if (option("absorbClicks")) gui.absorbClicks(returner);
