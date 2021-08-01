@@ -76,6 +76,7 @@ typeProto.initialize = function initialize() {
     for (let functionName in dmPosters) mainLink.overloadManager.addTicketFunction(name + " " + functionName, function(linkId, ...data) {
         mainLink.postMessage(name + " " + functionName, linkId, ...data);
     });
+    // Right now all the receiving functions have to search for the link by id. It would be better to not need to do that. Maybe change this so that the receiving functions are constructed from the prototype instead of a seperate receivingFucntions object and set it up so that receiving a dm chooses the link automatically and then calls the correspoding function on that link directly
     for (let functionName in me.receivingFunctions[side]) {
         mainLink.workerFunctions[name + " " + functionName] = function(...args) {
             me.receivingFunctions[side][functionName](...args);

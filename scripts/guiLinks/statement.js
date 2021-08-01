@@ -9,24 +9,16 @@ let hostInitializer = function hostInitializer() {
     statementType.linkProto = statementProto;
     statementType.createLink = function createLink(linkId, type = statementType) {
         let page = pageType.createLink(linkId, type);
-        page.simple = gui.element("div", page.div, ["class", "simple", "genesis", ""]);
+        page.graphType = "TypedGraph";
+        page.simple = gui.element("div", page.div, ["class", "simple", "canmodify", "false", "genesis", ""]);
         page.emptySpan = gui.textShell("This statement is empty (Genesis)", "p", page.simple, ["class", "genesis"]);
-        page.members = {};
-        page.newMemberButton = gui.screenedInput(page.simple, {
-            atts: ["class", "newmemberbutton", "disguise", ""],
-            placeholder: "new term",
-            onchange: statementType.newMemberAction
-        });
+        page.members = gui.element("div", page.simple, ["class", "members"]);
+        page.newMemberType = gui.select(page.simple, ["new member type"], {atts: ["class", "newmemberbutton", "disguise", ""]});
     }
     
     statementProto.showMember = function showMember(line) {
         console.log("page " + this.linkId + " showing member " + line);
-    }
-    
-    statementType.newMemberAction = function newMemberAction(line, page) {
-        page = pageType.getLinkFromEvent(page);
-        page.newMemberButton.value = "checking " + line + "...";
-        page.dm("newMember", line);
+        this.simple.removeAttribute("genesis");
     }
 }
 
@@ -36,6 +28,9 @@ let hostReceivingFunctions = {
     }, showMember: function showMember(linkId, line) {
         let page = pageType.getPageFromLinkId(linkId);
         page.showMember(line);
+    }, canModify: function canModify(linkId, can) {
+        let page = pageType.getPageFromLinkId(linkId);
+        page.simple.setAttribute("canmodify", can);
     }
 }
 
@@ -48,8 +43,9 @@ let workerInitializer = function workerInitializer() {
     statementType.linkProto = statementProto;
     extension.createLink = function createLink(page, type = extension.statementType) {
         pageType.createLink(page, type);
-        let link = page.guiLink;
-        for (let member of page.graph.members.items) if (member.id) link.dm("showMember", member.saveToAutosaveString());
+        let link = page.guiLink, graph = page.graph;
+        for (let member of graph.members.items) if (member.id) link.dm("showMember", member.saveToAutosaveString());
+        link.dm("canModify", graph.canModify());
     }
 }
 

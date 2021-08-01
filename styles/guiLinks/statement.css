@@ -10,3 +10,11 @@
 .genesis {
     display: none;
 }
+
+.simple[genesis][canmodify="false"] .genesis {
+    display: block;
+}
+
+.simple[canmodify="false"] .newmemberbutton {
+    display: none;
+}

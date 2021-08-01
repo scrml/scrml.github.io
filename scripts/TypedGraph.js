@@ -1,5 +1,5 @@
 // Typed graphs are the structures of statements as graphs. Added functionality over Graph is type matching and the root element
-let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction;
+let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, universe = Graph.universe, geneses = universe.geneses = {};
 
 TypedGraph.protoModel = Object.create(Graph.protoModel);
 TypedGraph.protoModel.thisIs = "TypedGraph";
@@ -7,6 +7,7 @@ TypedGraph.protoModel.thisIs = "TypedGraph";
 TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
     let returner = Graph.newGraph(protoModel);
     returner.addMember(returner.ui, memberProto).checkChildOrder = false;
+    returner.markGenesis();
     return returner;
 }
 
@@ -16,11 +17,31 @@ TypedGraph.protoModel.addMember = function addMember(type, protoModel = memberPr
     if (!this.canDelete()) throw Error("cannot modify a typed graph which is in use");
     let member = Graph.protoModel.addMember.call(this, type, protoModel);
     if (member.id) this.member(0).setChild(member.id, member.id);
+    this.markGenesis(false);
     return member;
 }
 
 TypedGraph.protoModel.canModify = function canModify() {
-    return isEmpty(this.usedByTypes());
+    if (!this.canDelete()) return false;
+    for (let genesis in geneses) if (genesis != this.ui) return true;
+    return false;
+}
+
+TypedGraph.protoModel.isGenesis = function isGenesis() {return this.members.items.length === 1};
+
+TypedGraph.protoModel.markGenesis = function markGenesis(mark = true) {
+    if (mark === (this.ui in geneses)) return;
+    if (mark) geneses[this.ui] = undefined;
+    else delete geneses[this.ui];
+}
+
+TypedGraph.protoModel.setUi = function setUi(newUi) {
+    let oldUi = this.ui;
+    Graph.protoModel.setUi.call(this, newUi);
+    if (geneses[oldUi]) {
+        delete geneses[oldUi];
+        geneses[newUi] = undefined;
+    }
 }
 
 // type is the definition graph, term is the term currently being checked in this graph, template is the corresponding term in the definition
@@ -42,4 +63,9 @@ TypedGraph.protoModel.checkTerm = function checkTerm(type, term, template, encou
 // check that the terms in this typed graph match their types
 TypedGraph.protoModel.checkMatchType = function checkMatchType() {
     for (let term of this.members.items) if (term.id === 0) continue; else this.checkTerm(Graph.allGraphs[term.type], term.id, 0, {});
+}
+
+memberProto.deleteMember = function deleteMember() {
+    Graph.memberProto.deleteMember.call(this);
+    if (this.graph.isGenesis()) this.graph.markGenesis();
 }

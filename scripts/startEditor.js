@@ -1,6 +1,7 @@
 let scriptLoader = scrmljs.scriptLoader,
     gui,
     filePrefix = scrmljs.filePrefix,
+    emptyFunction = scrmljs.emptyFunction,
     storage = scrmljs.storage,
     guiWorkerLink,
     root,
@@ -56,6 +57,8 @@ scriptLoader.addEphemeralListener(function start() {
             workerFunctions[e.data.shift()](...e.data);
         } catch (x) {
             document.getElementById("errorout").textContent = line + "\n" + x.message;
+            // force the program to halt even if the worker tries continuing
+            worker.onmessage = emptyFunction;
             throw x;
         }
     }

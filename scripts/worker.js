@@ -1,3 +1,5 @@
+function updateMessage(line) {postMessage(["errorOut", line])};
+
 // script setup
 let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGraph, functions = {}, scrmljs = {
     filePrefix: "../",
@@ -27,9 +29,10 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
     }, emptyFunction: function emptyFunction() {}
-}, emptyFunction = scrmljs.emptyFunction, isEmpty = scrmljs.isEmpty;
+}, emptyFunction = scrmljs.emptyFunction, isEmpty = scrmljs.isEmpty, universe, allGraphs;
 
 scrmljs.importScript = function importScript(name, location, finished) {
+    updateMessage("worker loading " + location);
     let req = new XMLHttpRequest();
     req.onload = function(x) {
         try {Function("{"+req.responseText+"\r\n}")()}
@@ -40,7 +43,7 @@ scrmljs.importScript = function importScript(name, location, finished) {
         }
         finished();
     };
-    req.onerror = function(x) {postMessage(["errorOut", "worker failed to load script " + location])};
+    req.onerror = function(x) {updateMessage("worker failed to load script " + location)};
     req.open("get", location);
     req.overrideMimeType("text/plaintext");
     req.send();
@@ -72,13 +75,15 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
     });
     scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {
         TypedGraph = scrmljs.Graph.TypedGraph;
+        universe = scrmljs.Graph.universe;
+        allGraphs = scrmljs.Graph.allGraphs;
         initializeGraphProtoForWorker();
     });
     scriptLoader.addEphemeralListener(function() {
         pageTickets = scrmljs.pageTickets = overloadManager.newOverloadManager();
         pageTickets.openProcess = function openProcess(line) {
             overloadManager.protoModel.openProcess.call(this);
-            postMessage(["setLoadingScreen", line]);
+            updateMessage(line);
         }
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
         pageTickets.closeProcessHook = function() {
@@ -86,6 +91,7 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
             pages.flushErase();
             postMessage(["closeLoadingScreen"]);
         };
+        updateMessage = function updateMessage(line) {postMessage(["setLoadingScreen", line])};
         postMessage(["start"]);
     });
 });
@@ -99,7 +105,7 @@ onmessage = function onmessage(e) {
         functions[e.data.shift()](...e.data);
         pageTickets.closeProcess();
     } catch (x) {
-        postMessage(["errorOut", "worker error " + line + "\n" + x.message]);
+        updateMessage("worker error " + line + "\n" + x.message);
         throw x;
     }
 }
@@ -386,11 +392,30 @@ statementProto.newGraph = function newGraph() {return TypedGraph.newGraph(statem
 function newStatement(name, nickname = "", protoModel = statementProto) {
     let returner = newPage(name, nickname, protoModel);
     returner.graph = protoModel.newGraph();
+    returner.graph.page = returner;
     return returner;
 }
 
-function initializeGraphProtoForWorker(protoModel = TypedGraph.protoModel) {
-    statementProto.graphProto = Object.create(protoModel);
+function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
+    let graphProto = pageTypeProto.graphProto = Object.create(protoModel);
+    
+    graphProto.isVisible = function isVisible() {
+        return this.page && this.page.isVisible;
+    }
+    
+    graphProto.markGenesis = function markGenesis(mark = true) {
+        let wasGenesis = this.ui in universe.geneses;
+        if (wasGenesis === mark) return;
+        protoModel.markGenesis.call(this, mark);
+        let keys = Object.keys(universe.geneses);
+        if (mark && keys.length === 2) allGraphs[keys[0] === this.ui? keys[1]: keys[0]].markCanModify();
+        else if (!mark && keys.length === 1) allGraphs[keys[0]].markCanModify();
+        if (this.isVisible()) this.page.guiLink.dm("markGenesis", mark);
+    }
+    
+    graphProto.markCanModify = function markCanModify() {
+        if (this.isVisible()) this.page.guiLink.dm("canModify", this.canModify());
+    }
 }
 
 function trueFunction() {return true}
