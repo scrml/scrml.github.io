@@ -58,7 +58,7 @@ pageType.initializers.host = function() {
         });
         page.nameSpan.addEventListener("blur", type.nameBlurredListener);
         page.nicknameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "nickname", "class", "nickname", "disguise", ""]);
-        page.nicknameSpan.addEventListener("change", type.nameProcessorListener);
+        //page.nicknameSpan.addEventListener("change", type.nameProcessorListener); nicknamelistener instead
         gui.absorbClicks(page.nicknameSpan);
         page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
         page.fullNameText = gui.text("", page.fullNameSpan);
@@ -89,6 +89,7 @@ pageType.initializers.host = function() {
     }
     pageType.nameProcessorListener = function(line, e) {
         e = pageType.getLinkFromEvent(e);
+        // this doesn't make sense for if nickname changed
         e.dm("tryChangeName", line);
     }
     pageType.nameBlurredListener = function(e) {
@@ -186,7 +187,7 @@ pageType.receivingFunctions.worker = {
         let page = getPageFromLinkId(linkId);
         if (page.canChangeName(newName)) page.manager.setVarValue("name", newName);
         else page.guiLink.dm("pageNameCheckFail", newName);
-    }, moveTo: function moveTo(linkId, parentId, insertBeforeId, doSmoothly) {
+    }, /* add nickname dm*/ moveTo: function moveTo(linkId, parentId, insertBeforeId, doSmoothly) {
         let page = getPageFromLinkId(linkId);
         page.moveTo(getPageFromLinkId(parentId), getPageFromLinkId(insertBeforeId), doSmoothly);
     }, closeMoveMode: function() {

@@ -87,7 +87,7 @@ let workerInitializer = function workerInitializer() {
     }
     chapterProto.eraseLink = function eraseLink() {
         pageType.linkProto.eraseLink.call(this);
-        for (let childPage of this.page.childPages) childPage.showPage(open);
+        for (let childPage of this.page.childPages) childPage.showPage(false);
     }
 }
 

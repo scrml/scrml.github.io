@@ -33,16 +33,22 @@ TypedGraph.protoModel.maximalTerms = function maximalTerms() {
     return returner;
 }
 
+// get a list of all possible next terms
 TypedGraph.protoModel.canFits = function canFits() {
     let returner = {};
     for (let graph of allGraphs) if (this.canFit(graph)) returner[graph.ui] = undefined;
     return returner;
 }
 
+// can this graph fit a term of that type, doesn't look at shape
 TypedGraph.protoModel.canFit = function canFit(graph) {
     for (let required in graph.usesTypes()) if (!this.usesType(required)) return false;
     return true;
 }
+
+/*TypedGraph.protoModel.allHomomorphismsFromGraph = function allHomomorphismsFromGraph(graph) {
+    
+}*/
 
 TypedGraph.protoModel.isGenesis = function isGenesis() {return this.members.items.length === 1};
 
