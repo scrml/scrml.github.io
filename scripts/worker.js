@@ -24,7 +24,7 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
         chapter: ["page"],
         Graph: ["varManager", "idManager", "generalFunctions"],
         TypedGraph: ["Graph"],
-        statement: ["page"]
+        statement: ["chapter"]
     }, isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
@@ -81,6 +81,7 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
     });
     scriptLoader.addEphemeralListener(function() {
         pageTickets = scrmljs.pageTickets = overloadManager.newOverloadManager();
+        pageTickets.name = "pageTickets";
         pageTickets.openProcess = function openProcess(line) {
             overloadManager.protoModel.openProcess.call(this);
             updateMessage(line);
@@ -90,7 +91,7 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
             pages.flushErase();
             postMessage(["closeLoadingScreen"]);
         };
-        pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToString()])});
+        pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToAutosaveString()])});
         updateMessage = function updateMessage(line) {postMessage(["setLoadingScreen", line])};
         postMessage(["start"]);
     });
@@ -99,12 +100,13 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
 // handle incoming messages
 onmessage = function onmessage(e) {
     let line = e.data.toString();
+    pageTickets.openProcess(line);
     try {
         let line = e.data.toString();
-        pageTickets.openProcess(line);
         functions[e.data.shift()](...e.data);
         pageTickets.closeProcess();
     } catch (x) {
+        console.log("worker error " + line + "\n" + x.message);
         updateMessage("worker error " + line + "\n" + x.message);
         throw x;
     }
@@ -171,7 +173,7 @@ let newPageByType = {
 
 pageProto.showPage = function showPage(show) {
     if (show === this.isVisible) return;
-    if (show) mainLink.types.page.extensions[this.pageType].createLink(this);
+    if (show) mainLink.types.page.extensions[this.pageType].type.createLink(this);
     else {
         this.guiLink.eraseLink();
         delete this.guiLink;
@@ -208,7 +210,7 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // set parent/child relationships
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId][0] === "chapter") for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
     // set toggles
-    for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] == "o");
+    for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] === "o");
     // set up guiLinks for visible pages
     getPageFromPageId(0).showPage(true);
     postMessage(["smoothMode", true]);
@@ -236,11 +238,6 @@ pageProto.computeFullName = function computeFullName() {
 
 pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
-}
-
-pageProto.tryChangePageName = function tryChangePageName(proposedName) {
-    if (this.parent) for (let childPage of this.parent.childPages) if (childPage !== this && childPage.name == proposedName) return guiLinkTickets.addTicket(this.linkId, "pageNameCheckFail", proposedName);
-    this.manager.setVarValue("name", proposedName);
 }
 
 pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
@@ -281,12 +278,13 @@ pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = f
     parent.preSave();
     
     // if this is visible, message that the icon needs to move
-    if (this.isVisible) this.guiLink.dm("movePage", parent.linkId, insertBefore === "none"? "none": insertBefore.linkId, doSmoothly);
+    if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
 }
 
 pageProto.togglePage = function togglePage(open = false) {
     if (this.isOpen === open) return;
     this.isOpen = open;
+    if (this.isVisible) this.guiLink.dm("togglePage", open);
     this.preSave();
 }
 
@@ -300,16 +298,6 @@ pageProto.setPageId = function setPageId(newPageId) {
     delete pageTickets.items[oldPageId];
     this.preSave();
     if (this.parent) this.parent.preSave();
-}
-
-pageProto.setLinkId = function setLinkId(newLinkId) {
-    let oldLinkId = this.linkId;
-    if (oldLinkId == newLinkId) return;
-    this.linkId = newLinkId;
-    if (oldLinkId == undefined) return;
-    postMessage(["changeLinkId", oldLinkId, newLinkId]);
-    guiLinkTickets.items[newLinkId] = guiLinkTickets.items[oldLinkId];
-    delete guiLinkTickets.items[oldLinkId];
 }
 
 pageProto.deletePage = function deletePage() {
@@ -361,6 +349,11 @@ chapterProto.canAcceptMove = function canAcceptMove(page) {
     return true;
 }
 
+chapterProto.showPage = function showPage(open) {
+    pageProto.showPage.call(this, open);
+    if (this.isOpen) for (let childPage of this.childPages.slice().reverse()) childPage.showPage(open);
+}
+
 chapterProto.togglePage = function togglePage(open = false) {
     if (open === this.isOpen) return;
     pageProto.togglePage.call(this, open);
@@ -368,15 +361,19 @@ chapterProto.togglePage = function togglePage(open = false) {
     if (this.isVisible) for (let childPage of this.childPages.slice().reverse()) childPage.showPage(open);
 }
 
-pageProto.saveToString = function saveToString() {
+pageProto.saveToAutosaveString = function saveToAutosaveString() {
     return this.pageType + "\n" + this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
 }
 
-chapterProto.saveToString = function saveToString() {
-    let line = pageProto.saveToString.call(this) + "\n";
+chapterProto.saveToAutosaveString = function saveToAutosaveString() {
+    let line = pageProto.saveToAutosaveString.call(this) + "\n";
     for (let child of this.childPages) line += child.pageId + " ";
     if (this.childPages.length > 0) line = line.substring(0, line.length - 1);
     return line;
+}
+
+statementProto.saveToAutosaveString = function saveToAutosaveString() {
+    return pageProto.saveToAutosaveString.call(this) + "\n" + this.graph.saveToAutosaveString();
 }
 
 pageProto.canDelete = trueFunction;
@@ -387,7 +384,12 @@ chapterProto.canDelete = function canDelete() {
 
 statementProto.pageType = "statement";
 statementProto.isStatement = true;
-statementProto.newGraph = function newGraph() {return TypedGraph.newGraph(statementProto.graphProto)}; // used in statement constructor to create blank graph
+// used in statement constructor to create blank graph
+statementProto.newGraph = function newGraph() {
+    let returner = TypedGraph.newGraph(statementProto.graphProto);
+    returner.page = this;
+    return returner;
+};
 
 function newStatement(name, nickname = "", protoModel = statementProto) {
     let returner = newPage(name, nickname, protoModel);
@@ -397,8 +399,8 @@ function newStatement(name, nickname = "", protoModel = statementProto) {
 }
 
 statementProto.showPage = function showPage(show) {
-    if (show === this.isVisible) return;
     pageProto.showPage.call(this, show);
+    if (show === this.isVisible) return;
 }
 
 statementProto.deletePage = function deletePage() {
@@ -406,17 +408,26 @@ statementProto.deletePage = function deletePage() {
     this.graph.deleteGraph();
 }
 
+statementProto.showGraphId = function showGraphId(id) {
+    if (this.isVisible) this.guiLink.dm("setGraphId", id);
+}
+
 function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
     let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(TypedGraph.memberProto);
     
-    graphProto.addMember = function addMember(type, memberProto = memberProtoModel) {
-        let member = protoModel.addMember.call(this, type, memberProto);
+    graphProto.addMember = function addMember(name, type, memberProto = memberProtoModel) {
+        let member = protoModel.addMember.call(this, name, type, memberProto);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("showMember", member.id, type);
+            this.page.guiLink.dm("newMember", member.id, name, type);
             let def = allGraphs[type], maxs = def.maximalTerms();
             for (let child of maxs) this.page.guiLink.dm("openChild", member.id, child.name, child.type); 
         }
         return member;
+    }
+    
+    graphProto.setUi = function setUi(newUi) {
+        protoModel.setUi.call(this, newUi);
+        this.page.showGraphId(newUi);
     }
     
     memberProtoModel.setChild = function setChild(name, id) {
@@ -425,5 +436,10 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
         if (graph.page && graph.page.isVisible) {
             graph.page.guiLink.dm("setChild", this.id, name, id);
         }
+    }
+    
+    memberProtoModel.setName = function setName(name) {
+        TypedGraph.memberProto.setName.call(this, name);
+        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setName", this.id, name);
     }
 }

@@ -2,18 +2,18 @@ let pageType = scrmljs.mainLink.types.page, chapterType, gui = scrmljs.gui, edit
 
 let hostInitializer = function hostInitializer() {
     scrmljs.loadCSS("styles/guiLinks/chapter.css");
-    let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
+    let extension = pageType.extensions.chapter, chapterProto = extension.linkProto = Object.create(pageType.linkProto);
     chapterProto.isType = "chapter";
     chapterProto.isChapter = true;
     chapterType = extension.type = Object.create(pageType);
-    extension.type.linkProto = chapterProto;
-    chapterType.createLink = function createLink(linkId, type = chapterType) {
-        let page = pageType.createLink(linkId, type);
-        extension.newPageGap(page.div);
+    chapterType.linkProto = chapterProto;
+    pageType.showChapter = chapterType.createLink = function createLink(linkId, extensionName = "chapter") {
+        let page = pageType.createLink(linkId, extensionName);
+        chapterType.newPageGap(page.div);
         if (scrmljs.moveMode) page.guiLink.dm("canAcceptMove", page.canAcceptMove(scrmljs.moveMode));
     }
     // page gaps
-    let gaps = extension.pageGaps = {};
+    let gaps = chapterType.pageGaps = {};
     gaps.getPageGapFromEvent = function getPageGapFromEvent(event) {
         let gap = event.target;
         while (gap.className !== "pagegap") gap = gap.parentElement;
@@ -40,23 +40,16 @@ let hostInitializer = function hostInitializer() {
     gaps.newPageInChanged = function newPageInChanged(event) {
         let gap = gaps.getPageGapFromEvent(event), newPageIn = gap.querySelector(".newpagein"), line = newPageIn.value;
         if (!gui.nodeNameScreen(line)) return gui.messages.inputText(newPageIn, "invalid nodeName");
-        mainLink.postMessage("openPageProcess", "checking new page name");
         let parentPage = mainLink.links[gaps.getGapParentId(gap)];
         parentPage.dm("tryNewPage", line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
     }
     gaps.doMove = function doMove(event) {
         let gap = gaps.getPageGapFromEvent(event);
-        scrmljs.lockedPageFocus.dm("moveTo", gaps.getGapParentId(gap), gaps.getGapNextPageId(gap), true);
         editor.removeAttribute("movemode");
         for (let div of editor.querySelectorAll("[canacceptmove]")) div.removeAttribute("canacceptmove");
-        //scrmljs.post("movePage", editor.querySelector("[movingpage]").getAttribute("linkid"), gaps.getGapParentId(gap), gaps.getGapNextPageId(gap));
-        /*let doMove = function doMove(e) {
-            let gap = e.target.parentElement, movingPage = getPage(document.querySelector("[movingpage]").getAttribute("pagenumber"));
-            post("move", movingPage.pageNumber, getGapParentNumber(gap), getGapNextPageNumber(gap));
-            scrmljs.moveModeOff();
-        }*/
+        scrmljs.lockedPageFocus.dm("moveTo", gaps.getGapParentId(gap), gaps.getGapNextPageId(gap), true);
     }
-    extension.newPageGap = function newPageGap(loadHere, insertBefore = null) {
+    chapterType.newPageGap = function newPageGap(loadHere, insertBefore = null) {
         let gap = gui.element("div", loadHere, ["class", "pagegap"], insertBefore);
         gap.addEventListener("focusin", gaps.pageGapFocus);
         gap.newPageIn = gui.element("input", gap, ["class", "newpagein", "placeholder", "new "+scrmljs.pageMode, "disguise", ""]);
@@ -68,26 +61,35 @@ let hostInitializer = function hostInitializer() {
         gap.moveHereButton.addEventListener("click", gaps.doMove);
         return gap;
     }
+    chapterProto.newPageFail = function newPageFail() {
+        console.log("noting new page fail");
+    }
+    chapterProto.canAcceptMove = function canAcceptMove(can) {
+        this.div.setAttribute("canacceptmove", can);
+    }
 }
 
 let workerInitializer = function workerInitializer() {
-    let extension = pageType.extensions.chapter, chapterProto = Object.create(pageType.linkProto);
+    let extension = pageType.extensions.chapter, chapterProto = extension.linkProto = Object.create(pageType.linkProto);
     chapterProto.isType = "chapter";
     chapterProto.isChapter = true;
-    chapterType = extension.chapterType = Object.create(pageType);
-    chapterType.showPage = "showChapter";
-    extension.chapterType.linkProto = chapterProto;
-    extension.createLink = function createLink(page, type = extension.chapterType) {
-        pageType.createLink(page, type);
+    chapterType = extension.type = Object.create(pageType);
+    chapterType.linkProto =chapterProto;
+    chapterType.extensionName = "chapter";
+    chapterType.createLink = function createLink(page, extensionName = "chapter") {
+        pageType.createLink(page, extensionName);
         if (scrmljs.moveMode) page.guiLink.dm("canAcceptMove", page.canAcceptMove(scrmljs.moveMode));
     }
-    chapterProto.togglePage = function togglePage(open) {
-        pageType.linkProto.togglePage.call(this, open);
-        for (let childPage of this.page.childPages) childPage.showPage(open);
-    }
     chapterProto.eraseLink = function eraseLink() {
-        pageType.linkProto.eraseLink.call(this);
         for (let childPage of this.page.childPages) childPage.showPage(false);
+        pageType.linkProto.eraseLink.call(this);
+    }
+    chapterProto.tryNewPage = function tryNewPage(name, insertBefore, pageType) {
+        let page = this.page;
+        for (let child of page.childPages) if (child.name === name) return this.dm("newPageFail", insertBefore);
+        let newPage = newPageByType[pageType](name);
+        newPage.moveTo(page, insertBefore === "none"? "none": mainLink.getLink(insertBefore).page, false);
+        newPage.showPage(true);
     }
 }
 
@@ -95,36 +97,5 @@ pageType.extensions.chapter = {
     initializers: {
         host: hostInitializer,
         worker: workerInitializer
-    }, receivingFunctions: {
-        host: {
-            showChapter: function(linkId) {
-                chapterType.createLink(linkId, chapterType);
-            }, newPageFail: function newPageNameCheckFail(parentLinkId, newName, insertBefore) {
-                if (parentLinkId != pageType.extensions.chapter.pageGaps.getGapParentId(scrmljs.focusedPageGap)) throw Error("checking new page name message mismatch");
-                gui.messages.inputText(scrmljs.focusedPageGap.newPageIn, "name conflict");
-            }, clearPageGap: function clearPageGap() {
-                if (!scrmljs.focusedPageGap) return;
-                mainLink.types.chapter.pageGaps.clearPageGap({target: scrmljs.focusedPageGap});
-                scrmljs.focusedPageGap = false;
-            }, canAcceptMove: function canAcceptMove(linkId, accept) {
-                pageType.getPageFromLinkId(linkId).div.setAttribute("canacceptmove", accept);
-            }
-        }, worker: {
-            tryNewPage: function tryNewPage(linkId, newName, insertBeforeId, pageMode) {
-                let parent = getPageFromLinkId(linkId);
-                for (let child of parent.childPages) if (child.name === newName) {
-                    parent.guiLink.dm("newPageFail", newName, insertBeforeId);
-                    scrmljs.pageTickets.closeProcess();
-                    return;
-                }
-                let page = newPageByType[pageMode](newName);
-                page.showPage(true);
-                page.moveTo(parent, getPageFromLinkId(insertBeforeId));
-                scrmljs.pageTickets.closeProcess();
-            }, startMoveModeChecks: function startMoveModeChecks(linkId) {
-                let page = scrmljs.moveMode = getPageFromLinkId(linkId);
-                for (let link of mainLink.links.items) if (link.page.isChapter) link.dm("canAcceptMove", link.page.canAcceptMove(page));
-            }
-        }
     }
 }

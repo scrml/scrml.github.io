@@ -35,7 +35,7 @@ Graph.protoModel.deleteGraph = function deleteGraph() {
 let memberProto = Graph.memberProto = {checkChildOrder: true};
 
 // The only place a member is stored is in the graph's members manager. Everywhere else members are referred to by id
-Graph.protoModel.addMember = function addMember(type, protoModel = this.memberProto) {
+Graph.protoModel.addMember = function addMember(name, type, protoModel = this.memberProto) {
     if (type == 0 && this.ui !== 0) throw Error("cannot use universe as the type of a member");
     let member = Object.create(protoModel);
     member.graph = this;
@@ -49,8 +49,7 @@ Graph.protoModel.addMember = function addMember(type, protoModel = this.memberPr
         this.updateUniverse();
     }
     this.members.addItem(member);
-    member.name = member.id;
-    this.membersByName[member.id] = member.id;
+    member.setName(name);
     member.originalId = member.id;
     return member;
 }
@@ -88,9 +87,8 @@ Graph.protoModel.eraseMember = function eraseMember(id) {this.member(id).deleteM
 Graph.protoModel.flushEraseMember = function flushEraseMember() {this.members.flushErasePreserveOrder()}
 
 Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
-    let line = "";
-    line += this.members.items.length + "\n";
-    for (let member of this.members.items) line += "child " + member.id + ": " + member.saveToAutosaveString() + "\n";
+    let line = this.members.items.length;
+    for (let member of this.members.items) line += "\n" + member.saveToAutosaveString();
     return line;
 }
 
@@ -149,10 +147,8 @@ memberProto.setId = function setId(newId) {
 }
 
 memberProto.saveToAutosaveString = function saveToAutosaveString() {
-    let line = "";
-    line += this.type + " ";
-    for (let child in this.children) line += "(" + child + " " + this.children[child] + ")";
-    line += "\t";
+    let line = this.type + " " + this.name;
+    for (let childName in this.children) line += " " + childName + " " + this.children[childName];
     return line;
 }
 
@@ -174,7 +170,7 @@ Graph.universeMemberProto.setId = function setUi(newUi) {
 
 Graph.universe = Graph.newGraph();
 Graph.universe.name = "universe";
-Graph.universe.addMember = function addMember(type) {Graph.protoModel.addMember.call(this, type, Graph.universeMemberProto)};
+Graph.universe.addMember = function addMember(type) {Graph.protoModel.addMember.call(this, type, type, Graph.universeMemberProto)};
 Graph.universeMemberProto.setChild = function setChild(name, id) {
     try {memberProto.setChild.call(this, name, id)} catch (e) {
         if (e.message == "can only be parent of a lower member" || e.message === "graph must be acyclic") throw Error("created cyclic definition");

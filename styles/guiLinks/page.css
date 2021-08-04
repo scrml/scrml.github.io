@@ -57,9 +57,13 @@
     border-style: outset;
 }
 
-.editor[movemode] .newpagein {
+.editor[movemode] .newpagein, .editor[movemode] .pagetools, .editor[movemode] .missilelaunch {
     display: none;
 }
+
+.editor[movemode] [movingpage] > .pagehead .pagetools {
+    display: inline-block;
+} 
 
 [linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
     display: none;

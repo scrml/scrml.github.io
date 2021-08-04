@@ -54,9 +54,19 @@ scrmljs.climbElementAncestryUntil = function climbElementAncestryUntil(elementOr
     return elementOrEvent;
 }
 
+scrmljs.getAllFunctions = function getAllFunctions(obj) {
+    let returner = {};
+    for (let f in obj) if (typeof obj[f] === "function") returner[f] = undefined;
+    return returner;
+}
+
 scrmljs.subset = function subset(subset, superset) {
     for (let prop in subset) if (!(prop in superset)) return false;
     return true;
+}
+
+scrmljs.portProperties = function portProperties(from, to) {
+    for (let prop in from) to[prop] = to[prop] || from[prop];
 }
 
 scrmljs.trueFunction = function trueFunction() {return true}

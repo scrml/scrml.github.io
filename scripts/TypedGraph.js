@@ -6,16 +6,16 @@ TypedGraph.protoModel.thisIs = "TypedGraph";
 
 TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
     let returner = Graph.newGraph(protoModel);
-    returner.addMember(returner.ui, memberProto).checkChildOrder = false;
+    returner.addMember("cap element", returner.ui, memberProto).checkChildOrder = false;
     returner.markGenesis();
     return returner;
 }
 
 let memberProto = TypedGraph.memberProto = Object.create(Graph.memberProto);
 
-TypedGraph.protoModel.addMember = function addMember(type, protoModel = memberProto) {
+TypedGraph.protoModel.addMember = function addMember(name, type, protoModel = memberProto) {
     if (!this.canDelete()) throw Error("cannot modify a typed graph which is in use");
-    let member = Graph.protoModel.addMember.call(this, type, protoModel);
+    let member = Graph.protoModel.addMember.call(this, name, type, protoModel);
     if (member.id) this.member(0).setChild(member.id, member.id);
     this.markGenesis(false);
     return member;

@@ -15,7 +15,8 @@ overloadManager.newOverloadManager = function newOverloadManager(protoModel = ov
 
 overloadManager.protoModel.addTicketFunction = function addTicketFunction(name, func) {
     if (this.ticketFunctions[name]) throw Error(name + " is already a ticket function");
-    this.ticketFunctions[name] = func
+    let me = this;
+    this.ticketFunctions[name] = func;
 }
 
 overloadManager.protoModel.openProcess = function openProcess() {

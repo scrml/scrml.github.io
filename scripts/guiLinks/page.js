@@ -7,41 +7,8 @@ pageType.initializers.host = function() {
     let pageProto = pageType.linkProto;
     pageProto.isPage = true;
     pageProto.isType = "page";
-    pageProto.togglePage = function togglePage(open) {
-        if (open) this.div.setAttribute("open", "");
-        else this.div.removeAttribute("open");
-    }
-    pageProto.movePage = function movePage(parent, insertBefore = "none", doSmooth = scrmljs.doSmoothly) {
-        let div = gui.element("div", this.div.parentElement, [], this.div);
-        div.appendChild(div.previousSibling);
-        div.appendChild(div.nextSibling);
-        gui.smoothMove(div, parent.div, insertBefore === "none"? parent.div.lastChild: insertBefore.div.previousSibling, {
-            doSmoothly: doSmooth,
-            onEnd: function() {
-                gui.removeLayer(div);
-            }
-        });
-    }
-    pageProto.setLinkId = function setLinkId(newId, oldId = this.linkId) {
-        pageProto.prototype.setLinkId.call(this, newId, oldId);
-        this.div.setAttribute("linkid", newId);
-    }
-    pageProto.canDelete = function canDelete(can) {
-        this.div.setAttribute("candelete", can);
-    }
-    pageProto.newNameFail = function newNameFail(line) {
-        this.nameSpan.value = line;
-        gui.messages.inputText(this.nameSpan, "name conflict");
-    }
-    pageProto.eraseLink = function eraseLink() {
-        gui.orphan(this.div.previousSibling); // erase the preceding page gap
-        gui.orphan(this.div);
-        linkProto.eraseLink.call(this);
-    }
-    pageProto.deletePage = function deletePage() {
-        this.dm("deletePage");
-    }
-    pageType.createLink = function createLink(linkId, type = pageType) {
+    pageType.createLink = function createLink(linkId, extensionName) {
+        let type = pageType.extensions[extensionName].type;
         let page = mainLink.newLink(type, linkId);
         page.div = gui.element("details", editor, ["class", page.isType, "linkid", linkId, "ispage", "", "candelete", "false"]);
         page.div.addEventListener("toggle", type.toggleListener);
@@ -63,23 +30,61 @@ pageType.initializers.host = function() {
         page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
         page.fullNameText = gui.text("", page.fullNameSpan);
         page.pageTools = gui.element("div", page.pageHead, ["class", "pagetools"]);
-        page.moveButton = gui.button("⇳", page.pageTools, type.moveModeAction, ["disguise", "", "bigger", ""]);
+        page.moveButton = gui.button("⇳", page.pageTools, type.moveModeAction, ["class", "movebutton", "disguise", "", "bigger", ""]);
         gui.shieldClicks(page.moveButton);
         page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
         // if this is not the first page then create a page gap before this page
-        if (linkId) pageType.extensions.chapter.newPageGap(page.div.parentElement, page.div);
+        if (linkId) pageType.extensions.chapter.type.newPageGap(page.div.parentElement, page.div);
         return page;
     }
-    pageType.createLinkHook = emptyFunction;
+    pageProto.getName = function getName(name) {
+        gui.messages.setInputValue(this.nameSpan, name);
+        this.nameSpan.removeAttribute("disabled");
+        this.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
+        this.nameSpan.blur();
+    }
+    pageProto.togglePage = function togglePage(open) {
+        if (open) this.div.setAttribute("open", "");
+        else this.div.removeAttribute("open");
+    }
+    pageProto.movePage = function movePage(parentId, insertBeforeId = "none", doSmooth = scrmljs.doSmoothly) {
+        let parent = mainLink.getLink(parentId), insertBefore = insertBeforeId === "none"? null: mainLink.getLink(insertBeforeId), div = gui.element("div", this.div.parentElement, [], this.div);
+        div.appendChild(div.previousSibling);
+        div.appendChild(div.nextSibling);
+        gui.smoothMove(div, parent.div, insertBeforeId === "none"? parent.div.lastChild: insertBefore.div.previousSibling, {
+            doSmoothly: doSmooth,
+            onEnd: function() {
+                gui.removeLayer(div);
+            }
+        });
+    }
+    pageProto.setLinkId = function setLinkId(newId, oldId = this.linkId) {
+        let links = mainLink.links;
+        //console.log("directly deleting " + oldId + " and moving it to " + newId);
+        delete links[oldId];
+        links[newId] = this;
+        this.linkId = newId;
+        this.div.setAttribute("linkid", newId);
+    }
+    pageProto.canDelete = function canDelete(can) {
+        this.div.setAttribute("candelete", can);
+    }
+    pageProto.newNameFail = function newNameFail(goodName) {
+        gui.messages.setInputValue(this.nameSpan, goodName);
+        gui.messages.inputText(this.nameSpan, "name conflict");
+    }
+    pageProto.eraseLink = function eraseLink() {
+        gui.orphan(this.div.previousSibling); // erase the preceding page gap
+        gui.orphan(this.div);
+        linkProto.eraseLink.call(this);
+    }
+    pageProto.deletePage = function deletePage() {
+        this.dm("deletePage");
+    }
     pageType.climber = gui.basicClimber("[ispage]", editor);
     pageType.getLinkFromEvent = function getLinkFromEvent(e) {
         e = pageType.climber(e);
         return mainLink.links[e.getAttribute("linkid")];
-    }
-    pageType.getPageFromLinkId = function getPageFromLinkId(linkId) {
-        let page = mainLink.links[linkId];
-        if (!page || !page.isPage) throw Error("link " + linkId + " is not a page");
-        return page;
     }
     pageType.toggleListener = function(e) {
         e = pageType.getLinkFromEvent(e);
@@ -103,7 +108,6 @@ pageType.initializers.host = function() {
             editor.removeAttribute("movemode");
             e.div.removeAttribute("movingPage");
             for (let page of editor.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
-            e.dm("closeMoveMode");
         } else {
             scrmljs.lockedPageFocus = e;
             editor.setAttribute("movemode", "");
@@ -117,83 +121,40 @@ pageType.initializers.host = function() {
     }   
 }
 
-pageType.receivingFunctions.host = {
-    getName: function getName(linkId, name) {
-        let page = pageType.getPageFromLinkId(linkId);
-        gui.messages.setInputValue(page.nameSpan, name);
-        page.nameSpan.removeAttribute("disabled");
-        page.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
-        page.nameSpan.blur();
-    }, getNickname: function getNickname(linkId, nickname) {
-        pageType.getPageFromLinkId(linkId).nicknameSpan.value = nickname;
-    }, setFullName: function setFullName(linkId, fullName) {
-        pageType.getPageFromLinkId(linkId).fullNameText.nodeValue = fullName;
-    }, togglePage: function togglePage(linkId, open) {
-        pageType.getPageFromLinkId(linkId).togglePage(open);
-    }, pageNameCheckFail: function pageNameCheckFail(linkId, line) {
-        pageType.getPageFromLinkId(linkId).newNameFail(line);
-    }, movePage: function movePage(linkId, parentId, insertBeforeId = "none", doSmoothly = false) {
-        pageType.getPageFromLinkId(linkId).movePage(pageType.getPageFromLinkId(parentId), insertBeforeId === "none"? "none": pageType.getPageFromLinkId(insertBeforeId), doSmoothly);
-    }, canDelete: function canDelete(linkId, can) {
-        let item = mainLink.links[linkId];
-        if (item.isPage) item.canDelete(can);
-    }, eraseLink: function eraseLink(linkId) {
-        pageType.getPageFromLinkId(linkId).eraseLink();
-    }
-}
-
 pageType.initializers.worker = function() {
-    pageType.showPage = "showPage";
     let pageProto = pageType.linkProto;
     pageProto.isPage = true;
     pageProto.isType = "page";
-    pageType.createLink = function createLink(page, type = pageType) {
+    pageType.createLink = function createLink(page, extensionName) {
         if (page.guiLink) throw Error("gui link already set up for page id " + page.pageId);
-        let link = page.guiLink = mainLink.newLink(type);
+        let link = page.guiLink = mainLink.newLink(pageType.extensions[extensionName].type);
         link.page = page;
-        page.manager.setVarValue("linkId", link.linkId);
-        page.manager.linkProperty("linkId", page);
-        link.dm(type.showPage);
         link.unlinks = [];
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.dm("canDelete", page.canDelete());
-        if (page.parent) link.dm("movePage", page.parent.linkId, page.nextPage? page.nextPage.linkId: "none", false);
-        link.togglePage(page.isOpen);
+        if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextPage? page.nextPage.guiLink.linkId: "none", false);
+        link.dm("togglePage", page.isOpen);
     }
+    pageProto.getName = function getName() {this.dm("getName", this.page.name)};
     pageProto.togglePage = function togglePage(open) {
-        this.dm("togglePage", open);
+        this.page.togglePage(open);
     }
     pageProto.eraseLink = function eraseLink() {
         for (let unlink of this.unlinks) unlink();
         linkProto.eraseLink.call(this);
-        this.dm("eraseLink");
     }
-}
-
-pageType.receivingFunctions.worker = {
-    getName: function(linkId) {
-        let page = getPageFromLinkId(linkId);
-        page.guiLink.dm("getName", page.name);
-    }, getNickname: function(linkId) {
-        let page = getPageFromLinkId(linkId);
-        page.guiLink.dm("getNickname", page.nickname);
-    }, togglePage: function(linkId, open) {
-        let page = getPageFromLinkId(linkId);
-        page.togglePage(open);
-    }, canDelete: function(linkId) {
-        let page = getPageFromLinkId(linkId);
-        page.guiLink.dm("canDelete", page.canDelete());
-    }, tryChangeName: function(linkId, newName) {
-        let page = getPageFromLinkId(linkId);
-        if (page.canChangeName(newName)) page.manager.setVarValue("name", newName);
-        else page.guiLink.dm("pageNameCheckFail", newName);
-    }, /* add nickname dm*/ moveTo: function moveTo(linkId, parentId, insertBeforeId, doSmoothly) {
-        let page = getPageFromLinkId(linkId);
-        page.moveTo(getPageFromLinkId(parentId), getPageFromLinkId(insertBeforeId), doSmoothly);
-    }, closeMoveMode: function() {
-        scrmljs.moveMode = false;
-    }, deletePage: function(linkId) {
-        let page = getPageFromLinkId(linkId);
-        page.deletePage();
+    pageProto.tryChangeName = function tryChangeName(newName) {
+        if (this.page.canChangeName(newName)) this.page.manager.setVarValue("name", newName);
+        else this.dm("newNameFail", this.name);
+    }
+    pageProto.startMoveModeChecks = function startMoveModeChecks() {
+        let page = this.page;
+        for (let chapter of pages.items) if (chapter.isVisible && chapter.isChapter) chapter.guiLink.dm("canAcceptMove", chapter.canAcceptMove(page));
+    }
+    pageProto.moveTo = function moveTo(parentId, insertBeforeId, doSmoothly) {
+        this.page.moveTo(mainLink.getLink(parentId).page, insertBeforeId === "none"? "none": mainLink.getLink(insertBeforeId).page, doSmoothly);
+    }
+    pageProto.deletePage = function deletePage() {
+        this.page.deletePage();
     }
 }

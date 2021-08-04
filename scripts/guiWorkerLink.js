@@ -1,5 +1,4 @@
-let guiWorkerLink = scrmljs.guiWorkerLink = {}, loader = scrmljs.scriptLoader, emptyFunction = scrmljs.emptyFunction;
-let protoModel, typeProto, linkProto;
+let protoModel, typeProto, linkProto, guiWorkerLink = scrmljs.guiWorkerLink = {}, loader = scrmljs.scriptLoader, getAllFunctions = scrmljs.getAllFunctions, portProperties = scrmljs.portProperties, emptyFunction = scrmljs.emptyFunction;
 
 protoModel = guiWorkerLink.protoModel = {};
 
@@ -14,22 +13,27 @@ guiWorkerLink.openGuiWorkerLink = function openGuiWorkerLink(workerFunctions, wh
     } else if (whichSide === "worker") returner.postMessage = workerOrPostMessage;
     else throw Error("side is " + whichSide + ", not host or worker");
     returner.types = {};
-    returner.overloadManager = scrmljs.overloadManager.newOverloadManager();
     // returner.links should be an idManager for the side which controls the links, but it defaults to a holder object
     returner.links = {};
     return returner;
 }
 
-protoModel.getIdManagerForLinks = function getIdManagerForLinks(idName = "linkId") {
-    this.links = idManager.newManager(idName);
-    this.eraseLink = protoModel.eraseManagedLink;
+protoModel.getLink = function getLink(linkId) {
+    return this.links[linkId];
+}
+
+protoModel.getManagedLink = function getManagedLink(linkId) {
+    return this.links.items[linkId];
 }
 
 protoModel.eraseLink = function eraseLink(linkId) {
+    //console.log("directly deleting " + linkId);
     delete this.links[linkId];
 }
 
 protoModel.eraseManagedLink = function eraseManagedLink(linkId) {
+    //console.log("managed erasing " + linkId);
+    this.getLink(linkId).dm("eraseLink");
     this.links.preErase(linkId);
 }
 
@@ -37,17 +41,23 @@ protoModel.flushErase = function flushErase() {
     this.links.flushErase();
 }
 
-protoModel.dm = function dm(typeName, functionName, linkId, ...args) {
-    this.overloadManager.addTicket(linkId, typeName + " " + functionName, ...args);
+protoModel.getIdManagerForLinks = function getIdManagerForLinks(idName = "linkId") {
+    let manager = this.links = idManager.newManager(idName);
+    this.eraseLink = this.eraseManagedLink;
+    this.getLink = this.getManagedLink;
+    manager.defaultSetIdName = function(id) {
+        if (typeof this[idName] !== "undefined") {
+            //console.log("setting linkId from " + this.linkId + " to " + id);
+            this.dm(manager.setIdName, id);
+        }
+        this[idName] = id;
+    }
 }
 
-protoModel.openProcess = function openProcess() {
-    this.overloadManager.openProcess();
-}
-
-protoModel.closeProcess = function closeProcess() {
-    this.overloadManager.closeProcess();
-}
+// direct message, one side of the link directly calls a function on the other side of the link
+protoModel.dm = function dm(typeName, functionName, linkId, ...data) {mainLink.postMessage(typeName + " dm " + functionName, linkId, ...data);}
+// type direct message, one side of the link calls a function on the type of the other side of the link
+protoModel.tdm = function tdm(typeName, functionName, ...data) {mainLink.postMessage(typeName + " tdm " + functionName, ...data);}
 
 typeProto = guiWorkerLink.typeProto = {};
 
@@ -65,35 +75,40 @@ protoModel.newType = function newType(name, protoModel = typeProto) {
     return returner;
 }
 
+let dmLog = emptyFunction;
+
 typeProto.initialize = function initialize() {
-    let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, otherSide = side === "host"? "worker": "host", dmPosters = me.receivingFunctions[otherSide];
-    this.initializers[this.mainLink.side]();
-    for (let extension in this.extensions) {
-        for (let functionName in this.extensions[extension].receivingFunctions[side]) this.receivingFunctions[side][functionName] = this.extensions[extension].receivingFunctions[side][functionName];
-        for (let functionName in this.extensions[extension].receivingFunctions[otherSide]) this.receivingFunctions[otherSide][functionName] = this.extensions[extension].receivingFunctions[otherSide][functionName];
-        this.extensions[extension].initializers[this.mainLink.side]();
+    let me = this, name = me.name, mainLink = me.mainLink, side = mainLink.side, extensions = me.extensions, dms = {}, tdms = {};
+    portProperties(getAllFunctions(me.linkProto), dms);
+    this.initializers[side]();
+    for (let extension in extensions) {
+        extension = extensions[extension];
+        extension.initializers[side]();
+        portProperties(getAllFunctions(extension.linkProto), dms);
+        portProperties(getAllFunctions(extension.type), tdms);
     }
-    for (let functionName in dmPosters) mainLink.overloadManager.addTicketFunction(name + " " + functionName, function(linkId, ...data) {
-        mainLink.postMessage(name + " " + functionName, linkId, ...data);
-    });
-    // Right now all the receiving functions have to search for the link by id. It would be better to not need to do that. Maybe change this so that the receiving functions are constructed from the prototype instead of a seperate receivingFucntions object and set it up so that receiving a dm chooses the link automatically and then calls the correspoding function on that link directly
-    for (let functionName in me.receivingFunctions[side]) {
-        mainLink.workerFunctions[name + " " + functionName] = function(...args) {
-            me.receivingFunctions[side][functionName](...args);
-        }
+    for (let func in dms) mainLink.workerFunctions[name + " dm " + func] = function(linkId, ...data) {dmLog(mainLink.side + " " + linkId + " dmed " + func + " " + data); mainLink.getLink(linkId)[func](...data)};
+    for (let func in tdms) if (func !== "createLink") mainLink.workerFunctions[name + " tdm " + func] = function(...data) {dmLog(mainLink.side + " tdmed " + func + " " + data); mainLink.types[name][func](...data)};
+    mainLink.workerFunctions[name + " tdm createLink"] = function(datum, extensionName) {
+        if (typeof extensionName !== "undefined") return mainLink.types[name].extensions[extensionName].type.createLink(datum, extensionName);
+        else return mainLink.types[name].createLink(datum);
     }
 }
 
-typeProto.dm = function dm(...args) {this.mainLink.dm(this.name, ...args)}
+typeProto.dm = function dm(linkId, ...data) {dmLog(this.mainLink.side + " " + linkId + " dming " + data); this.mainLink.dm(this.name, linkId, ...data)}
+typeProto.tdm = function tdm(...data) {dmLog(this.mainLink.side + " tdming " + data); this.mainLink.tdm(this.name, ...data)}
 
 linkProto = guiWorkerLink.linkProto = {};
 
 protoModel.newLink = function newLink(type, linkId) {
+    //console.log(this.side + " creating link " + linkId);
     let returner = Object.create(type.linkProto);
     returner.type = type;
     if (typeof linkId === "undefined") {
-        if (this.links.isIdManager) this.links.addItem(returner);
-        else throw Error("trying to make a link without a link id");
+        if (this.links.isIdManager) {
+            returner.tdm("createLink", this.links.items.length, type.extensionName);
+            this.links.addItem(returner);
+        } else throw Error("trying to make a link without a link id");
     } else {
         if (this.links.isIdManager) throw Error("trying to specify a linkId when a manager is present");
         this.links[linkId] = returner;
@@ -102,10 +117,10 @@ protoModel.newLink = function newLink(type, linkId) {
     return returner;
 }
 
-linkProto.dm = function dm(functionName, ...args) {
-    this.type.dm(functionName, this.linkId, ...args);
-}
+linkProto.dm = function dm(functionName, ...data) {this.type.dm(functionName, this.linkId, ...data)};
+linkProto.tdm = function tdm(functionName, ...data) {this.type.tdm(functionName, ...data)};
 
 linkProto.eraseLink = function eraseLink() {
+    //console.log(mainLink.side + " erasing " + this.linkId);
     this.type.mainLink.eraseLink(this.linkId);
 }

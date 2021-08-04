@@ -13,6 +13,7 @@
 .loadingicon {
     width: 10em;
     height: 10em;
+    margin: auto;
     border-radius: 10em;
     border: 1em solid;
     text-align: center;
