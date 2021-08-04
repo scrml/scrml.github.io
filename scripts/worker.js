@@ -198,12 +198,25 @@ functions.preloadPageFromAutosave = function preloadPageFromAutosave(pageId, lin
 functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // create all pages
     for (let i = 0; i < preLoaders.length; ++i) {
-        let lines = preLoaders[i] = preLoaders[i].split("\n");
+        let lines = preLoaders[i] = preLoaders[i].split("\n"), page, graph;
         switch (lines[0]) {
             case "chapter":
                 newChapter(lines[1], lines[2]);
             break; case "statement":
-                newStatement(lines[1], lines[2]);
+                page = newStatement(lines[1], lines[2]);
+                graph = page.graph;
+                let numMembers = lines[4];
+                for (let memberId = 1; memberId < numMembers; ++memberId) {
+                    let subLines = lines[memberId + 5].split("\t");
+                    while (subLines[subLines.length] === "\t") subLines.pop();
+                    // subLines[0] is the name, type, and children
+                    let memberLines = subLines[0].split(" ");
+                    while (memberLines[memberLines.length-1] === "") memberLines.pop();
+                    let member = graph.addMember(memberLines[0], memberLines[1]);
+                    for (let childIndex = 2; childIndex < memberLines.length; childIndex += 2) {
+                        member.setChild(memberLines[childIndex], memberLines[childIndex+1]);
+                    }
+                }
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }
@@ -422,6 +435,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
             let def = allGraphs[type], maxs = def.maximalTerms();
             for (let child of maxs) this.page.guiLink.dm("openChild", member.id, child.name, child.type); 
         }
+        if (this.page) this.page.preSave();
         return member;
     }
     
@@ -436,6 +450,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
         if (graph.page && graph.page.isVisible) {
             graph.page.guiLink.dm("setChild", this.id, name, id);
         }
+        graph.page.preSave();
     }
     
     memberProtoModel.setName = function setName(name) {

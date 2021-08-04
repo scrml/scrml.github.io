@@ -43,8 +43,18 @@ let hostInitializer = function hostInitializer() {
         gui.element("div", member, ["class", "children"]);
     }
     
+    statementProto.showMember = function showMember(memberId, line) {
+        let lines = line.split("\t"), childLines = lines[0].split(" ");
+        while (childLines[childLines.length-1] === "") childLines.pop();
+        this.newMember(memberId, childLines[0], childLines[1]);
+        for (let childIndex = 2; childIndex < childLines.length; childIndex += 2) {
+            this.openChild(memberId, childLines[childIndex], "skip");
+            this.setChild(memberId, childLines[childIndex], childLines[childIndex+1]);
+        }
+    }
+    
     statementProto.openChild = function openChild(memberId, name, type) {
-        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + " type " + type]).addEventListener("change", statementType.childNameListener);
+        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type (graph id) " + type]).addEventListener("change", statementType.childNameListener);
     }
     
     statementType.childNameListener = function childNameListener(e) {
@@ -78,7 +88,7 @@ let workerInitializer = function workerInitializer() {
     pageType.showStatement = statementType.createLink = function createLink(page, extensionName = "statement") {
         pageType.createLink(page, extensionName);
         let link = page.guiLink, graph = page.graph;
-        for (let member of graph.members.items) if (member.id) link.dm("showMember", member.saveToAutosaveString());
+        for (let member of graph.members.items) if (member.id) link.dm("showMember", member.id, member.saveToAutosaveString());
         link.dm("canModify", graph.canModify());
         link.dm("setGraphId", graph.ui);
     }

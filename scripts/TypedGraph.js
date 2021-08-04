@@ -6,7 +6,7 @@ TypedGraph.protoModel.thisIs = "TypedGraph";
 
 TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
     let returner = Graph.newGraph(protoModel);
-    returner.addMember("cap element", returner.ui, memberProto).checkChildOrder = false;
+    returner.addMember(0, returner.ui, memberProto).checkChildOrder = false;
     returner.markGenesis();
     return returner;
 }

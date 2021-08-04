@@ -147,7 +147,7 @@ memberProto.setId = function setId(newId) {
 }
 
 memberProto.saveToAutosaveString = function saveToAutosaveString() {
-    let line = this.type + " " + this.name;
+    let line = this.name + " " + this.type;
     for (let childName in this.children) line += " " + childName + " " + this.children[childName];
     return line;
 }
