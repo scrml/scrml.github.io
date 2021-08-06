@@ -27,6 +27,7 @@ idManager.protoModel.addItem = function addItem(item) {
 idManager.protoModel.preErase = function preErase(id) {
     if (this.idName === "linkId") log("preErasing " + id);
     this.eraseThese.push(id);
+    this.items[id] = undefined;
 }
 
 idManager.protoModel.flushErase = function flushErase() {

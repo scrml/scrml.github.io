@@ -1,4 +1,4 @@
-let gui = scrmljs.gui,
+/*let gui = scrmljs.gui,
     scriptLoader = scrmljs.scriptLoader,
     filePrefix = scrmljs.filePrefix;
 
@@ -82,4 +82,4 @@ gui.linkedText = function linkedText(loadHere, manager, property) {
     let returner = {textNode: gui.text("", loadHere)};
     returner.cleanup = [manager.linkProperty(property, returner.textNode, "nodeValue")];
     return returner;
-}
+}*/

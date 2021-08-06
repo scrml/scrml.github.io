@@ -140,7 +140,8 @@ pageType.initializers.worker = function() {
         this.page.togglePage(open);
     }
     pageProto.eraseLink = function eraseLink() {
-        for (let unlink of this.unlinks) unlink();
+        for (let unlink of this.unlinks) unlink.unlink();
+        this.page.manager.flushEraseAll();
         linkProto.eraseLink.call(this);
     }
     pageProto.tryChangeName = function tryChangeName(newName) {

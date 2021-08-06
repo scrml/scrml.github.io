@@ -5,8 +5,8 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
-        varManager: "scripts/varManager.js",
         idManager: "scripts/idManager.js",
+        varManager: "scripts/varManager.js",
         overloadManager: "scripts/overloadManager.js",
         guiWorkerLink: "scripts/guiWorkerLink.js",
         page: "scripts/guiLinks/page.js",
@@ -16,8 +16,8 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
         statement: "scripts/guiLinks/statement.js"
     }, scripts: {
         generalFunctions: [],
-        varManager: [],
         idManager: ["generalFunctions"],
+        varManager: ["idManager"],
         overloadManager: [],
         guiWorkerLink: ["varManager", "idManager", "overloadManager"],
         page: ["guiWorkerLink"],

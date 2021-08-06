@@ -15,6 +15,6 @@
     display: block;
 }
 
-.simple[canmodify="false"] .newmembertype {
+.simple[canmodify="false"] .newmembertype, .simple[canmodify="false"] .newmembername {
     display: none;
 }
