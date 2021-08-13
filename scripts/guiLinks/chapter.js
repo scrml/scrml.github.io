@@ -88,6 +88,7 @@ let workerInitializer = function workerInitializer() {
         let page = this.page;
         for (let child of page.childPages) if (child.name === name) return this.dm("newPageFail", insertBefore);
         let newPage = newPageByType[pageType](name);
+        newPage.togglePage(true);
         newPage.moveTo(page, insertBefore === "none"? "none": mainLink.getLink(insertBefore).page, false);
         newPage.showPage(true);
     }

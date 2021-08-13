@@ -8,8 +8,11 @@ scrmljs.newVarManager = function newVarManager(protoModel = varManager.protoMode
 
 protoModel.setVarValue = function setVarValue(name, value) {
     if (!this.vars[name]) this.vars[name] = idManager.newManager("varManagerId");
-    this.vars[name].value = value;
-    for (let item of this.vars[name].items) item.updateValue(value);
+    let varPart = this.vars[name];
+    let oldValue = varPart.value;
+    if (oldValue === value) return;
+    varPart.value = value;
+    for (let item of varPart.items) item.updateValue(value, oldValue);
 }
 
 let updateValue = function updateValue(newValue) {this.object[this.property] = newValue};
@@ -35,7 +38,7 @@ protoModel.linkListener = function linkListener(varName, listener, fireWith = un
         unlink: unlink
     }
     this.vars[varName].addItem(adder);
-    if (typeof fireWith !== "undefined") listener(this.vars[varName].value, fireWith);
+    if (typeof fireWith !== "undefined") listener(this.vars[varName].value, undefined, fireWith);
     return adder;
 }
 

@@ -11,7 +11,7 @@ idManager.newManager = function newManager(idName = "id", protoModel = idManager
     returner.items = [];
     returner.idName = idName;
     returner.setIdName = "set"+capitalizeFirstLetter(idName);
-    returner.defaultSetIdName = function(id) {if (idName === "linkId") log("default setting " + id);this[returner.idName] = id};
+    returner.defaultSetId = function(id) {this[returner.idName] = id};
     returner.eraseThese = [];
     return returner;
 }
@@ -19,7 +19,7 @@ idManager.newManager = function newManager(idName = "id", protoModel = idManager
 idManager.protoModel.addItem = function addItem(item) {
     if (this.idName === "linkId") log("idManager adding linkId " + this.items.length);
     if (this.idName in item) throw Error("item already has property " + this.idName + ": " + item[this.idName]);
-    if (!item[this.setIdName]) item[this.setIdName] = this.defaultSetIdName;
+    if (!item[this.setIdName]) item[this.setIdName] = this.defaultSetId;
     item[this.setIdName](this.items.length);
     this.items.push(item);
 }
@@ -49,7 +49,7 @@ idManager.protoModel.flushErase = function flushErase() {
         }
         log("moving " + pullIndex + " to " + replace);
         items[replace] = items[pullIndex];
-        items[replace][setIdName](replace);
+        items[replace][setIdName](replace, pullIndex);
         --pullIndex;
     }
     items.splice(items.length - numErased);
@@ -67,7 +67,7 @@ idManager.protoModel.flushErasePreserveOrder = function flushErasePreserveOrder(
             continue;
         }
         if (eraseIndex !== 0) {
-            items[itemIndex][setIdName](itemIndex - eraseIndex);
+            items[itemIndex][setIdName](itemIndex - eraseIndex, itemIndex);
             items[itemIndex - eraseIndex] = items[itemIndex];
         }
         ++itemIndex;

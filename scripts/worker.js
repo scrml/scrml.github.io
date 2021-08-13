@@ -1,7 +1,7 @@
 function updateMessage(line) {postMessage(["errorOut", line])};
 
 // script setup
-let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGraph, functions = {}, scrmljs = {
+let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, TypedGraph, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
@@ -29,7 +29,7 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, TypedGra
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
     }, emptyFunction: function emptyFunction() {}, trueFunction: function() {return true}
-}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty, universe, allGraphs;
+}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty, allGraphs;
 
 scrmljs.importScript = function importScript(name, location, finished) {
     updateMessage("worker loading " + location);
@@ -74,8 +74,8 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
         mainLink.getIdManagerForLinks("linkId");
     });
     scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {
-        TypedGraph = scrmljs.Graph.TypedGraph;
-        universe = scrmljs.Graph.universe;
+        Graph = scrmljs.Graph;
+        TypedGraph = Graph.TypedGraph;
         allGraphs = scrmljs.Graph.allGraphs;
         initializeGraphProtoForWorker();
     });
@@ -412,8 +412,13 @@ function newStatement(name, nickname = "", protoModel = statementProto) {
 }
 
 statementProto.showPage = function showPage(show) {
-    pageProto.showPage.call(this, show);
     if (show === this.isVisible) return;
+    pageProto.showPage.call(this, show);
+    let graph = this.graph, members = graph.members.items;
+    if (show) for (let member of members) if (member.memberId) {
+        this.guiLink.dm("showMember", member.memberId, member.saveToAutosaveString());
+        for (let child of member.children.items) this.guiLink.dm("setChild", member.memberId, child.name, graph.member(child.memberId).name);
+    }
 }
 
 statementProto.deletePage = function deletePage() {
@@ -426,14 +431,14 @@ statementProto.showGraphId = function showGraphId(id) {
 }
 
 function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
-    let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(TypedGraph.memberProto);
+    let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto), universe = Graph.newGraph();
     
     graphProto.addMember = function addMember(name, type, memberProto = memberProtoModel) {
         let member = protoModel.addMember.call(this, name, type, memberProto);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("newMember", member.id, name, type);
-            let def = allGraphs[type], maxs = def.maximalTerms();
-            for (let child of maxs) this.page.guiLink.dm("openChild", member.id, child.name, child.type); 
+            this.page.guiLink.dm("newMember", member.memberId, name, type);
+            let def = allGraphs.items[type], maxs = def.maximalTerms();
+            for (let child of maxs) this.page.guiLink.dm("openChild", member.memberId, child.name, child.type); 
         }
         if (this.page) this.page.preSave();
         return member;
@@ -444,17 +449,15 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
         this.page.showGraphId(newUi);
     }
     
-    memberProtoModel.setChild = function setChild(name, id) {
-        TypedGraph.memberProto.setChild.call(this, name, id);
+    memberProtoModel.setChild = function setChild(name, memberId) {
+        graphProto.memberProto.setChild.call(this, name, memberId);
         let graph = this.graph;
-        if (graph.page && graph.page.isVisible) {
-            graph.page.guiLink.dm("setChild", this.id, name, id);
-        }
+        if (graph.page && graph.page.isVisible) graph.page.guiLink.dm("setChild", this.memberId, name, graph.member(memberId).name);
         graph.page.preSave();
     }
     
     memberProtoModel.setName = function setName(name) {
         TypedGraph.memberProto.setName.call(this, name);
-        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setName", this.id, name);
+        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setName", this.memberId, name);
     }
 }

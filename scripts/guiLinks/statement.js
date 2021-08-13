@@ -39,7 +39,7 @@ let hostInitializer = function hostInitializer() {
     statementProto.newMember = function newMember(memberId, name, type) {
         this.simple.removeAttribute("genesis");
         let member = gui.element("div", this.members, ["class", "member", "memberid", memberId]);
-        gui.textShell("member " + memberId + ": " + name + " type " + type, "p", member, ["class", "membertitle"]);
+        gui.textShell("member " + memberId + ": " + name + ", type " + type, "p", member, ["class", "membertitle"]);
         gui.element("div", member, ["class", "children"]);
     }
     
@@ -62,11 +62,11 @@ let hostInitializer = function hostInitializer() {
         link.dm("setChild", e.target.parentElement.getAttribute("memberid"), e.target.getAttribute("childname"), e.target.value);
     }
     
-    statementProto.setChild = function setChild(memberId, childName, childId) {
+    statementProto.setChild = function setChild(memberId, childName, childMemberName) {
         let input = this.members.querySelector("[memberid=\""+memberId+"\"] [childName=\""+childName+"\"]");
         input.setAttribute("disabled", "");
         input.setAttribute("disguise", "");
-        input.value = "child " + childName + " is " + childId;
+        input.value = "child " + childName + " is " + childMemberName;
     }
     
     statementProto.setGraphId = function setGraphId(id) {
@@ -98,8 +98,8 @@ let workerInitializer = function workerInitializer() {
     statementProto.newMember = function newMember(name, type) {
         this.page.graph.addMember(name, type);
     }
-    statementProto.setChild = function setChild(memberId, childName, childId) {
-        this.page.graph.member(memberId).setChild(childName, childId);
+    statementProto.setChild = function setChild(memberId, childName, childMemberName) {
+        this.page.graph.member(memberId).setChild(childName, this.page.graph.membersByName[childMemberName]);
     }
 }
 
