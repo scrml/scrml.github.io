@@ -42,7 +42,7 @@ protoModel.linkListener = function linkListener(varName, listener, fireWith = un
     return adder;
 }
 
-protoModel.unlink = function unlink(varName, id) {this.vars[varName].preErase(id)}
+protoModel.unlink = function unlink(varName, adder) {this.vars[varName].preErase(adder.id)}
 protoModel.flushErase = function flushErase(varName) {this.vars[varName].flushErase()}
 protoModel.flushEraseAll = function flushEraseAll() {for (let varName in this.vars) this.flushErase(varName)}
 protoModel.deleteVar = function deleteVar(name) {delete this.vars[name]}

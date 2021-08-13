@@ -2,11 +2,17 @@
 let Graph = scrmljs.Graph = {}, idManager = scrmljs.idManager, newVarManager = scrmljs.newVarManager, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction;
 
 Graph.allGraphs = idManager.newManager("ui");
+Graph.graph = function graph(ui) {
+    if (!Graph.allGraphs.items[ui]) throw Error("cannot find graph " + ui);
+    return Graph.allGraphs.items[ui];
+};
 
 Graph.protoModel = {thisIs: "Graph"};// object to be used as prototype of instances of graph
     
 Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     let returner = Object.create(protoModel), manager = returner.manager = newVarManager();
+    returner.usesTypes = {};
+    returner.usedByTypes = {};
     // override setUi, the prototype wants to update the manager but the manager can't be initialized yet
     returner.setUi = function(ui) {this.ui = ui};
     Graph.allGraphs.addItem(returner);
@@ -18,10 +24,11 @@ Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     return returner;
 }
 
-Graph.protoModel.usesTypes = function usesTypes() {
-    let returner = {};
-    for (let member of this.members.items) returner[member.type] = undefined;
-    return returner;
+Graph.copyOf = function copyOf(graph, protoModel = graph.prototype) {
+    let returner = Graph.newGraph(protoModel);
+    // Add all the members first then set children. We don't want to claim a child which hasn't been born yet!
+    for (let member of this.members.items) returner.addMember(member.name, member.type);
+    for (let member of this.members.items) for (let child of member.children.items) returner.membersByName[member.name].setChild(child.name, returner.membersByName[graph.member(child.memberId).name]);
 }
 Graph.protoModel.usesType = function usesType(type) {
     for (let member of this.members.items) if (member.type == type) return true;
@@ -32,6 +39,7 @@ Graph.protoModel.canDelete = trueFunction;
 
 Graph.protoModel.deleteGraph = function deleteGraph() {
     if (!this.canDelete()) throw Error("cannot delete graph");
+    for (let ui in this.usesTypes) delete Graph.graph(ui).usedByTypes[this.ui];
     Graph.allGraphs.preErase(this.ui);
 }
 
@@ -41,12 +49,15 @@ let memberProto = Graph.protoModel.memberProto = {}, childProto = memberProto.ch
 Graph.protoModel.addMember = function addMember(name, type, protoModel = this.memberProto) {
     if (!this.canModify()) throw Error("cannot modify graph");
     if (name in this.membersByName) throw Error("already have a member named " + name);
+    let typeGraph = Graph.graph(type);
     let member = Object.create(protoModel);
     member.graph = this;
     let manager = member.manager = newVarManager();
+    member.unlinks = [];
     manager.setVarValue("name", name);
     manager.linkProperty("name", member);
-    member.type = type;
+    member.unlinks.push(typeGraph.manager.linkListener("ui", function(newUi) {manager.setVarValue("type", newUi)}, true));
+    manager.linkProperty("type", member);
     // children is an idManager list of (name, memberId) pairs
     member.children = idManager.newManager("childId");
     member.childrenByName = {};
@@ -55,6 +66,8 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
     this.members.addItem(member);
     this.membersByName[name] = member.memberId;
     member.originalId = member.id;
+    typeGraph.usedByTypes[this.ui] = undefined;
+    this.usesTypes[type] = undefined;
     this.saveStringChangedHook();
     return member;
 }
@@ -95,9 +108,16 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
     }
 }
 
+// check if I have all the required types to create a new term
+Graph.protoModel.canFit = function canFit(graph) {
+    for (let required in graph.usesTypes) if (!(required in this.usesTypes)) return false;
+    return true;
+}
+
 Graph.protoModel.canModify = trueFunction;
 Graph.protoModel.setUi = function setUi(ui) {this.manager.setVarValue("ui", ui)}
 Graph.protoModel.member = function member(id) {return this.members.items[id]}
+Graph.protoModel.memberByName = function memberByName(name) {return this.member(this.membersByName[name])}
 Graph.protoModel.eraseMember = function eraseMember(id) {this.member(id).deleteMember()}
 Graph.protoModel.saveStringChangedHook = emptyFunction;
 
@@ -147,25 +167,30 @@ memberProto.notifyFamilyUpdate = emptyFunction;
 memberProto.deleteMember = function deleteMember() {
     if (!this.canDelete()) throw Error("cannot delete member");
     let graph = this.graph, members = graph.members, myType = this.type, inUse = false;
-    for (let d in this.descendants) delete graph.member(d).ancestors[this.ui];
-    for (let member of members.items) inUse = inUse || (member.type == myType && member.id !== this.id);
+    for (let d in this.descendants) delete graph.member(d).ancestors[this.memberId];
     members.preErase(this.id);
     members.flushErasePreserveOrder();
+    for (let member of members.items) inUse = inUse || (member.type == myType);
+    if (!inUse) {
+        delete graph.usesType[myType];
+        delete Graph.graph(myType).usedByTypes[graph.ui];
+    }
 }
 
 // to be called by the idManager only
 memberProto.setMemberId = function setMemberId(newMemberId, oldMemberId) {
     let graph = this.graph, members = graph.members.items;
     this.memberId = newMemberId;
-    if (typeof oldMemberId === "undefined") return;
-    for (let member of members) {
-        for (let child of member.children.items) if (child.memberId == oldMemberId) child.memberId = newMemberId;
-        if (oldMemberId in member.ancestors) {
-            member.ancestors[newMemberId] = undefined;
-            delete member.ancestors[oldMemberId];
-        } else if (oldMemberId in member.descendants) {
-            member.descendants[newMemberId] = undefined;
-            delete member.descendants[oldMemberId];
+    if (typeof oldMemberId !== "undefined") {
+        for (let member of members) {
+            for (let child of member.children.items) if (child.memberId == oldMemberId) child.memberId = newMemberId;
+            if (oldMemberId in member.ancestors) {
+                member.ancestors[newMemberId] = undefined;
+                delete member.ancestors[oldMemberId];
+            } else if (oldMemberId in member.descendants) {
+                member.descendants[newMemberId] = undefined;
+                delete member.descendants[oldMemberId];
+            }
         }
     }
     graph.membersByName[this.name] = newMemberId;

@@ -37,12 +37,6 @@ TypedGraph.protoModel.usesTypes = function usesTypes() {
     return returner;
 }*/
 
-// can this graph fit a term of that type, doesn't look at shape
-TypedGraph.protoModel.canFit = function canFit(graph) {
-    for (let required in graph.usesTypes()) if (!this.usesType(required)) return false;
-    return true;
-}
-
 /*TypedGraph.protoModel.allHomomorphismsFromGraph = function allHomomorphismsFromGraph(graph) {
     
 }*/
@@ -52,7 +46,7 @@ TypedGraph.protoModel.isGenesis = function isGenesis() {return this.members.item
 // type is the definition graph, term is the term currently being checked in this graph, template is the corresponding term in the definition
 TypedGraph.protoModel.checkTerm = function checkTerm(type, term, template, encountered) {
     let member = this.member(term), inType = type.member(template);
-    if (!(type === Graph.allGraphs[member.type])) throw Error("cannot find type " + member.type + " from " + term);
+    if (!(type === Graph.graph(member.type))) throw Error("cannot find type " + member.type + " from " + term);
     // check that types are the same
     if (member.type !== inType.type) throw Error("type of " + term + " is " + member.type + " but it should be " + inType.type);
     // check that the required descendant sctructure is present
@@ -67,5 +61,5 @@ TypedGraph.protoModel.checkTerm = function checkTerm(type, term, template, encou
 }
 // check that the terms in this typed graph match their types
 TypedGraph.protoModel.checkMatchType = function checkMatchType() {
-    for (let term of this.members.items) if (term.memberId === 0) continue; else this.checkTerm(Graph.allGraphs[term.type], term.memberId, 0, {});
+    for (let term of this.members.items) if (term.memberId === 0) continue; else this.checkTerm(Graph.graph(term.type), term.memberId, 0, {});
 }

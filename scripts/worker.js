@@ -29,7 +29,7 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, T
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
     }, emptyFunction: function emptyFunction() {}, trueFunction: function() {return true}
-}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty, allGraphs;
+}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty;
 
 scrmljs.importScript = function importScript(name, location, finished) {
     updateMessage("worker loading " + location);
@@ -76,7 +76,6 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
     scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {
         Graph = scrmljs.Graph;
         TypedGraph = Graph.TypedGraph;
-        allGraphs = scrmljs.Graph.allGraphs;
         initializeGraphProtoForWorker();
     });
     scriptLoader.addEphemeralListener(function() {
@@ -437,7 +436,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
         let member = protoModel.addMember.call(this, name, type, memberProto);
         if (this.page && this.page.isVisible) {
             this.page.guiLink.dm("newMember", member.memberId, name, type);
-            let def = allGraphs.items[type], maxs = def.maximalTerms();
+            let def = Graph.graph(type), maxs = def.maximalTerms();
             for (let child of maxs) this.page.guiLink.dm("openChild", member.memberId, child.name, child.type); 
         }
         if (this.page) this.page.preSave();

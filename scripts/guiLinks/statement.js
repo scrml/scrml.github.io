@@ -54,7 +54,7 @@ let hostInitializer = function hostInitializer() {
     }
     
     statementProto.openChild = function openChild(memberId, name, type) {
-        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type (graph id) " + type]).addEventListener("change", statementType.childNameListener);
+        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type " + type]).addEventListener("change", statementType.childNameListener);
     }
     
     statementType.childNameListener = function childNameListener(e) {
