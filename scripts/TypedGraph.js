@@ -1,12 +1,13 @@
 // Typed graphs are the structures of statements as graphs. Added functionality over Graph is type matching and the root element
-let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, subset = scrmljs.subset;
+let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, subset = scrmljs.subset, universeProto, universe;
 
 TypedGraph.protoModel = Object.create(Graph.protoModel);
 TypedGraph.protoModel.thisIs = "TypedGraph";
 
 TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
     let returner = Graph.newGraph(protoModel);
-    returner.addMember(0, returner.ui, memberProto).checkChildOrder = false;
+    returner.addMember(0, returner.ui, memberProto);
+    returner.isInUniverse = false;
     return returner;
 }
 
@@ -62,4 +63,21 @@ TypedGraph.protoModel.checkTerm = function checkTerm(type, term, template, encou
 // check that the terms in this typed graph match their types
 TypedGraph.protoModel.checkMatchType = function checkMatchType() {
     for (let term of this.members.items) if (term.memberId === 0) continue; else this.checkTerm(Graph.graph(term.type), term.memberId, 0, {});
+}
+
+universeProto = TypedGraph.universeProto = Object.create(Graph.protoModel);
+universe = TypedGraph.universe = Graph.newGraph(universeProto);
+
+TypedGraph.protoModel.putInUniverse = function putInUniverse(putIn) {
+    if (this.isInUniverse == putIn) return;
+    this.isInUniverse = putIn;
+    if (putIn) {
+        universe.addMember(this.ui, this.ui);
+    } else {
+        universe.member(universe.membersByName[this.ui]).deleteMember();
+    }
+}
+
+TypedGraph.protoModel.setUi = function setUi(newUi, oldUi) {
+    Graph.protoModel.setUi.call(this, newUi, oldUi);
 }

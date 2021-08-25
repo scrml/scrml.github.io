@@ -6,6 +6,7 @@ gui.button = function button(text, loadHere, onclick, atts, insertBefore) {
     if (onclick) returner.addEventListener("click", onclick);
     return returner;
 }
+
 gui.hoverButton = function hoverButton(text, loadHere, onclick, spanAtts) {
     let returner = {};
     returner.button = gui.element("button", loadHere, ["class", "hoverHide"]);

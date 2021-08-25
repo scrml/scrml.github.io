@@ -24,18 +24,13 @@ Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     return returner;
 }
 
-Graph.copyOf = function copyOf(graph, protoModel = graph.prototype) {
-    let returner = Graph.newGraph(protoModel);
-    // Add all the members first then set children. We don't want to claim a child which hasn't been born yet!
-    for (let member of this.members.items) returner.addMember(member.name, member.type);
-    for (let member of this.members.items) for (let child of member.children.items) returner.membersByName[member.name].setChild(child.name, returner.membersByName[graph.member(child.memberId).name]);
-}
 Graph.protoModel.usesType = function usesType(type) {
     for (let member of this.members.items) if (member.type == type) return true;
     return false;
 }
+
 Graph.protoModel.isEmpty = function isEmpty() {return this.members.items.length === 0}
-Graph.protoModel.canDelete = trueFunction;
+Graph.protoModel.canDelete = function canDelete() {return isEmpty(this.usedByTypes)}
 
 Graph.protoModel.deleteGraph = function deleteGraph() {
     if (!this.canDelete()) throw Error("cannot delete graph");
@@ -47,7 +42,6 @@ let memberProto = Graph.protoModel.memberProto = {}, childProto = memberProto.ch
 
 // The only place a member is stored is in the graph's members manager. Everywhere else members are referred to by memberId.
 Graph.protoModel.addMember = function addMember(name, type, protoModel = this.memberProto) {
-    if (!this.canModify()) throw Error("cannot modify graph");
     if (name in this.membersByName) throw Error("already have a member named " + name);
     let typeGraph = Graph.graph(type);
     let member = Object.create(protoModel);
@@ -72,6 +66,11 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
     return member;
 }
 
+Graph.protoModel.canAddMember = function canAddMember(name, type) {
+    if (!this.canModify()) return false;
+    if (name in this.membersByName) return false;
+}
+
 {
     let relate = function relate(members, old, young) {
         let oldM = members[old], youngM = members[young], omd = oldM.descendants, oma = oldM.ancestors, ymd = youngM.descendants, yma = youngM.ancestors;
@@ -88,11 +87,11 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
         // the only ones which could possibly change are the members given and their families so collect these
         for (let member of theseMembers) {
             relevants[member] = undefined;
-            for (let ancestor in members.member(member).ancestors) relevants[ancestor] = undefined;
-            for (let descendant in members.member(member).descendants) relevants[descendant] = undefined;
+            for (let ancestor in members.items[member].ancestors) relevants[ancestor] = undefined;
+            for (let descendant in members.items[member].descendants) relevants[descendant] = undefined;
         }
         // get the members instead of just their ids
-        for (let member in relevants) relevants[member] = members.member(member);
+        for (let member in relevants) relevants[member] = members.items[member];
         // reset the families of the relevant members
         for (let member in relevants) {
             member = relevants[member];
@@ -102,7 +101,7 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
         // relate all the relevant members
         for (let member in relevants) {
             member = relevants[member];
-            for (let childName of member.children.items) relate(members, member.memberId, childName.memberId);
+            for (let childName of member.children.items) relate(members.items, member.memberId, childName.memberId);
         }
         for (let member in relevants) relevants[member].notifyFamilyUpdate();
     }
@@ -135,10 +134,11 @@ memberProto.moveInByName = function moveInByName(name, oldName) {
     byName[name] = this.id;
 }
 
+// Set child named childName to childMemberId. If I already have a child named childName I first unset then child. Then I reset my own ancestry to check for cycles.
 memberProto.setChild = function setChild(childName, childMemberId, protoModel = this.childProto) {
     let graph = this.graph, members = graph.members.items;
     if (!members[childMemberId]) throw Error(childMemberId + " is not a member of graph " + graph.ui);
-    if (childName in this.childrenByName) throw Error("already have a child named " + childName);
+    if (childName in this.childrenByName) this.unsetChild(childName);
     let child = Object.create(protoModel);
     let manager = child.manager = newVarManager();
     manager.setVarValue("name", childName);
@@ -146,8 +146,15 @@ memberProto.setChild = function setChild(childName, childMemberId, protoModel = 
     manager.setVarValue("memberId", childMemberId);
     manager.linkProperty("memberId", child);
     this.children.addItem(child);
-    graph.resetAncestry();
+    graph.resetAncestry(this.memberId);
     graph.saveStringChangedHook();
+}
+
+// check if setting this child is allowed, i.e. won't introduce any cycles
+memberProto.canSetChild = function canSetChild(childName, childMemberId) {
+    if (this.memberId == childMemberId) return false;
+    let graph = this.graph, newChild = graph.member(childMemberId);
+    for (let child of this.children.items) if (child.name !== childName && (childMemberId in graph.member(child.memberId).descendants)) return false;
 }
 
 memberProto.unsetChild = function unsetChild(childName) {
@@ -170,6 +177,7 @@ memberProto.deleteMember = function deleteMember() {
     for (let d in this.descendants) delete graph.member(d).ancestors[this.memberId];
     members.preErase(this.id);
     members.flushErasePreserveOrder();
+    delete graph.membersByName[this.name];
     for (let member of members.items) inUse = inUse || (member.type == myType);
     if (!inUse) {
         delete graph.usesType[myType];

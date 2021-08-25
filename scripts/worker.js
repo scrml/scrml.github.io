@@ -204,9 +204,9 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
             break; case "statement":
                 page = newStatement(lines[1], lines[2]);
                 graph = page.graph;
-                let numMembers = lines[4];
+                let inUniverse = lines[4], numMembers = lines[5];
                 for (let memberId = 1; memberId < numMembers; ++memberId) {
-                    let subLines = lines[memberId + 5].split("\t");
+                    let subLines = lines[memberId + 6].split("\t");
                     while (subLines[subLines.length] === "\t") subLines.pop();
                     // subLines[0] is the name, type, and children
                     let memberLines = subLines[0].split(" ");
@@ -216,6 +216,7 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
                         member.setChild(memberLines[childIndex], memberLines[childIndex+1]);
                     }
                 }
+                graph.putInUniverse(inUniverse === "i");
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }
@@ -385,7 +386,8 @@ chapterProto.saveToAutosaveString = function saveToAutosaveString() {
 }
 
 statementProto.saveToAutosaveString = function saveToAutosaveString() {
-    return pageProto.saveToAutosaveString.call(this) + "\n" + this.graph.saveToAutosaveString();
+    let graph = this.graph;
+    return pageProto.saveToAutosaveString.call(this) + "\n" + (graph.isInUniverse? "i": "o") + "\n" + graph.saveToAutosaveString();
 }
 
 pageProto.canDelete = trueFunction;
@@ -413,10 +415,13 @@ function newStatement(name, nickname = "", protoModel = statementProto) {
 statementProto.showPage = function showPage(show) {
     if (show === this.isVisible) return;
     pageProto.showPage.call(this, show);
-    let graph = this.graph, members = graph.members.items;
-    if (show) for (let member of members) if (member.memberId) {
-        this.guiLink.dm("showMember", member.memberId, member.saveToAutosaveString());
-        for (let child of member.children.items) this.guiLink.dm("setChild", member.memberId, child.name, graph.member(child.memberId).name);
+    let graph = this.graph, members = graph.members.items, guiLink = this.guiLink;
+    if (show) {
+        for (let member of members) if (member.memberId) {
+            guiLink.dm("showMember", member.memberId, member.saveToAutosaveString());
+            for (let child of member.children.items) guiLink.dm("setChild", member.memberId, child.name, graph.member(child.memberId).name);
+        }
+        guiLink.dm("isInUniverse", graph.isInUniverse);
     }
 }
 
@@ -430,7 +435,7 @@ statementProto.showGraphId = function showGraphId(id) {
 }
 
 function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
-    let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto), universe = Graph.newGraph();
+    let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto);
     
     graphProto.addMember = function addMember(name, type, memberProto = memberProtoModel) {
         let member = protoModel.addMember.call(this, name, type, memberProto);
@@ -457,6 +462,15 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     
     memberProtoModel.setName = function setName(name) {
         TypedGraph.memberProto.setName.call(this, name);
-        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setName", this.memberId, name);
+        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setMemberName", this.memberId, name);
+    }
+    
+    graphProto.putInUniverse = function putInUniverse(putIn) {
+        if (this.isInUniverse == putIn) return;
+        TypedGraph.protoModel.putInUniverse.call(this, putIn);
+        let page = this.page;
+        page.preSave();
+        if (!page.isVisible) return;
+        page.guiLink.dm("isInUniverse", putIn);
     }
 }

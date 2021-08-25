@@ -18,6 +18,7 @@ let hostInitializer = function hostInitializer() {
         page.newMemberType = gui.element("input", page.simple, ["class", "newmembertype", "type", "number", "min", "1", "disguise", "", "placeholder", "type (graph id)"]);
         page.newMemberButton = gui.button("Create", page.simple, statementType.newMemberEntered, ["class", "newmembertype"]);
         page.graphIdSpan = gui.textShell("graph id", "span", page.pageHead, [], page.pageTools);
+        page.inUniverseButton = gui.button("Insert into universe", page.pageTools, statementType.inUniverseListener, [], page.moveButton);
     }
     
     statementType.newMemberEntered = function newMemberEntered(e) {
@@ -73,8 +74,17 @@ let hostInitializer = function hostInitializer() {
         this.graphIdSpan.firstChild.nodeValue = "graph id: " + id;
     }
     
-    statementProto.setName = function setName(memberId, name) {
+    statementProto.setMemberName = function setMemberName(memberId, name) {
         //this.simple.querySelector("[memberid=\""+memberId+"\"] .newmembername").value = name;
+    }
+    
+    statementType.inUniverseListener = function inUniverseToggle(e) {
+        let link = pageType.getLinkFromEvent(e);
+        link.dm("inUniverse", link.inUniverseButton.textContent === "Insert into universe");
+    }
+    
+    statementProto.isInUniverse = function isInUniverse(isIn) {
+        this.inUniverseButton.textContent = isIn? "Remove from universe": "Insert into universe";
     }
 }
 
@@ -100,6 +110,11 @@ let workerInitializer = function workerInitializer() {
     }
     statementProto.setChild = function setChild(memberId, childName, childMemberName) {
         this.page.graph.member(memberId).setChild(childName, this.page.graph.membersByName[childMemberName]);
+    }
+    statementProto.inUniverse = function inUniverse(putIn) {
+        let graph = this.page.graph;
+        if (graph.isInUniverse == putIn) return;
+        else graph.putInUniverse(putIn);
     }
 }
 

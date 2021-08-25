@@ -157,5 +157,6 @@ pageType.initializers.worker = function() {
     }
     pageProto.deletePage = function deletePage() {
         this.page.deletePage();
+        Graph.allGraphs.flushErasePreserveOrder();
     }
 }

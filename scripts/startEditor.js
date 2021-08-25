@@ -9,6 +9,8 @@ let scriptLoader = scrmljs.scriptLoader,
     worker, 
     workerFunctions = {log: console.log},
     loadingScreen,
+    xml,
+    fileConversion,
     bothInitialized = {editor: false, worker: false};
 
 scrmljs.lockedPageFocus = false;
@@ -30,7 +32,11 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
 scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapter.js");
 scriptLoader.ensureJS("statement", ["page"], filePrefix + "scripts/guiLinks/statement.js");
-scriptLoader.ensureJS("jax");
+//scriptLoader.ensureJS("jax");
+scriptLoader.ensureJS("xml");
+scriptLoader.items.xml.addEphemeralListener("js", function() {xml = scrmljs.xml});
+scriptLoader.ensureJS("fileConversion", ["storage", "xml", "gui"]);
+scriptLoader.items.fileConversion.addEphemeralListener("js", function() {fileConversion = scrmljs.fileConversion});
 scriptLoader.addEphemeralListener(function start() {
     // Loading screen setup: Loading screen opens any time the worker is told to do something, blocking the gui from taking input while the worker processes its thing. Its message is updated any time the worker responds. If the loading screen is ever up long enough for the user to see it, this will keep the message changing as things happen and will show no change if something gets stuck. There is an inactivity timer tied to the loading screen too, if the loading screen is unused for long enough then the timer fires an inactivity function.
     
@@ -111,7 +117,10 @@ switch (1) {
             while (line = storage.fetch("page " + pn++)) lineOut += "\npage " + (pn-1) + ":\n"+line;
             document.getElementById("errorout").textContent = lineOut;
         });
-    break;
+    break; case 2:
+        setDebugAction(function() {
+            document.getElementById("errorout").textContent = xml.nodeToString(fileConversion.autosaveToDoc());
+        })
 }
 
 // configuration parameters

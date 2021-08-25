@@ -11,6 +11,7 @@ idManager.newManager = function newManager(idName = "id", protoModel = idManager
     returner.items = [];
     returner.idName = idName;
     returner.setIdName = "set"+capitalizeFirstLetter(idName);
+    // this isn't on the prototype chain because it's a function meant to be called on items, not on idManager, and the items don't necessarily know about the idManager so can't access returner.idName
     returner.defaultSetId = function(id) {this[returner.idName] = id};
     returner.eraseThese = [];
     return returner;
