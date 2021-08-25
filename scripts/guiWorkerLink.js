@@ -45,11 +45,8 @@ protoModel.getIdManagerForLinks = function getIdManagerForLinks(idName = "linkId
     let manager = this.links = idManager.newManager(idName);
     this.eraseLink = this.eraseManagedLink;
     this.getLink = this.getManagedLink;
-    manager.defaultSetId = function(id) {
-        if (typeof this[idName] !== "undefined") {
-            //console.log("setting linkId from " + this.linkId + " to " + id);
-            this.dm(manager.setIdName, id);
-        }
+    manager.defaultSetId = function(id, oldId) {
+        if (typeof oldId !== "undefined") this.dm(manager.setIdName, id, oldId);
         this[idName] = id;
     }
 }
