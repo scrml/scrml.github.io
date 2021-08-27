@@ -78,7 +78,7 @@ let hostInitializer = function hostInitializer() {
                 link.newMemberButton.setAttribute("disabled", "");
                 return gui.messages.inputText(input, "choose the full name first");
             }
-            input.setAttribute("title", link.typeNames[input.value]);
+            input.setAttribute("title", link.typeNames[input.value].fullName);
             if (link.newMemberName.value !== "") link.newMemberButton.removeAttribute("disabled");
             input.blur();
         }
@@ -128,7 +128,7 @@ let hostInitializer = function hostInitializer() {
     }
     
     statementProto.openChild = function openChild(memberId, name, type) {
-        gui.element("input", this.members.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type " + type]).addEventListener("change", statementType.childNameListener);
+        gui.element("input", this.membersDiv.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type " + type]).addEventListener("change", statementType.childNameListener);
     }
     
     statementType.childNameListener = function childNameListener(e) {
@@ -137,7 +137,7 @@ let hostInitializer = function hostInitializer() {
     }
     
     statementProto.setChild = function setChild(memberId, childName, childMemberName) {
-        let input = this.members.querySelector("[memberid=\""+memberId+"\"] [childName=\""+childName+"\"]");
+        let input = this.membersDiv.querySelector("[memberid=\""+memberId+"\"] [childName=\""+childName+"\"]");
         input.setAttribute("disabled", "");
         input.setAttribute("disguise", "");
         input.value = "child " + childName + " is " + childMemberName;
@@ -185,6 +185,7 @@ let workerInitializer = function workerInitializer() {
         let graph = this.page.graph;
         this.dm("setTypeName", graph.usesTypes[member.type], Graph.graph(member.type).page.fullName);
         this.dm("newMember", member.name, graph.usesTypes[member.type]);
+        for (let max of Graph.graph(member.type).maximalTerms()) console.log(max);
     }
     statementProto.setChild = function setChild(memberId, childName, childMemberName) {
         this.page.graph.member(memberId).setChild(childName, this.page.graph.membersByName[childMemberName]);

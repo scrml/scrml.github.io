@@ -500,7 +500,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     graphProto.addMember = function addMember(name, type, typeName, memberProto = memberProtoModel) {
         let member = protoModel.addMember.call(this, name, type, typeName, memberProto);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("newMember", name, type, typeName);
+            this.page.guiLink.dm("newMember", name, typeName);
             let def = Graph.graph(type), maxs = def.maximalTerms();
             for (let child of maxs) this.page.guiLink.dm("openChild", member.memberId, child.name, child.type); 
         }
