@@ -6,6 +6,9 @@ let scriptLoader = scrmljs.scriptLoader,
     guiWorkerLink,
     root,
     pageLinks = {},
+    fullPageNameOptions = scrmljs.fullPageNameOptions = {},
+    fullPageNameOptionsByName = scrmljs.fullPageNameOptionsByName = {},
+    allFullPageNames = scrmljs.allFullPageNames = document.getElementById("allfullpagenames"),
     worker, 
     workerFunctions = {log: console.log},
     loadingScreen,
@@ -95,7 +98,7 @@ scriptLoader.addEphemeralListener(function start() {
 });
 
 // DOM elements
-let editor = scrmljs.editor = document.body.querySelector(".editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton");
+let editor = scrmljs.editor = document.body.querySelector(".editor"), nameModeButton = document.getElementById("nodenamemode"), nicknameModeButton = document.getElementById("nicknamemode"), debugButton = document.getElementById("debugbutton"), importButton = document.getElementById("importbutton"), exportbutton = document.getElementById("exportbutton");
 
 let setDebugAction = function setDebugAction(action) {
     debugButton.setAttribute("title", action.toString());
@@ -125,6 +128,10 @@ switch (1) {
 
 // configuration parameters
 let smoothDuration = .3, newPageHeight;
+
+// io buttons
+importButton.addEventListener("click", importSCRMLFileFromUser);
+exportbutton.addEventListener("click", function() {post("exportSCRMLFile")});
 
 // page display mode section
 let pageNumberListener = function(e) {editor.setAttribute("pagenumbermode", e.target.getAttribute("id"))}
@@ -161,6 +168,42 @@ workerFunctions.changeLinkId = function changeLinkId(oldId, newId) {
     guiWorkerLink.links[oldId].setLinkId(newId);
 }
 
+workerFunctions.newPage = function newPage(pageId, pageType) {
+    let option;
+    switch (pageType) {
+        case "statement": 
+            option = fullPageNameOptions[pageId] = gui.element("option", allFullPageNames, ["value", "full page name here", "pageid", pageId]);
+        break;
+    }
+}
+
+workerFunctions.changePageId = function changePageId(newId, oldId) {
+    let option = fullPageNameOptions[oldId];
+    delete fullPageNameOptions[oldId];
+    fullPageNameOptions[newId] = option;
+    option.setAttribute("pageid", newId);
+    storage.move("page " + oldId, "page " + newId);
+}
+
+scrmljs.getPageIdFromFullName = function getPageIdFromFullName(fullName) {
+    return fullPageNameOptionsByName[fullName].getAttribute("pageid");
+}
+
+workerFunctions.deletePage = function deletePage(pageId) {
+    let option = fullPageNameOptions[pageId];
+    gui.orphan(option);
+    delete fullPageNameOptions[pageId];
+    delete fullPageNameOptionsByName[option.value];
+    storage.erase("page " + pageId);
+}
+
+workerFunctions.fullPageNameUpdate = function fullPageNameUpdate(pageId, fullPageName) {
+    let option = fullPageNameOptions[pageId];
+    delete fullPageNameOptionsByName[option.value];
+    option.value = fullPageName;
+    fullPageNameOptionsByName[fullPageName] = option;
+}
+
 workerFunctions.smoothMode = function smoothMode(smoothMode) {
     scrmljs.doSmoothly = smoothMode;
 }
@@ -169,17 +212,37 @@ workerFunctions.savePage = function save(pageId, line) {
     storage.store("page " + pageId, line);
 }
 
-workerFunctions.moveAutosaveEntry = function moveAutosaveEntry(oldPageId, newPageId) {
-    storage.move("page " + oldPageId, "page " + newPageId);
-}
-
-workerFunctions.deleteAutosaveEntry = function deleteAutosaveEntry(pageId) {
-    storage.erase("page " + pageId);
-}
-
 workerFunctions.errorOut = function errorOut(message) {
     document.getElementById("errorout").textContent = message;
 }
+
+// this file io will eventually be moved into a gui module
+
+function importSCRMLFileFromUser() {
+    let input = gui.element("input", importButton.parentElement, ["type", "file", "hide", ""], importButton);
+    input.addEventListener("change", function() {
+        importSCRMLFile(input.files[0]);
+        gui.orphan(input);
+    });
+    input.click();
+}
+
+function importSCRMLFile(file) {
+    workerFunctions.errorOut("file import still under construction");
+}
+
+function saveTextFile(fileLine, fileName, fileExtension = ".scrml", fileType = "text/xml") {
+    if (1>0) return document.getElementById("errorout").textContent = fileLine;
+    let file = new File([fileLine], fileName+fileExtension, {type: fileType});
+    // make and click an appropriate download link
+    let url = URL.createObjectURL(file);
+    let a = gui.element("a", document.body, ["href", url, "download", ""]);
+    gui.text("download link", a);
+    a.click();
+    gui.orphan(a);
+}
+
+workerFunctions.saveTextFile = saveTextFile;
 
 let onInactivity = function onInactivity() {
     

@@ -153,30 +153,6 @@ input[type="button"][disguise] {
     outline-color: rgba(0,0,0,0);
 }
 
-.popup {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    padding: 1%;
-    padding-bottom: 2em;
-    margin: 1%;
-    min-height: 25%;
-    min-width: 25%;
-    background-color: rgb(235, 255, 230);
-    border: 5px double green;
-    border-radius: 7px;
-    z-index: 10000;
-}
-
-.popup .closeButton {
-    position: absolute;
-    bottom: 3%;
-    left: 0;
-    right: 0;
-    margin: auto;
-    width: 50%;
-}
-
 @keyframes highlightFlashing {
     0% {
         background-color: rgb(180, 200, 60);
@@ -204,8 +180,12 @@ input[type="button"][disguise] {
     animation-iteration-count: infinite;
 }
 
-label > input {
-    margin-left: 1em;
+label {
+    margin-right: 1ex;
+}
+
+label::after {
+    content: ":";
 }
 
 .infoInSummary {
@@ -222,6 +202,10 @@ input.infoInSummary {
 
 .floatRight {
     float: right;
+}
+
+table {
+    border-collapse: collapse;
 }
 
 .quarterBox {

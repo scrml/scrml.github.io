@@ -18,3 +18,29 @@
 .simple[canmodify="false"] .newmembertype, .simple[canmodify="false"] .newmembername {
     display: none;
 }
+
+.simple[genesis] .typenames, .simple[genesis] .members {
+    display: none;
+}
+
+.typenames {
+    border: 2px solid black;
+    margin: .5em;
+    background: rgb(192, 247, 130);
+}
+
+.members {
+    border: 2px solid black;
+    margin: .5em;
+    background: rgb(251, 237, 113);
+}
+
+.typenames th, .members th {
+    border: 1px solid black;
+    padding: 1em;
+}
+
+.typenames td, .members td {
+    border: 1px solid black;
+    padding: .3em;
+}

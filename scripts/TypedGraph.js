@@ -6,15 +6,19 @@ TypedGraph.protoModel.thisIs = "TypedGraph";
 
 TypedGraph.newGraph = function newGraph(protoModel = TypedGraph.protoModel) {
     let returner = Graph.newGraph(protoModel);
-    returner.addMember(0, returner.ui, memberProto);
     returner.isInUniverse = false;
+    returner.changeUsedByType = returner.changeUsesType = emptyFunction; // don't do the type dependency thing for the root element
+    returner.addMember(0, returner.ui, returner.ui, memberProto); // root element
+    // undo override
+    delete returner.changeUsedByType;
+    delete returner.changeUsesType;
     return returner;
 }
 
 let memberProto = TypedGraph.protoModel.memberProto = Object.create(Graph.protoModel.memberProto);
 
-TypedGraph.protoModel.addMember = function addMember(name, type, protoModel = this.memberProto) {
-    let member = Graph.protoModel.addMember.call(this, name, type, protoModel);
+TypedGraph.protoModel.addMember = function addMember(name, type, typeName = type, protoModel = this.memberProto) {
+    let member = Graph.protoModel.addMember.call(this, name, type, typeName, protoModel);
     if (member.memberId) this.member(0).setChild(member.memberId, member.memberId);
     return member;
 }
@@ -25,10 +29,9 @@ TypedGraph.protoModel.maximalTerms = function maximalTerms() {
     return returner;
 }
 
-TypedGraph.protoModel.usesTypes = function usesTypes() {
-    let returner = Graph.protoModel.usesTypes.call(this);
-    delete returner[this.ui];
-    return returner;
+TypedGraph.protoModel.usesType = function usesType(type) {
+    for (let member of this.members.items) if (member.memberId && (member.type == type)) return true;
+    return false;
 }
 
 // get a list of all possible next terms
@@ -72,7 +75,7 @@ TypedGraph.protoModel.putInUniverse = function putInUniverse(putIn) {
     if (this.isInUniverse == putIn) return;
     this.isInUniverse = putIn;
     if (putIn) {
-        universe.addMember(this.ui, this.ui);
+        universe.addMember(this.ui);
     } else {
         universe.member(universe.membersByName[this.ui]).deleteMember();
     }
@@ -80,4 +83,10 @@ TypedGraph.protoModel.putInUniverse = function putInUniverse(putIn) {
 
 TypedGraph.protoModel.setUi = function setUi(newUi, oldUi) {
     Graph.protoModel.setUi.call(this, newUi, oldUi);
+}
+
+TypedGraph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
+    let line = this.members.items.length-1, encounteredTypes = {};
+    for (let member of this.members.items) if (member.memberId) line += "\n" + member.saveToAutosaveString((member.type in encounteredTypes)? undefined: encounteredTypes[member.type] = this.usesTypes[member.type]);
+    return line;
 }

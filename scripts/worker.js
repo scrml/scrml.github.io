@@ -124,6 +124,10 @@ function getPageFromLinkId(linkId) {
     return returner.page;
 }
 
+function getGraphFromPageId(pageId) {
+    return pages.items[pageId].graph;
+}
+
 let pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), guiLinkSetups = {};
 
 functions.log = console.log;
@@ -140,6 +144,7 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager = scrmljs.newVarManager();
     returner.manager.setVarValue("pageId", returner.pageId);
     returner.manager.linkProperty("pageId", returner);
+    postMessage(["newPage", returner.pageId, protoModel.pageType]);
     returner.manager.setVarValue("name", name);
     returner.manager.linkProperty("name", returner);
     returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
@@ -204,16 +209,18 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
             break; case "statement":
                 page = newStatement(lines[1], lines[2]);
                 graph = page.graph;
-                let inUniverse = lines[4], numMembers = lines[5];
-                for (let memberId = 1; memberId < numMembers; ++memberId) {
-                    let subLines = lines[memberId + 6].split("\t");
+                let inUniverse = lines[4], numMembers = lines[5], typeNames = {};
+                for (let memberId = 0; memberId < numMembers; ++memberId) {
+                    let subLines = lines[memberId + 6].split("\t"), onIndex = 0;
                     while (subLines[subLines.length] === "\t") subLines.pop();
                     // subLines[0] is the name, type, and children
                     let memberLines = subLines[0].split(" ");
                     while (memberLines[memberLines.length-1] === "") memberLines.pop();
-                    let member = graph.addMember(memberLines[0], memberLines[1]);
-                    for (let childIndex = 2; childIndex < memberLines.length; childIndex += 2) {
-                        member.setChild(memberLines[childIndex], memberLines[childIndex+1]);
+                    let name = memberLines[onIndex++], type = memberLines[onIndex++];
+                    if (!(type in typeNames)) typeNames[type] = memberLines[onIndex++];
+                    let member = graph.addMember(name, type, typeNames[type]);
+                    while (onIndex < memberLines.length) {
+                        member.setChild(memberLines[onIndex++], memberLines[onIndex++]);
                     }
                 }
                 graph.putInUniverse(inUniverse === "i");
@@ -227,6 +234,14 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // set up guiLinks for visible pages
     getPageFromPageId(0).showPage(true);
     postMessage(["smoothMode", true]);
+}
+
+// this should probably be moved to a separate script which focuses on file compilation from worker information
+functions.exportSCRMLFile = function exportSCRMLFile() {
+    let line = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    let rootChapter = pages.items[0];
+    line += rootChapter.saveToSCRMLString();
+    postMessage(["saveTextFile", line, rootChapter.name]);
 }
 
 functions.openPageProcess = function openPageProcess(line) {pageTickets.openProcess(line)};
@@ -245,12 +260,13 @@ pageProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
 }
 
 pageProto.computeFullName = function computeFullName() {
-    if (this.parent) return this.parent.fullName + "." + this.name;
+    if (this.parent) return this.parent.fullName + "/" + this.name;
     else return this.name;
 }
 
 pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
+    //console.log("full name " + this.fullName);
 }
 
 pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
@@ -301,12 +317,11 @@ pageProto.togglePage = function togglePage(open = false) {
     this.preSave();
 }
 
-pageProto.setPageId = function setPageId(newPageId) {
-    let oldPageId = this.pageId;
+pageProto.setPageId = function setPageId(newPageId, oldPageId) {
     if (oldPageId == newPageId) return;
     this.pageId = newPageId;
-    if (oldPageId == undefined) return;
-    postMessage(["moveAutosaveEntry", oldPageId, newPageId]);
+    if (typeof oldPageId === "undefined") return;
+    postMessage(["changePageId", newPageId, oldPageId]);
     pageTickets.items[newPageId] = pageTickets.items[oldPageId];
     delete pageTickets.items[oldPageId];
     this.preSave();
@@ -329,7 +344,7 @@ pageProto.deletePage = function deletePage() {
     if (this.parent.isVisible) this.parent.guiLink.dm("canDelete", this.parent.canDelete());
     // remove from list of all pages
     pages.preErase(this.pageId);
-    postMessage(["deleteAutosaveEntry", this.pageId]);
+    postMessage(["deletePage", this.pageId]);
 }
 
 pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
@@ -378,6 +393,50 @@ pageProto.saveToAutosaveString = function saveToAutosaveString() {
     return this.pageType + "\n" + this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
 }
 
+pageProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+    let line = indent + "<"+this.name + " pageType=\"" + this.pageType + "\"";
+    if (this.nickname !== "") line += " nickname=\"" + xmlEscape(this.nickname) + "\"";
+    line += "/>";
+    return line;
+}
+
+chapterProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+    let line = pageProto.saveToSCRMLString.call(this, indent, tab);
+    if (this.childPages.length) {
+        line = line.replace(/\/>$/, ">");
+        for (let childPage of this.childPages) line += "\n" + childPage.saveToSCRMLString(indent + tab, tab);
+        line += "\n" + indent + "</" + this.name + ">";
+    }
+    return line;
+}
+
+statementProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+    let line = pageProto.saveToSCRMLString.call(this, indent, tab);
+    let graph = this.graph, members = this.graph.members.items;
+    if (graph.isGenesis()) return line;
+    line = line.replace(/\/>$/, ">");
+    line += "\n"+indent+tab+"<types>";
+    for (let type in graph.usesTypes) line += "\n"+indent+tab+tab+"<"+graph.usesTypes[type]+">"+Graph.graph(type).page.fullName+"</"+graph.usesTypes[type]+">";
+    line += "\n"+indent+tab+"</types>";
+    line += "\n"+indent+tab+"<terms>";
+    for (let member of graph.members.items) if (member.memberId) {
+        line += "\n"+indent+tab+tab+"<"+graph.usesTypes[member.type]+" name=\""+member.name+"\"";
+        if (member.children.items.length === 0) line += "/>";
+        else {
+            line += ">";
+            for (let child of member.children.items) line += "\n"+indent+tab+tab+tab+"<"+child.name+">"+graph.member(child.memberId).name+"</"+child.name+">";
+            line += "\n"+indent+tab+tab+"</"+graph.usesTypes[member.type]+">";
+        }
+    }
+    line += "\n"+indent+tab+"</terms>";
+    line += "\n"+indent+"</"+this.name+">";
+    return line;
+}
+
+function xmlEscape(line) {
+    return line.replaceAll(/</gm, "&lt;").replaceAll(/&(?!lt;)(?!amp;)(?!gt;)(?!quot;)(?!apos;)(?!#\d+;)/gm, "&amp;").replaceAll(/>/gm, "&gt;").replaceAll(/"/gm, "&quot;").replaceAll(/'/gm, "&apos;");
+}
+
 chapterProto.saveToAutosaveString = function saveToAutosaveString() {
     let line = pageProto.saveToAutosaveString.call(this) + "\n";
     for (let child of this.childPages) line += child.pageId + " ";
@@ -407,6 +466,7 @@ statementProto.newGraph = function newGraph() {
 
 function newStatement(name, nickname = "", protoModel = statementProto) {
     let returner = newPage(name, nickname, protoModel);
+    returner.manager.linkListener("fullName", function(fullName) {postMessage(["fullPageNameUpdate", returner.pageId, fullName])}, true);
     returner.graph = protoModel.newGraph();
     returner.graph.page = returner;
     return returner;
@@ -418,7 +478,7 @@ statementProto.showPage = function showPage(show) {
     let graph = this.graph, members = graph.members.items, guiLink = this.guiLink;
     if (show) {
         for (let member of members) if (member.memberId) {
-            guiLink.dm("showMember", member.memberId, member.saveToAutosaveString());
+            guiLink.showMember(member);
             for (let child of member.children.items) guiLink.dm("setChild", member.memberId, child.name, graph.member(child.memberId).name);
         }
         guiLink.dm("isInUniverse", graph.isInUniverse);
@@ -437,15 +497,26 @@ statementProto.showGraphId = function showGraphId(id) {
 function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
     let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto);
     
-    graphProto.addMember = function addMember(name, type, memberProto = memberProtoModel) {
-        let member = protoModel.addMember.call(this, name, type, memberProto);
+    graphProto.addMember = function addMember(name, type, typeName, memberProto = memberProtoModel) {
+        let member = protoModel.addMember.call(this, name, type, typeName, memberProto);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("newMember", member.memberId, name, type);
+            this.page.guiLink.dm("newMember", name, type, typeName);
             let def = Graph.graph(type), maxs = def.maximalTerms();
             for (let child of maxs) this.page.guiLink.dm("openChild", member.memberId, child.name, child.type); 
         }
         if (this.page) this.page.preSave();
         return member;
+    }
+    
+    graphProto.markUsesType = function markUsesType(type, typeName) {
+        protoModel.markUsesType.call(this, type, typeName);
+        if (this.page && this.page.isVisible) {
+            this.page.guiLink.dm("setTypeName", typeName, "type full name");
+        }
+    }
+    
+    graphProto.markNotUsesType = function markNotUsesType(type) {
+        protoModel.markNotUsesType.call(this, type);
     }
     
     graphProto.setUi = function setUi(newUi) {

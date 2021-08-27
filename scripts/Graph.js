@@ -24,6 +24,7 @@ Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     return returner;
 }
 
+// Test directly if this type is in use, instead of checking usesTypes, in case it is ever necessary. Usually just check if type is in this.usesTypes
 Graph.protoModel.usesType = function usesType(type) {
     for (let member of this.members.items) if (member.type == type) return true;
     return false;
@@ -34,15 +35,16 @@ Graph.protoModel.canDelete = function canDelete() {return isEmpty(this.usedByTyp
 
 Graph.protoModel.deleteGraph = function deleteGraph() {
     if (!this.canDelete()) throw Error("cannot delete graph");
-    for (let ui in this.usesTypes) delete Graph.graph(ui).usedByTypes[this.ui];
+    for (let ui in this.usesTypes) Graph.graph(ui).changeUsedByType(this.ui, false);
     Graph.allGraphs.preErase(this.ui);
 }
 
 let memberProto = Graph.protoModel.memberProto = {}, childProto = memberProto.childProto = {};
 
 // The only place a member is stored is in the graph's members manager. Everywhere else members are referred to by memberId.
-Graph.protoModel.addMember = function addMember(name, type, protoModel = this.memberProto) {
+Graph.protoModel.addMember = function addMember(name, type = name, typeName = type, protoModel = this.memberProto) {
     if (name in this.membersByName) throw Error("already have a member named " + name);
+    if (type in this.usesTypes && this.usesTypes[type] != typeName) throw Error("type name conflict");
     let typeGraph = Graph.graph(type);
     let member = Object.create(protoModel);
     member.graph = this;
@@ -59,11 +61,33 @@ Graph.protoModel.addMember = function addMember(name, type, protoModel = this.me
     member.descendants = {};
     this.members.addItem(member);
     this.membersByName[name] = member.memberId;
-    member.originalId = member.id;
-    typeGraph.usedByTypes[this.ui] = undefined;
-    this.usesTypes[type] = undefined;
+    member.originalId = member.id; // for testing member erasing, to be removed later
+    typeGraph.changeUsedByType(this.ui, true, typeName);
+    this.changeUsesType(type, true, typeName);
     this.saveStringChangedHook();
     return member;
+}
+
+// don't call these marks directly, instead call change below
+Graph.protoModel.markUsesType = function markUsesType(type, typeName) {this.usesTypes[type] = typeName}
+Graph.protoModel.markNotUsesType = function markNotUsesType(type) {delete this.usesTypes[type]}
+Graph.protoModel.markUsedByType = function markUsedByType(type, typeName) {this.usedByTypes[type] = typeName}
+Graph.protoModel.markNotUsedByType = function markNotUsedByType(type) {delete this.usedByTypes[type]}
+
+Graph.protoModel.changeUsesType = function changeUsesType(type, use, typeName) {
+    if (use) {
+        if (!(type in this.usesTypes)) this.markUsesType(type, typeName);
+    } else {
+        if (type in this.usesTypes) this.markNotUsesType(type);
+    }
+}
+
+Graph.protoModel.changeUsedByType = function changeUsedByType(type, use, typeName) {
+    if (use) {
+        if (!(type in this.usedByTypes)) this.markUsedByType(type, typeName);
+    } else {
+        if (type in this.usedByTypes) this.markNotUsedByType(type);
+    }
 }
 
 Graph.protoModel.canAddMember = function canAddMember(name, type) {
@@ -121,8 +145,8 @@ Graph.protoModel.eraseMember = function eraseMember(id) {this.member(id).deleteM
 Graph.protoModel.saveStringChangedHook = emptyFunction;
 
 Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
-    let line = this.members.items.length;
-    for (let member of this.members.items) line += "\n" + member.saveToAutosaveString();
+    let line = this.members.items.length, encounteredTypes = {};
+    for (let member of this.members.items) line += "\n" + member.saveToAutosaveString((member.type in encounteredTypes)? undefined: encounteredTypes[member.type] = this.usesTypes[member.type]);
     return line;
 }
 
@@ -180,8 +204,8 @@ memberProto.deleteMember = function deleteMember() {
     delete graph.membersByName[this.name];
     for (let member of members.items) inUse = inUse || (member.type == myType);
     if (!inUse) {
-        delete graph.usesType[myType];
-        delete Graph.graph(myType).usedByTypes[graph.ui];
+        graph.changeUsesType(myType, false);
+        Graph.graph(myType).changeUsedByType(graph.ui, false);
     }
 }
 
@@ -205,8 +229,8 @@ memberProto.setMemberId = function setMemberId(newMemberId, oldMemberId) {
     graph.saveStringChangedHook();
 }
 
-memberProto.saveToAutosaveString = function saveToAutosaveString() {
-    let line = this.name + " " + this.type;
+memberProto.saveToAutosaveString = function saveToAutosaveString(typeName) {
+    let line = this.name + " " + this.type + (typeof typeName === "undefined"? "": " " + typeName);
     for (let child of this.children.items) line += " " + child.name + " " + child.memberId;
     return line;
 }

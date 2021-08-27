@@ -1,38 +1,42 @@
-/*{
-    // on popup
-    let openPopup = function openPopup(inPopup, highlight) {
-        this.closePopup();
-        this.div.appendChild(inPopup);
-        this.main.removeAttribute("hide");
-        if (highlight) this.closeHighlight = gui.highlight(highlight);
-        if (inPopup.focus) inPopup.focus();
+let gui = scrmljs.gui, emptyFunction = scrmljs.emptyFunction, optionFetcher = scrmljs.optionFetcher;
+
+scrmljs.loadCSS("styles/gui/popup.css");
+
+gui.ensureModules(["disabler"]);
+
+gui.popups = {};
+
+let popupDefaultOptions = {};
+
+gui.popups.basic = function popupInputText(hostElement, options = {}) {
+    let returner = {};
+    let option = optionFetcher(popupDefaultOptions, options);
+    let popupShell = returner.popupShell = gui.element("div", null, ["class", "popupshell"]);
+    gui.insertAbove(hostElement, popupShell);
+    let popup = returner.popup = gui.element("div", popupShell, ["class", "popup"]);
+    gui.absorbClicks(popup);
+    returner.closePopup = function closePopup() {
+        gui.filicide(popupShell);
+        gui.swap(hostElement, popupShell);
     }
-    let closePopup = function closePopup() {
-        clearChildren(this.div);
-        this.main.setAttribute("hide", "");
-        this.closeHighlight();
-        this.closeHighlight = emptyFunction;
-    }
-    gui.popup = function popup(loadHere, atts = []) {
-        let returner = {};
-        returner.main = gui.element("div", loadHere, ["class", "popup", "hide", ""]);
-        returner.div = gui.element("div", returner.main, atts);
-        returner.closeButton = gui.button("close", returner.main, function() {returner.closePopup()}, ["class", "closeButton"]);
-        returner.openPopup = openPopup;
-        returner.closePopup = closePopup;
-        returner.closeHighlight = emptyFunction;
-        return returner;
-    }
+    return returner;
 }
 
-gui.popupLinkedValue = function popupLinkedValue(popup, triggerNode, manager, property, screen, onchange) {
-    triggerNode.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        popup.openPopup(gui.linkedScreenedInput(null, manager, property, screen, function(value) {
-            popup.closePopup();
-            if (onchange) onchange(value);
-        }), triggerNode)
-    });
-}*/
+let inputTextDefaultOptions = {
+    popupOptions: popupDefaultOptions
+}
+
+gui.popups.inputText = function popupInputText(hostElement, onchange = emptyFunction, options = {}) {
+    let option = optionFetcher(inputTextDefaultOptions, options),
+        popup = gui.popups.basic(hostElement, option("popupOptions")),
+        box = popup.box = gui.element("div", popup.popup),
+        input = popup.input = gui.element("input", box, ["type", "text"]),
+        labelText = option("label");
+    if (typeof labelText !== "undefined") {
+        let label = popup.label = gui.textShell(labelText, "label", box, ["for", option("labelId")], input);
+        input.setAttribute("id", option("labelId"));
+    }
+    input.addEventListener("change", onchange);
+    input.focus();
+    return popup;
+}

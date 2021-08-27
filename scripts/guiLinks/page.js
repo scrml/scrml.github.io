@@ -1,4 +1,4 @@
-let scriptLoader = scrmljs.scriptLoader, editor = scrmljs.editor, gui = scrmljs.gui, idManager = scrmljs.idManager, guiWorkerLink = scrmljs.guiWorkerLink, linkProto = guiWorkerLink.linkProto, mainLink = scrmljs.mainLink, emptyFunction = scrmljs.emptyFunction, pageType = scrmljs.pageType = mainLink.newType("page");
+let scriptLoader = scrmljs.scriptLoader, editor = scrmljs.editor, gui = scrmljs.gui, idManager = scrmljs.idManager, guiWorkerLink = scrmljs.guiWorkerLink, linkProto = guiWorkerLink.linkProto, mainLink = scrmljs.mainLink, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, pageType = scrmljs.pageType = mainLink.newType("page");
 
 scriptLoader.items.page.data.initialize = function() {pageType.initialize()}
 
@@ -24,8 +24,14 @@ pageType.initializers.host = function() {
             absorbClicks: true
         });
         page.nameSpan.addEventListener("blur", type.nameBlurredListener);
-        page.nicknameSpan = gui.element("input", page.pageHead, ["type", "text", "placeholder", "nickname", "class", "nickname", "disguise", ""]);
-        //page.nicknameSpan.addEventListener("change", type.nameProcessorListener); nicknamelistener instead
+        page.nicknameSpan = gui.screenedInput(page.pageHead, {
+            atts: ["class", "nickname", "disguise", ""],
+            placeholder: "nickname",
+            onchange: type.nicknameProcessorListener,
+            absorbClicks: true,
+            screen: trueFunction
+        });
+        page.nicknameSpan.addEventListener("blur", type.nicknameBlurredListener);
         gui.absorbClicks(page.nicknameSpan);
         page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
         page.fullNameText = gui.text("", page.fullNameSpan);
@@ -42,6 +48,13 @@ pageType.initializers.host = function() {
         this.nameSpan.removeAttribute("disabled");
         this.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
         this.nameSpan.blur();
+        this.nameSpan.setWidth();
+    }
+    pageProto.getNickname = function getNickname(nickname) {
+        gui.messages.setInputValue(this.nicknameSpan, nickname);
+        this.nicknameSpan.removeAttribute("disabled");
+        this.nicknameSpan.blur();
+        this.nicknameSpan.setWidth();
     }
     pageProto.togglePage = function togglePage(open) {
         if (open) this.div.setAttribute("open", "");
@@ -94,12 +107,19 @@ pageType.initializers.host = function() {
     }
     pageType.nameProcessorListener = function(line, e) {
         e = pageType.getLinkFromEvent(e);
-        // this doesn't make sense for if nickname changed
         e.dm("tryChangeName", line);
+    }
+    pageType.nicknameProcessorListener = function(line, e) {
+        e = pageType.getLinkFromEvent(e);
+        e.dm("setNickname", line);
     }
     pageType.nameBlurredListener = function(e) {
         e = pageType.getLinkFromEvent(e);
         e.dm("getName");
+    }
+    pageType.nicknameBlurredListener = function(e) {
+        e = pageType.getLinkFromEvent(e);
+        e.dm("getNickname");
     }
     pageType.moveModeAction = function(e) {
         e = pageType.getLinkFromEvent(e);
@@ -131,11 +151,13 @@ pageType.initializers.worker = function() {
         link.page = page;
         link.unlinks = [];
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
+        link.unlinks.push(page.manager.linkListener("nickname", function(nickname) {link.dm("getNickname", nickname)}, true));
         link.dm("canDelete", page.canDelete());
         if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextPage? page.nextPage.guiLink.linkId: "none", false);
         link.dm("togglePage", page.isOpen);
     }
     pageProto.getName = function getName() {this.dm("getName", this.page.name)};
+    pageProto.getNickname = function getNickname() {this.dm("getNickname", this.page.nickname)};
     pageProto.togglePage = function togglePage(open) {
         this.page.togglePage(open);
     }
@@ -147,6 +169,9 @@ pageType.initializers.worker = function() {
     pageProto.tryChangeName = function tryChangeName(newName) {
         if (this.page.canChangeName(newName)) this.page.manager.setVarValue("name", newName);
         else this.dm("newNameFail", this.name);
+    }
+    pageProto.setNickname = function setNickname(newNickname) {
+        this.page.manager.setVarValue("nickname", newNickname);
     }
     pageProto.startMoveModeChecks = function startMoveModeChecks() {
         let page = this.page;
