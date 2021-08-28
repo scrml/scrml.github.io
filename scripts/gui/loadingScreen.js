@@ -4,8 +4,6 @@ let gui = scrmljs.gui,
 
 loadCSS("styles/gui/loadingScreen.css");
 
-gui.moduleDependency("loadingScreen", ["disabler"]);
-
 gui.loadingScreenProto = {};
 
 gui.loadingScreenProto.openLoadingScreen = function openLoadingScreen(message = "") {
@@ -14,7 +12,7 @@ gui.loadingScreenProto.openLoadingScreen = function openLoadingScreen(message = 
         this.isOpen = true;
         this.screen.removeAttribute("hide");
         this.screen.setAttribute("temporarilyinvisible", "");
-        this.unblock = gui.blockEvents(this.div);
+        this.unblock = gui.blockEvents(this.div, gui.blockTheseEvents, false);
     }
 }
 
@@ -40,5 +38,10 @@ gui.loadingScreen = function loadingScreen(coverMe = document.body, insertAbove 
     returner.loadingTitle = gui.text("Loading...", gui.element("p", returner.screenContents));
     returner.msgSpan = gui.element("p", returner.screenContents);
     returner.msgText = gui.text("loading screen is hidden", returner.msgSpan);
+    returner.bailButton = gui.textShell("reset", "button", returner.screenContents);
+    returner.bailButton.addEventListener("click", function(e) {
+        window.localStorage.clear();
+        window.location.reload();
+    }, true)
     return returner;
 }

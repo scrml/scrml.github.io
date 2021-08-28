@@ -26,14 +26,14 @@ gui.blockTheseEvents = {
     click: undefined
 }
 
-gui.blockEvents = function blockEvents(element, events = gui.blockTheseEvents) {
+gui.blockEvents = function blockEvents(element, events = gui.blockTheseEvents, capture = true) {
     let unblocks = [];
     for (let type in events) {
-        element.addEventListener(type, gui.eventAbsorber, true);
+        element.addEventListener(type, gui.eventAbsorber, capture);
         unblocks.push(type);
     }
     return function unblockEvents() {
-        for (let type of unblocks) element.removeEventListener(type, gui.eventAbsorber, true);
+        for (let type of unblocks) element.removeEventListener(type, gui.eventAbsorber, capture);
     }
 }
 
