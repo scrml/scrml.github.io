@@ -1,4 +1,4 @@
-let pageType = scrmljs.mainLink.types.page, statementType, gui = scrmljs.gui, editor = scrmljs.editor, getPageIdFromFullName = scrmljs.getPageIdFromFullName, fullPageNameOptionsByName = scrmljs.fullPageNameOptionsByName;
+let pageType = scrmljs.mainLink.types.page, statementType, gui = scrmljs.gui, editor = scrmljs.editor, getPageIdFromFullName = scrmljs.getPageIdFromFullName, fullPageNameOptionsByName = scrmljs.fullPageNameOptionsByName, allFullPageNames = scrmljs.allFullPageNames;
 
 let hostInitializer = function hostInitializer() {
     scrmljs.loadCSS("styles/guiLinks/statement.css");
@@ -11,8 +11,9 @@ let hostInitializer = function hostInitializer() {
         let page = pageType.createLink(linkId, extensionName);
         page.graphType = "TypedGraph";
         page.simple = gui.element("div", page.div, ["class", "simple", "canmodify", "false", "genesis", ""]);
-        page.simple.addEventListener("mouseenter", statementType.focusListener);
+        page.inUniverseButton = gui.button("Insert into universe", page.simple, statementType.inUniverseListener);
         page.typeNames = {};
+        page.typeNamesOptions = gui.element("datalist", null);
         page.typeNamesDiv = gui.element("table", page.simple, ["class", "typenames"]);
         gui.textShell("Type Names", "caption", page.typeNamesDiv);
         page.typeNamesHeader = gui.element("tr", page.typeNamesDiv);
@@ -25,13 +26,15 @@ let hostInitializer = function hostInitializer() {
         page.membersDivHeader = gui.element("tr", page.membersDiv);
         gui.textShell("Type", "th", page.membersDivHeader);
         gui.textShell("Name", "th", page.membersDivHeader);
-        page.newMemberName = gui.screenedInput(page.simple, {placeholder: "name", atts: ["class", "newmembername"]});
+        page.newMemberDiv = gui.element("div", page.simple, ["class", "newmember"]);
+        page.newMemberName = gui.screenedInput(page.newMemberDiv, {placeholder: "name", atts: ["class", "newmembername"]});
         page.newMemberName.addEventListener("change", statementType.newMemberNameChangeListener);
-        page.newMemberType = gui.element("input", page.simple, ["class", "newmembertype", "type", "text", "list", "allfullpagenames", "disguise", "", "placeholder", "type"]);
+        page.newMemberType = gui.element("input", page.newMemberDiv, ["class", "newmembertype", "type", "text", "list", "allfullpagenames", "disguise", "", "placeholder", "type"]);
         page.newMemberType.addEventListener("change", statementType.newMemberTypeChangeListener);
-        page.newMemberButton = gui.button("Create", page.simple, statementType.newMemberEntered, ["class", "newmembertype", "disabled", ""]);
+        page.newMemberType.addEventListener("focus", statementType.newMemberTypeFocusListener);
+        page.newMemberType.addEventListener("blur", statementType.newMemberTypeBlurListener);
+        page.newMemberButton = gui.button("Create", page.newMemberDiv, statementType.newMemberEntered, ["class", "newmembertype", "disabled", ""]);
         page.graphIdSpan = gui.textShell("graph id", "span", page.pageHead, [], page.pageTools);
-        page.inUniverseButton = gui.button("Insert into universe", page.pageTools, statementType.inUniverseListener, [], page.moveButton);
     }
     
     statementType.newMemberNameChangeListener = function newMemberNameChangeListener(e) {
@@ -84,6 +87,16 @@ let hostInitializer = function hostInitializer() {
         }
     }
     
+    statementType.newMemberTypeFocusListener = function newMemberTypeFocusListener(e) {
+        e = pageType.getLinkFromEvent(e);
+        allFullPageNames.insertBefore(e.typeNamesOptions, allFullPageNames.firstChild);
+    }
+    
+    statementType.newMemberTypeBlurListener = function newMemberTypeBlurListener(e) {
+        e = pageType.getLinkFromEvent(e);
+        allFullPageNames.removeChild(e.typeNamesOptions);
+    }
+    
     statementType.newMemberEntered = function newMemberEntered(e) {
         e = pageType.getLinkFromEvent(e);
         e.dm("newMember", e.newMemberName.value, e.newMemberType.value, fullPageNameOptionsByName[e.newMemberType.title].getAttribute("pageid"));
@@ -95,17 +108,13 @@ let hostInitializer = function hostInitializer() {
         this.simple.setAttribute("canmodify", can);
     }
     
-    statementType.focusListener = function(e) {
-        e = pageType.getLinkFromEvent(e);
-        e.dm("canModify");
-    }
-    
     statementProto.setTypeName = function setTypeName(typeName, typeFullName) {
         if (!this.typeNames[typeName]) {
             let type = this.typeNames[typeName] = {name: typeName};
             type.div = gui.element("tr", this.typeNamesDiv);
             type.nameSpot = gui.textShell(typeName, "td", type.div);
             type.fullNameSpot = gui.textShell(typeFullName, "td", type.div);
+            type.option = gui.textShell(typeName, "option", this.typeNamesOptions);
         }
         let type = this.typeNames[typeName], oldName = type.fullName;
         type.fullName = typeFullName;
@@ -122,13 +131,27 @@ let hostInitializer = function hostInitializer() {
     statementProto.newMember = function newMember(name, typeName) {
         this.simple.removeAttribute("genesis");
         let member = this.members[name] = {};
-        member.div = gui.element("tr", this.membersDiv, ["class", "member"]);
+        member.div = gui.element("tr", this.membersDiv, ["class", "member", "membername", name]);
         member.typeSpot = gui.textShell(typeName, "td", member.div, ["typename", typeName]);
         member.nameSpot = gui.textShell(name, "td", member.div);
+        member.children = {};
     }
     
-    statementProto.openChild = function openChild(memberId, name, type) {
-        gui.element("input", this.membersDiv.querySelector("[memberid=\""+memberId+"\"]"), ["childname", name, "placeholder", "child " + name + ", must be type " + type]).addEventListener("change", statementType.childNameListener);
+    statementProto.openChild = function openChild(name, childName, typeName) {
+        let member = this.members[name], child = member.children[childName] = {};
+        child.div = gui.element("td", member.div);
+        child.elementId = "page"+this.linkId+".member"+name+".child"+childName;
+        child.selectTitle = gui.textShell(childName, "label", child.div, ["for", child.elementId, "childname", childName]);
+        child.select = gui.select(child.div, ["choose child"], {
+            onchange: statementType.childChooserListener,
+            atts: ["id", child.elementId]
+        });
+        for (let otherMember in this.members) if (otherMember !== name && this.members[otherMember].typeSpot.firstChild.nodeValue === typeName) gui.textShell(otherMember, "option", child.select);
+    }
+    
+    statementType.childChooserListener = function childChooserListener(e) {
+        let select = e.target, link = pageType.getLinkFromEvent(e);
+        link.dm("setChild", select.parentElement.parentElement.getAttribute("membername"), select.previousElementSibling.getAttribute("childname"), select.value);
     }
     
     statementType.childNameListener = function childNameListener(e) {
@@ -136,11 +159,9 @@ let hostInitializer = function hostInitializer() {
         link.dm("setChild", e.target.parentElement.getAttribute("memberid"), e.target.getAttribute("childname"), e.target.value);
     }
     
-    statementProto.setChild = function setChild(memberId, childName, childMemberName) {
-        let input = this.membersDiv.querySelector("[memberid=\""+memberId+"\"] [childName=\""+childName+"\"]");
-        input.setAttribute("disabled", "");
-        input.setAttribute("disguise", "");
-        input.value = "child " + childName + " is " + childMemberName;
+    statementProto.setChild = function setChild(memberName, childName, childMemberName, typeName) {
+        if (!(memberName in this.members)) this.openChild(memberName, childName, typeName);
+        this.members[memberName].children[childName].select.value = childMemberName;
     }
     
     statementProto.setGraphId = function setGraphId(id) {
@@ -185,10 +206,11 @@ let workerInitializer = function workerInitializer() {
         let graph = this.page.graph;
         this.dm("setTypeName", graph.usesTypes[member.type], Graph.graph(member.type).page.fullName);
         this.dm("newMember", member.name, graph.usesTypes[member.type]);
-        for (let max of Graph.graph(member.type).maximalTerms()) console.log(max);
+        for (let max of Graph.graph(member.type).maximalTerms()) this.dm("openChild", member.name, max.name, graph.usesTypes[max.type]);
     }
-    statementProto.setChild = function setChild(memberId, childName, childMemberName) {
-        this.page.graph.member(memberId).setChild(childName, this.page.graph.membersByName[childMemberName]);
+    statementProto.setChild = function setChild(memberName, childName, childMemberName) {
+        let page = this.page, graph = page.graph;
+        graph.memberByName(memberName).setChild(childName, graph.membersByName[childMemberName]);
     }
     statementProto.inUniverse = function inUniverse(putIn) {
         let graph = this.page.graph;

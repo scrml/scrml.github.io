@@ -19,8 +19,23 @@ let memberProto = TypedGraph.protoModel.memberProto = Object.create(Graph.protoM
 
 TypedGraph.protoModel.addMember = function addMember(name, type, typeName = type, protoModel = this.memberProto) {
     let member = Graph.protoModel.addMember.call(this, name, type, typeName, protoModel);
-    if (member.memberId) this.member(0).setChild(member.memberId, member.memberId);
+    if (member.memberId) this.member(0).setChild(name, member.memberId);
     return member;
+}
+
+memberProto.setChild = function setChild(childName, childMemberId, protoModel = this.childProto) {
+    Graph.protoModel.memberProto.setChild.call(this, childName, childMemberId, protoModel);
+    if (this.memberId == 0) return;
+    let graph = this.graph, root = graph.member(0), childMember = graph.member(childMemberId);
+    if (childMember.name in root.childrenByName) root.unsetChild(childMember.name); 
+}
+
+memberProto.unsetChild = function unsetChild(childName) {
+    if (!(childName in this.childrenByName)) throw Error("cannot find child " + childName);
+    let graph = this.graph, root = graph.member(0), oldChild = graph.member(this.childrenByName[childName].memberId);
+    Graph.protoModel.memberProto.unsetChild.call(this, childName);
+    if (this.memberId == 0) return;
+    if (isEmpty(oldChild.ancestors)) root.setChild(oldChild.name, oldChild.memberId);
 }
 
 TypedGraph.protoModel.maximalTerms = function maximalTerms() {

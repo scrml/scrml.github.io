@@ -160,13 +160,17 @@ memberProto.moveInByName = function moveInByName(name, oldName) {
 
 // Set child named childName to childMemberId. If I already have a child named childName I first unset then child. Then I reset my own ancestry to check for cycles.
 memberProto.setChild = function setChild(childName, childMemberId, protoModel = this.childProto) {
-    let graph = this.graph, members = graph.members.items;
+    let graph = this.graph, members = graph.members.items, byName = this.childrenByName;
     if (!members[childMemberId]) throw Error(childMemberId + " is not a member of graph " + graph.ui);
-    if (childName in this.childrenByName) this.unsetChild(childName);
+    if (childName in byName) this.unsetChild(childName);
     let child = Object.create(protoModel);
     let manager = child.manager = newVarManager();
     manager.setVarValue("name", childName);
     manager.linkProperty("name", child);
+    manager.linkListener("name", function(newName, oldName) {
+        delete byName[oldName];
+        byName[newName] = child;
+    }, true);
     manager.setVarValue("memberId", childMemberId);
     manager.linkProperty("memberId", child);
     this.children.addItem(child);
@@ -185,6 +189,7 @@ memberProto.unsetChild = function unsetChild(childName) {
     let children = this.children, byName = this.childrenByName, child = byName[childName];
     if (!(child)) throw Error(childName + " is not a child");
     children.preErase(child.childId);
+    delete byName[childName];
     children.flushErasePreserveOrder();
     let graph = this.graph;
     graph.resetAncestry(this.memberId, child.memberId);

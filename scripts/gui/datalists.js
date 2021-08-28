@@ -17,5 +17,6 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts, options =
     if (typeof disabledDescriptionOptionTexts == "string") disabledDescriptionOptionTexts = [disabledDescriptionOptionTexts];
     let returner = gui.element("select", loadHere, options("atts"));
     for (let line of disabledDescriptionOptionTexts) gui.option(line, returner, ["disabled", "true"], -1);
+    returner.addEventListener("change", options("onchange"));
     return returner;
 }

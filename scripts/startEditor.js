@@ -190,11 +190,12 @@ scrmljs.getPageIdFromFullName = function getPageIdFromFullName(fullName) {
 }
 
 workerFunctions.deletePage = function deletePage(pageId) {
+    storage.erase("page " + pageId);
     let option = fullPageNameOptions[pageId];
+    if (!option) return;
     gui.orphan(option);
     delete fullPageNameOptions[pageId];
     delete fullPageNameOptionsByName[option.value];
-    storage.erase("page " + pageId);
 }
 
 workerFunctions.fullPageNameUpdate = function fullPageNameUpdate(pageId, fullPageName) {

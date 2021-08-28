@@ -479,7 +479,7 @@ statementProto.showPage = function showPage(show) {
     if (show) {
         for (let member of members) if (member.memberId) {
             guiLink.showMember(member);
-            for (let child of member.children.items) guiLink.dm("setChild", member.memberId, child.name, graph.member(child.memberId).name);
+            for (let child of member.children.items) guiLink.dm("setChild", member.name, child.name, graph.member(child.memberId).name, graph.usesType[child.memberId]);
         }
         guiLink.dm("isInUniverse", graph.isInUniverse);
     }
@@ -499,11 +499,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     
     graphProto.addMember = function addMember(name, type, typeName, memberProto = memberProtoModel) {
         let member = protoModel.addMember.call(this, name, type, typeName, memberProto);
-        if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("newMember", name, typeName);
-            let def = Graph.graph(type), maxs = def.maximalTerms();
-            for (let child of maxs) this.page.guiLink.dm("openChild", member.memberId, child.name, child.type); 
-        }
+        if (this.page && this.page.isVisible) this.page.guiLink.showMember(member);
         if (this.page) this.page.preSave();
         return member;
     }
@@ -527,7 +523,7 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     memberProtoModel.setChild = function setChild(name, memberId) {
         graphProto.memberProto.setChild.call(this, name, memberId);
         let graph = this.graph;
-        if (graph.page && graph.page.isVisible) graph.page.guiLink.dm("setChild", this.memberId, name, graph.member(memberId).name);
+        if (graph.page && graph.page.isVisible) graph.page.guiLink.dm("setChild", this.name, name, graph.member(memberId).name, graph.usesType[memberId]);
         graph.page.preSave();
     }
     
