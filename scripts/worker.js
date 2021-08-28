@@ -490,10 +490,6 @@ statementProto.deletePage = function deletePage() {
     this.graph.deleteGraph();
 }
 
-statementProto.showGraphId = function showGraphId(id) {
-    if (this.isVisible) this.guiLink.dm("setGraphId", id);
-}
-
 function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
     let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto);
     
@@ -507,17 +503,12 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     graphProto.markUsesType = function markUsesType(type, typeName) {
         protoModel.markUsesType.call(this, type, typeName);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("setTypeName", typeName, "type full name");
+            this.page.guiLink.dm("setTypeName", typeName, Graph.graph(type).page.fullName);
         }
     }
     
     graphProto.markNotUsesType = function markNotUsesType(type) {
         protoModel.markNotUsesType.call(this, type);
-    }
-    
-    graphProto.setUi = function setUi(newUi) {
-        protoModel.setUi.call(this, newUi);
-        this.page.showGraphId(newUi);
     }
     
     memberProtoModel.setChild = function setChild(name, memberId) {

@@ -189,6 +189,10 @@ scrmljs.getPageIdFromFullName = function getPageIdFromFullName(fullName) {
     return fullPageNameOptionsByName[fullName].getAttribute("pageid");
 }
 
+window.setTimeout(function() {
+    //gui.popups.inputText(editor);
+}, 2000);
+
 workerFunctions.deletePage = function deletePage(pageId) {
     storage.erase("page " + pageId);
     let option = fullPageNameOptions[pageId];

@@ -19,6 +19,7 @@ gui.popups.basic = function popupInputText(hostElement, options = {}) {
         gui.filicide(popupShell);
         gui.swap(hostElement, popupShell);
     }
+    returner.showBox = gui.element("div", popup, ["class", "popupbox"]);
     return returner;
 }
 
@@ -29,11 +30,10 @@ let inputTextDefaultOptions = {
 gui.popups.inputText = function popupInputText(hostElement, onchange = emptyFunction, options = {}) {
     let option = optionFetcher(inputTextDefaultOptions, options),
         popup = gui.popups.basic(hostElement, option("popupOptions")),
-        box = popup.box = gui.element("div", popup.popup),
-        input = popup.input = gui.element("input", box, ["type", "text"]),
+        input = popup.input = gui.element("input", popup.showBox, ["type", "text"]),
         labelText = option("label");
     if (typeof labelText !== "undefined") {
-        let label = popup.label = gui.textShell(labelText, "label", box, ["for", option("labelId")], input);
+        let label = popup.label = gui.textShell(labelText, "label", popup.showBox, ["for", option("labelId")], input);
         input.setAttribute("id", option("labelId"));
     }
     input.addEventListener("change", onchange);

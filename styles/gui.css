@@ -180,11 +180,11 @@ input[type="button"][disguise] {
     animation-iteration-count: infinite;
 }
 
-label {
+label:first-child {
     margin-right: 1ex;
 }
 
-label::after {
+label:first-child::after {
     content: ":";
 }
 

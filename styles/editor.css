@@ -7,7 +7,6 @@ body {
     margin: .5%;
     padding: .5% 1%;
     border-radius: 1em;
-    overflow: hidden;
 }
 
 .main > * {
@@ -54,6 +53,10 @@ textarea {
 
 .radiogroup {
     display: inline-block;
+}
+
+#importbutton {
+    margin-left: auto;
 }
 
 #errorout {

@@ -34,7 +34,6 @@ let hostInitializer = function hostInitializer() {
         page.newMemberType.addEventListener("focus", statementType.newMemberTypeFocusListener);
         page.newMemberType.addEventListener("blur", statementType.newMemberTypeBlurListener);
         page.newMemberButton = gui.button("Create", page.newMemberDiv, statementType.newMemberEntered, ["class", "newmembertype", "disabled", ""]);
-        page.graphIdSpan = gui.textShell("graph id", "span", page.pageHead, [], page.pageTools);
     }
     
     statementType.newMemberNameChangeListener = function newMemberNameChangeListener(e) {
@@ -164,11 +163,8 @@ let hostInitializer = function hostInitializer() {
         this.members[memberName].children[childName].select.value = childMemberName;
     }
     
-    statementProto.setGraphId = function setGraphId(id) {
-        this.graphIdSpan.firstChild.nodeValue = "graph id: " + id;
-    }
-    
     statementProto.setMemberName = function setMemberName(memberId, name) {
+        console.log("setting member name");
         //this.simple.querySelector("[memberid=\""+memberId+"\"] .newmembername").value = name;
     }
     
@@ -192,9 +188,9 @@ let workerInitializer = function workerInitializer() {
     pageType.showStatement = statementType.createLink = function createLink(page, extensionName = "statement") {
         pageType.createLink(page, extensionName);
         let link = page.guiLink, graph = page.graph;
+        //tits
         for (let member of graph.members.items) if (member.id) link.showMember(member);
         link.dm("canModify", graph.canModify());
-        link.dm("setGraphId", graph.ui);
     }
     statementProto.canModify = function canModify() {
         this.dm("canModify", this.page.graph.canModify());
