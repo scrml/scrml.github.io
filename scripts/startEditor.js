@@ -224,20 +224,116 @@ workerFunctions.errorOut = function errorOut(message) {
 // this file io will eventually be moved into a gui module
 
 function importSCRMLFileFromUser() {
+    //if (1>0) return importSCRMLFile(xml.parseDoc(storage.fetch("file")));
     let input = gui.element("input", importButton.parentElement, ["type", "file", "hide", ""], importButton);
     input.addEventListener("change", function() {
-        importSCRMLFile(input.files[0]);
+        let file = input.files[0], url = URL.createObjectURL(file), req = new XMLHttpRequest();
+        req.addEventListener("load", function() {
+            try {
+                importSCRMLFile(req.responseXML);
+            } catch (e) {
+                document.getElementById("errorout").textContent = e.message;
+                throw e;
+            }
+        });
+        req.open("GET", url);
+        req.overrideMimeType("text/xml");
+        req.send();
         gui.orphan(input);
     });
     input.click();
 }
 
-function importSCRMLFile(file) {
-    workerFunctions.errorOut("file import still under construction");
+function importSCRMLFile(doc) {
+    if (!doc) throw Error("not a valid xml file");
+    xml.trim(doc);
+    let docRoot = xml.getRoot(doc);
+    switch (docRoot.getAttribute("format")) {
+        case "editor":
+            importSCRMLFileEditor(doc);
+        break; default: throw Error("do not recognize how to read this file");
+    }
+}
+
+function importSCRMLFileEditor(doc) {
+    let docRoot = xml.getRoot(doc), pageId = 0, ui = 1, rootPage, autosaves = [];
+    while (doc.nodeType !== 9) doc = doc.parentElement;
+    for (let pageNode of docRoot.querySelectorAll("[pageType]")) {
+        if (pageId === 0) rootPage = pageNode;
+        pageNode.setAttribute("pageId", pageId);
+        autosaves[pageId] = pageNode.getAttribute("pageType")+"\n"+pageNode.nodeName+"\n"+(pageNode.hasAttribute("nickname")? pageNode.getAttribute("nickname"):"")+"\n"+(pageNode.hasAttribute("open")?"o":"c");
+        ++pageId;
+        if (pageNode.getAttribute("pageType") === "statement") pageNode.setAttribute("ui", ui++);
+    }
+    let pageNodesByFullName = {};
+    function assignFullNames(node) {
+        let prefix = node.parentElement.hasAttribute("pageType")? node.parentElement.getAttribute("fullName") + "/": "";
+        node.setAttribute("fullName", prefix + node.nodeName);
+        pageNodesByFullName[node.getAttribute("fullName")] = node;
+        if (node.getAttribute("pageType") === "chapter") for (let childNode of node.children) if (childNode.hasAttribute("pageType")) assignFullNames(childNode);
+    }
+    assignFullNames(rootPage);
+    for (let chapterNode of docRoot.querySelectorAll("[pageType=\"chapter\"]")) {
+        let pageId = chapterNode.getAttribute("pageId"), childrenLine = "";
+        for (let childNode of chapterNode.querySelectorAll("[pageId=\""+pageId+"\"] > [pageType]")) childrenLine += " " + childNode.getAttribute("pageId");
+        childrenLine = childrenLine.substring(1);
+        autosaves[pageId] += "\n" + childrenLine;
+    }
+    for (let statementNode of docRoot.querySelectorAll("[pageType=\"statement\"]")) {
+        let pageId = statementNode.getAttribute("pageId"), typesNode = statementNode.querySelector("[pageId=\""+pageId+"\"] > types"), termsNode = statementNode.querySelector("[pageId=\""+pageId+"\"] > terms"), line = autosaves[pageId], termLine;
+        if (!typesNode) typesNode = gui.elementDoc(doc, "types", statementNode);
+        if (!termsNode) termsNode = gui.elementDoc(doc, "terms", statementNode);
+        let types = [], typesByName = {};
+        for (let childNode of typesNode.children) {
+            typesByName[childNode.nodeName] = types.length;
+            types.push({
+                name: childNode.nodeName,
+                fullName: childNode.textContent,
+                ui: pageNodesByFullName[childNode.textContent].getAttribute("ui"),
+                id: types.length,
+                encountered: false
+            });
+        }
+        let terms = [], termsByName = {};
+        for (let childNode of termsNode.children) {
+            termsByName[childNode.getAttribute("name")] = terms.length;
+            terms.push({
+                name: childNode.getAttribute("name"),
+                type: childNode.nodeName,
+                typeId: typesByName[childNode.nodeName],
+                node: childNode,
+                id: terms.length
+            });
+        }
+        line += "\n"+(statementNode.hasAttribute("inUniverse")? "i": "o");
+        line += "\n"+terms.length;
+        let termType;
+        for (let term of terms) {
+            termType = types[typesByName[term.type]];
+            if (typeof termType === "undefined") throw Error("cannot find term type " + term.type);
+            termLine = term.name+" "+(termType.ui)+(termType.encountered?"":" "+termType.name);
+            termType.encountered = true;
+            for (let childNode of term.node.childNodes) {
+                if (!(childNode.textContent in termsByName)) throw Error("cannot find term " + childNode.textContent);
+                termLine += " "+childNode.nodeName+" "+(terms[termsByName[childNode.textContent]].id+1);
+            }
+            line += "\n"+termLine;
+        }
+        autosaves[pageId] = line;
+    }
+    pageId = 0;
+    while ((line = storage.fetch("page " + pageId)) !== null) storage.erase("page " + pageId++);
+    pageId = 0;
+    while (pageId < autosaves.length) storage.store("page "+pageId, autosaves[pageId++]);
+    window.location.reload();
+}
+
+function errorOut(message) {
+    document.getElementById("errorout").textContent = message;
 }
 
 function saveTextFile(fileLine, fileName, fileExtension = ".scrml", fileType = "text/xml") {
-    if (1>0) return document.getElementById("errorout").textContent = fileLine;
+    //if (1>0) return document.getElementById("errorout").textContent = fileLine;
     let file = new File([fileLine], fileName+fileExtension, {type: fileType});
     // make and click an appropriate download link
     let url = URL.createObjectURL(file);

@@ -178,19 +178,27 @@ memberProto.canChangeName = function canChangeName(newName) {
 memberProto.setChild = function setChild(childName, childMemberId, protoModel = this.childProto) {
     let graph = this.graph, members = graph.members.items, byName = this.childrenByName;
     if (!members[childMemberId]) throw Error(childMemberId + " is not a member of graph " + graph.ui);
-    if (childName in byName) this.unsetChild(childName);
-    let child = Object.create(protoModel);
-    let manager = child.manager = newVarManager();
-    manager.setVarValue("name", childName);
-    manager.linkProperty("name", child);
-    manager.linkListener("name", function(newName, oldName) {
-        delete byName[oldName];
-        byName[newName] = child;
-    }, true);
-    manager.setVarValue("memberId", childMemberId);
-    manager.linkProperty("memberId", child);
-    this.children.addItem(child);
-    graph.resetAncestry(this.memberId);
+    let child, resetThese = [], manager;
+    if (childName in byName) {
+        child = byName[childName];
+        resetThese.push(child.memberId);
+        manager = child.manager;
+        manager.setVarValue("memberId", childMemberId);
+    } else {
+        child = Object.create(protoModel);
+        manager = child.manager = newVarManager();
+        manager.setVarValue("name", childName);
+        manager.linkProperty("name", child);
+        manager.linkListener("name", function(newName, oldName) {
+            delete byName[oldName];
+            byName[newName] = child;
+        }, true);
+        manager.setVarValue("memberId", childMemberId);
+        manager.linkProperty("memberId", child);
+        this.children.addItem(child);
+    }
+    resetThese.push(this.memberId);
+    graph.resetAncestry(...resetThese);
     graph.saveStringChangedHook();
 }
 

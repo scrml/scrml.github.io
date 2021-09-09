@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SCRML format="editor">
+	<GRML pageType="chapter" nickname="GRML Features" open="">
+		<Claim pageType="chapter">
+			<ForAll pageType="statement"/>
+			<Exists pageType="statement"/>
+			<Proof pageType="statement"/>
+		</Claim>
+		<Logic pageType="chapter" nickname="Logic Features">
+			<Wildcard pageType="statement" nickname="Testable Wildcard"/>
+			<True pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="this"/>
+				</terms>
+			</True>
+			<False pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="this"/>
+				</terms>
+			</False>
+			<Contradiction pageType="statement"/>
+			<Contradictions pageType="chapter" open="">
+				<Fundamental pageType="statement">
+					<types>
+						<ForAll>GRML/Claim/ForAll</ForAll>
+						<Exists>GRML/Claim/Exists</Exists>
+						<Testable>GRML/Logic/Wildcard</Testable>
+						<True>GRML/Logic/True</True>
+						<False>GRML/Logic/False</False>
+						<Contradiction>GRML/Logic/Contradiction</Contradiction>
+					</types>
+					<terms>
+						<Testable name="this"/>
+						<True name="true">
+							<this>this</this>
+						</True>
+						<False name="false">
+							<this>this</this>
+						</False>
+						<ForAll name="forall">
+							<true>true</true>
+							<false>false</false>
+						</ForAll>
+						<Contradiction name="contradiction"/>
+						<Exists name="exists">
+							<contradiction>contradiction</contradiction>
+						</Exists>
+					</terms>
+				</Fundamental>
+			</Contradictions>
+			<Not pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="this"/>
+				</terms>
+			</Not>
+			<Nots pageType="chapter" open="">
+				<NotTrueIsFalse pageType="statement">
+					<types>
+						<ForAll>GRML/Claim/ForAll</ForAll>
+						<Exists>GRML/Claim/Exists</Exists>
+						<Testable>GRML/Logic/Wildcard</Testable>
+						<True>GRML/Logic/True</True>
+						<False>GRML/Logic/False</False>
+						<Not>GRML/Logic/Not</Not>
+					</types>
+					<terms>
+						<Testable name="this"/>
+						<True name="true">
+							<this>this</this>
+						</True>
+						<Not name="notThis">
+							<this>this</this>
+						</Not>
+						<ForAll name="forall">
+							<true>true</true>
+							<notThis>notThis</notThis>
+						</ForAll>
+						<False name="isFalse">
+							<this>notThis</this>
+						</False>
+						<Exists name="exists">
+							<isFalse>isFalse</isFalse>
+						</Exists>
+					</terms>
+				</NotTrueIsFalse>
+				<NotFalseIsTrue pageType="statement">
+					<types>
+						<ForAll>GRML/Claim/ForAll</ForAll>
+						<Exists>GRML/Claim/Exists</Exists>
+						<Testable>GRML/Logic/Wildcard</Testable>
+						<True>GRML/Logic/True</True>
+						<False>GRML/Logic/False</False>
+						<Not>GRML/Logic/Not</Not>
+					</types>
+					<terms>
+						<Testable name="this"/>
+						<False name="false">
+							<this>this</this>
+						</False>
+						<Not name="notThis">
+							<this>this</this>
+						</Not>
+						<ForAll name="forall">
+							<false>false</false>
+							<notThis>notThis</notThis>
+						</ForAll>
+						<True name="isTrue">
+							<this>notThis</this>
+						</True>
+						<Exists name="exists">
+							<isTrue>isTrue</isTrue>
+						</Exists>
+					</terms>
+				</NotFalseIsTrue>
+			</Nots>
+			<Or pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="first"/>
+					<Testable name="second"/>
+				</terms>
+			</Or>
+			<And pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="first"/>
+					<Testable name="second"/>
+				</terms>
+			</And>
+			<Iff pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="first"/>
+					<Testable name="second"/>
+				</terms>
+			</Iff>
+			<Implies pageType="statement">
+				<types>
+					<Testable>GRML/Logic/Wildcard</Testable>
+				</types>
+				<terms>
+					<Testable name="first"/>
+					<Testable name="second"/>
+				</terms>
+			</Implies>
+		</Logic>
+		<NotNotTrueIsTrue pageType="statement" open="">
+			<types>
+				<ForAll>GRML/Claim/ForAll</ForAll>
+				<Exists>GRML/Claim/Exists</Exists>
+				<Proof>GRML/Claim/Proof</Proof>
+				<Testable>GRML/Logic/Wildcard</Testable>
+				<True>GRML/Logic/True</True>
+				<False>GRML/Logic/False</False>
+				<Not>GRML/Logic/Not</Not>
+				<TtoF>GRML/Logic/Nots/NotTrueIsFalse</TtoF>
+				<FtoT>GRML/Logic/Nots/NotFalseIsTrue</FtoT>
+			</types>
+			<terms>
+				<Testable name="base"/>
+				<True name="baseTrue">
+					<this>base</this>
+				</True>
+				<Not name="notBase">
+					<this>baseTrue</this>
+				</Not>
+				<Not name="this">
+					<this>notBase</this>
+				</Not>
+				<ForAll name="forall">
+					<baseTrue>baseTrue</baseTrue>
+					<this>this</this>
+				</ForAll>
+				<True name="isTrue">
+					<this>this</this>
+				</True>
+				<Exists name="exists">
+					<isTrue>isTrue</isTrue>
+				</Exists>
+				<False name="intermediate">
+					<this>notBase</this>
+				</False>
+				<ForAll name="intermediateAssumption">
+					<notThis>notBase</notThis>
+				</ForAll>
+				<Exists name="intermediateResult">
+					<isFalse>intermediate</isFalse>
+				</Exists>
+				<TtoF name="intermediateP">
+					<forall>intermediateAssumption</forall>
+					<exists>intermediateResult</exists>
+				</TtoF>
+				<ForAll name="secondStepAssumption">
+					<false>intermediate</false>
+					<this>this</this>
+				</ForAll>
+				<Exists name="secondStepConclusion">
+					<isTrue>isTrue</isTrue>
+				</Exists>
+				<FtoT name="secondStep">
+					<forall>secondStepAssumption</forall>
+					<exists>secondStepConclusion</exists>
+				</FtoT>
+				<Proof name="proof">
+					<intermediateP>intermediateP</intermediateP>
+					<secondStep>secondStep</secondStep>
+				</Proof>
+			</terms>
+		</NotNotTrueIsTrue>
+	</GRML>
+</SCRML>

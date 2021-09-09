@@ -249,10 +249,10 @@ let hostInitializer = function hostInitializer() {
     
     statementType.childSelectFocusListener = function childSelectFocusListener(e) {
         let select = e.target, link = pageType.getLinkFromEvent(e), value = select.value;
-        select.innerHTML = link.typeNames[link.members[value].type].memberOptions.innerHTML;
-        for (let i = 0; i < select.children.length; ++i) if (select.children[i].textContent === value) {
-            select.selectedIndex = i;
-            break;
+        gui.filicide(select);
+        for (let option of link.typeNames[link.members[value].type].memberOptions.childNodes) {
+            gui.textShell(option.value, "option", select);
+            if (option.value === value) select.selectedIndex = select.childElementCount - 1;
         }
     }
     
@@ -263,8 +263,11 @@ let hostInitializer = function hostInitializer() {
     }
     
     statementType.childSelectChangeListener = function childSelectChangeListener(e) {
-        
+        let select = e.target, link = pageType.getLinkFromEvent(e), td = statementType.childNameClimber(select), row = statementType.typeNameClimber(select);
+        link.dm("setChild", row.getAttribute("membername"), td.getAttribute("childname"), select.value);
     }
+    
+    statementType.childNameClimber = gui.basicClimber("[childname]", editor);
     
     statementType.inUniverseListener = function inUniverseToggle(e) {
         let link = pageType.getLinkFromEvent(e);
@@ -334,6 +337,10 @@ let workerInitializer = function workerInitializer() {
         let graph = this.page.graph, member = graph.memberByName(oldName);
         if (member.canChangeName(newName)) member.manager.setVarValue("name", newName);
         else this.dm("memberNameChangeFail", oldName, newName);
+    }
+    statementProto.setChild = function setChild(memberName, childName, childMemberName) {
+        let graph = this.page.graph;
+        graph.memberByName(memberName).setChild(childName, graph.membersByName[childMemberName]);
     }
     statementProto.inUniverse = function inUniverse(putIn) {
         let graph = this.page.graph;

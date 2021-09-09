@@ -26,8 +26,5 @@ gui.textShellAlphabeticComparator = function textShellAlphabeticComparator(a, b)
 }
 
 gui.sortTextShells = function sortTextShells(parentElement, comparator = gui.textShellAlphabeticComparator) {
-    let arr = Array.from(parentElement.childNodes);
-    gui.filicide(parentElement);
-    arr.sort(comparator);
-    for (let element of arr) parentElement.appendChild(element);
+    Array.prototype.sort.call(parentElement, comparator);
 }

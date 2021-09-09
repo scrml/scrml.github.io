@@ -231,6 +231,13 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }
+    // root page saves differently
+    pages.items[0].saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+        let line = "<SCRML format=\"editor\">\n";
+        line += chapterProto.saveToSCRMLString.call(pages.items[0], indent + tab, tab);
+        line += "\n</SCRML>";
+        return line;
+    }
     // set parent/child relationships
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId][0] === "chapter") for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
     // set toggles
@@ -404,6 +411,7 @@ pageProto.saveToAutosaveString = function saveToAutosaveString() {
 pageProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
     let line = indent + "<"+this.name + " pageType=\"" + this.pageType + "\"";
     if (this.nickname !== "") line += " nickname=\"" + xmlEscape(this.nickname) + "\"";
+    if (this.isOpen) line += " open=\"\"";
     line += "/>";
     return line;
 }
@@ -421,8 +429,10 @@ chapterProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "
 statementProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
     let line = pageProto.saveToSCRMLString.call(this, indent, tab);
     let graph = this.graph, members = this.graph.members.items;
-    if (graph.isGenesis()) return line;
-    line = line.replace(/\/>$/, ">");
+    line = line.substring(0, line.length - 2);
+    if (this.graph.isInUniverse) line += " inUniverse=\"\"";
+    if (graph.isGenesis()) return line + "/>";
+    else line += ">";
     line += "\n"+indent+tab+"<types>";
     for (let type in graph.usesTypes) line += "\n"+indent+tab+tab+"<"+graph.usesTypes[type]+">"+Graph.graph(type).page.fullName+"</"+graph.usesTypes[type]+">";
     line += "\n"+indent+tab+"</types>";
