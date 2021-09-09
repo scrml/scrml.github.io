@@ -1,7 +1,7 @@
 function updateMessage(line) {postMessage(["errorOut", line])};
 
 // script setup
-let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, TypedGraph, functions = {}, scrmljs = {
+let pageTickets, pages, pagesByFullName = {}, guiLinks, idManager, overloadManager, mainLink, Graph, TypedGraph, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
@@ -163,6 +163,10 @@ function newPage(name, nickname = "", protoModel = pageProto) {
     returner.manager.linkListener("fullPageNumber", function(fullPageNumber) {returner.updateFullName()});
     returner.manager.setVarValue("fullName", name);
     returner.manager.linkProperty("fullName", returner);
+    returner.manager.linkListener("fullName", function(newFullName, oldFullName) {
+        pagesByFullName[newFullName] = returner;
+        if (typeof oldFullName !== "undefined") delete pagesByFullName[oldFullName];
+    });
     returner.isOpen = false;
     returner.guiLink = false;
     returner.isVisible = false;
@@ -266,7 +270,6 @@ pageProto.computeFullName = function computeFullName() {
 
 pageProto.updateFullName = function updateFullName() {
     this.manager.setVarValue("fullName", this.computeFullName());
-    //console.log("full name " + this.fullName);
 }
 
 pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
@@ -364,6 +367,11 @@ chapterProto.isAncestorOf = function isAncestorOf(page) {
         page = page.parent;
     }
     return false;
+}
+
+chapterProto.updateFullName = function updateFullName() {
+    pageProto.updateFullName.call(this);
+    for (let child of this.childPages) child.updateFullName();
 }
 
 chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
@@ -477,10 +485,7 @@ statementProto.showPage = function showPage(show) {
     pageProto.showPage.call(this, show);
     let graph = this.graph, members = graph.members.items, guiLink = this.guiLink;
     if (show) {
-        for (let member of members) if (member.memberId) {
-            guiLink.showMember(member);
-            for (let child of member.children.items) guiLink.dm("setChild", member.name, child.name, graph.member(child.memberId).name, graph.usesType[child.memberId]);
-        }
+        for (let member of members) if (member.memberId) guiLink.showMember(member);
         guiLink.dm("isInUniverse", graph.isInUniverse);
     }
 }
@@ -494,33 +499,39 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
     let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto);
     
     graphProto.addMember = function addMember(name, type, typeName, memberProto = memberProtoModel) {
-        let member = protoModel.addMember.call(this, name, type, typeName, memberProto);
-        if (this.page && this.page.isVisible) this.page.guiLink.showMember(member);
-        if (this.page) this.page.preSave();
+        let member = protoModel.addMember.call(this, name, type, typeName, memberProto), page, guiLink;
+        if ((page = this.page) && page.isVisible) { // adding a blank member to a visible graph
+            guiLink = page.guiLink;
+            guiLink.showMember(member);
+            // open all the required children and set their types
+            for (let max of Graph.graph(type).maximalTerms()) {
+                
+            }
+        }
+        if (page) page.preSave();
         return member;
     }
     
-    graphProto.markUsesType = function markUsesType(type, typeName) {
+    graphProto.markUsesType = function markUsesType(type, typeName, oldTypeName) {
         protoModel.markUsesType.call(this, type, typeName);
         if (this.page && this.page.isVisible) {
-            this.page.guiLink.dm("setTypeName", typeName, Graph.graph(type).page.fullName);
+            this.page.guiLink.dm("setTypeName", typeName, Graph.graph(type).page.fullName, oldTypeName);
         }
     }
     
     graphProto.markNotUsesType = function markNotUsesType(type) {
         protoModel.markNotUsesType.call(this, type);
+        if (this.page && this.page.isVisible) {
+            this.page.guiLink.dm("eraseTypeName", type);
+        }
     }
     
     memberProtoModel.setChild = function setChild(name, memberId) {
         graphProto.memberProto.setChild.call(this, name, memberId);
+        if (1>0) return;
         let graph = this.graph;
         if (graph.page && graph.page.isVisible) graph.page.guiLink.dm("setChild", this.name, name, graph.member(memberId).name, graph.usesType[memberId]);
         graph.page.preSave();
-    }
-    
-    memberProtoModel.setName = function setName(name) {
-        TypedGraph.memberProto.setName.call(this, name);
-        if (this.graph.page.isVisible) this.graph.page.guiLink.dm("setMemberName", this.memberId, name);
     }
     
     graphProto.putInUniverse = function putInUniverse(putIn) {
@@ -530,5 +541,9 @@ function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoMode
         page.preSave();
         if (!page.isVisible) return;
         page.guiLink.dm("isInUniverse", putIn);
+    }
+    
+    graphProto.saveStringChangedHook = function saveStringChangedHook() {
+        if (this.page) this.page.preSave();
     }
 }

@@ -12,6 +12,7 @@ Graph.protoModel = {thisIs: "Graph"};// object to be used as prototype of instan
 Graph.newGraph = function newGraph(protoModel = Graph.protoModel) {
     let returner = Object.create(protoModel), manager = returner.manager = newVarManager();
     returner.usesTypes = {};
+    returner.typesByName = {};
     returner.usedByTypes = {};
     // override setUi, the prototype wants to update the manager but the manager can't be initialized yet
     returner.setUi = function(ui) {this.ui = ui};
@@ -52,6 +53,7 @@ Graph.protoModel.addMember = function addMember(name, type = name, typeName = ty
     member.unlinks = [];
     manager.setVarValue("name", name);
     manager.linkProperty("name", member);
+    manager.linkListener("name", function(newName, oldName) {member.moveInByName(newName, oldName)}, true);
     member.unlinks.push(typeGraph.manager.linkListener("ui", function(newUi) {manager.setVarValue("type", newUi)}, true));
     manager.linkProperty("type", member);
     // children is an idManager list of (name, memberId) pairs
@@ -60,7 +62,6 @@ Graph.protoModel.addMember = function addMember(name, type = name, typeName = ty
     member.ancestors = {};
     member.descendants = {};
     this.members.addItem(member);
-    this.membersByName[name] = member.memberId;
     member.originalId = member.id; // for testing member erasing, to be removed later
     typeGraph.changeUsedByType(this.ui, true, typeName);
     this.changeUsesType(type, true, typeName);
@@ -69,14 +70,21 @@ Graph.protoModel.addMember = function addMember(name, type = name, typeName = ty
 }
 
 // don't call these marks directly, instead call change below
-Graph.protoModel.markUsesType = function markUsesType(type, typeName) {this.usesTypes[type] = typeName}
-Graph.protoModel.markNotUsesType = function markNotUsesType(type) {delete this.usesTypes[type]}
+Graph.protoModel.markUsesType = function markUsesType(type, typeName, oldTypeName) {
+    this.usesTypes[type] = typeName;
+    this.typesByName[typeName] = type;
+    if (typeof oldTypeName !== "undefined") delete this.typesByName[oldTypeName];
+}
+Graph.protoModel.markNotUsesType = function markNotUsesType(type) {
+    delete this.typesByName[this.usesTypes[type]];
+    delete this.usesTypes[type];
+}
 Graph.protoModel.markUsedByType = function markUsedByType(type, typeName) {this.usedByTypes[type] = typeName}
 Graph.protoModel.markNotUsedByType = function markNotUsedByType(type) {delete this.usedByTypes[type]}
 
 Graph.protoModel.changeUsesType = function changeUsesType(type, use, typeName) {
     if (use) {
-        if (!(type in this.usesTypes)) this.markUsesType(type, typeName);
+        if (!(type in this.usesTypes) || (this.usesTypes[type] !== typeName)) this.markUsesType(type, typeName, this.usesTypes[type]);
     } else {
         if (type in this.usesTypes) this.markNotUsesType(type);
     }
@@ -142,6 +150,7 @@ Graph.protoModel.setUi = function setUi(ui) {this.manager.setVarValue("ui", ui)}
 Graph.protoModel.member = function member(id) {return this.members.items[id]}
 Graph.protoModel.memberByName = function memberByName(name) {return this.member(this.membersByName[name])}
 Graph.protoModel.eraseMember = function eraseMember(id) {this.member(id).deleteMember()}
+Graph.protoModel.eraseMemberByName = function eraseMember(name) {this.memberByName(name).deleteMember()}
 Graph.protoModel.saveStringChangedHook = emptyFunction;
 
 Graph.protoModel.saveToAutosaveString = function saveToAutosaveString() {
@@ -154,8 +163,15 @@ memberProto.moveInByName = function moveInByName(name, oldName) {
     if (name == oldName) return;
     let byName = this.graph.membersByName;
     if (name in byName) throw Error("name " + name + " is already in use");
+    byName[name] = this.memberId;
+    if (typeof oldName === "undefined") return;
     delete byName[oldName];
-    byName[name] = this.id;
+}
+
+memberProto.canChangeName = function canChangeName(newName) {
+    let graph = this.graph, typeGraph = Graph.graph(this.type);
+    if (newName in graph.membersByName) return false;
+    return true;
 }
 
 // Set child named childName to childMemberId. If I already have a child named childName I first unset then child. Then I reset my own ancestry to check for cycles.
@@ -202,6 +218,7 @@ memberProto.notifyFamilyUpdate = emptyFunction;
 
 memberProto.deleteMember = function deleteMember() {
     if (!this.canDelete()) throw Error("cannot delete member");
+    for (let unlink of this.unlinks) unlink.unlink();
     let graph = this.graph, members = graph.members, myType = this.type, inUse = false;
     for (let d in this.descendants) delete graph.member(d).ancestors[this.memberId];
     members.preErase(this.id);
@@ -218,6 +235,7 @@ memberProto.deleteMember = function deleteMember() {
 memberProto.setMemberId = function setMemberId(newMemberId, oldMemberId) {
     let graph = this.graph, members = graph.members.items;
     this.memberId = newMemberId;
+    graph.membersByName[this.name] = newMemberId;
     if (typeof oldMemberId !== "undefined") {
         for (let member of members) {
             for (let child of member.children.items) if (child.memberId == oldMemberId) child.memberId = newMemberId;
@@ -230,7 +248,6 @@ memberProto.setMemberId = function setMemberId(newMemberId, oldMemberId) {
             }
         }
     }
-    graph.membersByName[this.name] = newMemberId;
     graph.saveStringChangedHook();
 }
 

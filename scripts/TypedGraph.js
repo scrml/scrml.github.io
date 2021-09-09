@@ -19,7 +19,15 @@ let memberProto = TypedGraph.protoModel.memberProto = Object.create(Graph.protoM
 
 TypedGraph.protoModel.addMember = function addMember(name, type, typeName = type, protoModel = this.memberProto) {
     let member = Graph.protoModel.addMember.call(this, name, type, typeName, protoModel);
-    if (member.memberId) this.member(0).setChild(name, member.memberId);
+    if (member.memberId) {
+        let root = this.member(0);
+        root.setChild(name, member.memberId);
+        member.manager.linkListener("name", function(newName, oldName) {
+            if (!(oldName in root.childrenByName)) return;
+            root.unsetChild(oldName);
+            root.setChild(newName, member.memberId);
+        });
+    }
     return member;
 }
 

@@ -19,7 +19,7 @@
     display: none;
 }
 
-.simple[genesis] .typenames, .simple[genesis] .members {
+.simple[notypes] .typenames, .simple[genesis] .members {
     display: none;
 }
 
@@ -43,4 +43,8 @@
 .typenames td, .members td {
     border: 1px solid black;
     padding: .3em;
+}
+
+[colspan="0"] {
+    display: none;
 }

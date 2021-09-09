@@ -20,3 +20,14 @@ gui.select = function select(loadHere, disabledDescriptionOptionTexts, options =
     returner.addEventListener("change", options("onchange"));
     return returner;
 }
+
+gui.textShellAlphabeticComparator = function textShellAlphabeticComparator(a, b) {
+    return a.innerText.localeCompare(b.innerText);
+}
+
+gui.sortTextShells = function sortTextShells(parentElement, comparator = gui.textShellAlphabeticComparator) {
+    let arr = Array.from(parentElement.childNodes);
+    gui.filicide(parentElement);
+    arr.sort(comparator);
+    for (let element of arr) parentElement.appendChild(element);
+}

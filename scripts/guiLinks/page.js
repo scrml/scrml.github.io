@@ -48,13 +48,13 @@ pageType.initializers.host = function() {
         this.nameSpan.removeAttribute("disabled");
         this.nicknameSpan.setAttribute("placeholder", "nickname for " + name);
         this.nameSpan.blur();
-        this.nameSpan.setWidth();
+        this.nameSpan.fixWidth();
     }
     pageProto.getNickname = function getNickname(nickname) {
         gui.messages.setInputValue(this.nicknameSpan, nickname);
         this.nicknameSpan.removeAttribute("disabled");
         this.nicknameSpan.blur();
-        this.nicknameSpan.setWidth();
+        this.nicknameSpan.fixWidth();
     }
     pageProto.togglePage = function togglePage(open) {
         if (open) this.div.setAttribute("open", "");
@@ -163,7 +163,7 @@ pageType.initializers.worker = function() {
     }
     pageProto.eraseLink = function eraseLink() {
         for (let unlink of this.unlinks) unlink.unlink();
-        this.page.manager.flushEraseAll();
+        this.page.manager.clearAll();
         linkProto.eraseLink.call(this);
     }
     pageProto.tryChangeName = function tryChangeName(newName) {

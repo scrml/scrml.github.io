@@ -34,9 +34,10 @@ gui.messages.inputText = function inputText(input, message, time = 1000) {
     }, time);
 }
 
-gui.messages.setInputValue = function setInputValue(input, value) {
+gui.messages.setInputValue = function setInputValue(input, value, changeWidth = true) {
     if (input.hasAttribute("messagerevertto")) input.setAttribute("messagerevertto", value);
     else input.value = value;
+    if (changeWidth) gui.fixInputWidth(input);
 }
 
 gui.messages.button = function button(button, message, time) {
