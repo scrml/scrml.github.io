@@ -255,6 +255,16 @@ function importSCRMLFile(doc) {
     }
 }
 
+scrmljs.loadExample = function loadExample() {
+    let req = new XMLHttpRequest();
+    req.addEventListener("load", function() {
+        importSCRMLFile(req.responseXML);
+    });
+    req.open("GET", "https://raw.githubusercontent.com/scrml/scrml.github.io/master/scrml/GRML.scrml");
+    req.overrideMimeType("application/xml");
+    req.send();
+}
+
 function importSCRMLFileEditor(doc) {
     let docRoot = xml.getRoot(doc), pageId = 0, ui = 1, rootPage, autosaves = [];
     while (doc.nodeType !== 9) doc = doc.parentElement;
