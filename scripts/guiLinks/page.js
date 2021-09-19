@@ -36,7 +36,7 @@ pageType.initializers.host = function() {
         page.fullNameSpan = gui.element("span", page.pageHead, ["class", "fullname"]);
         page.fullNameText = gui.text("", page.fullNameSpan);
         page.pageTools = gui.element("div", page.pageHead, ["class", "pagetools"]);
-        page.moveButton = gui.button("⇳", page.pageTools, type.moveModeAction, ["class", "movebutton", "disguise", "", "bigger", ""]);
+        page.moveButton = gui.button("⇳", page.pageTools, type.moveButtonListener, ["class", "movebutton", "disguise", "", "bigger", ""]);
         gui.shieldClicks(page.moveButton);
         page.deleteBundle = gui.deleteBundle(page.pageTools, type.deleteBundleAction);
         // if this is not the first page then create a page gap before this page
@@ -70,6 +70,7 @@ pageType.initializers.host = function() {
                 gui.removeLayer(div);
             }
         });
+      this.setMoveMode(false);
     }
     pageProto.setLinkId = function setLinkId(newId, oldId = this.linkId) {
         let links = mainLink.links;
@@ -121,18 +122,22 @@ pageType.initializers.host = function() {
         e = pageType.getLinkFromEvent(e);
         e.dm("getNickname");
     }
-    pageType.moveModeAction = function(e) {
-        e = pageType.getLinkFromEvent(e);
-        if (editor.hasAttribute("movemode")) {
+    pageType.moveButtonListener = function moveButtonListener(e) {
+      e = pageType.getLinkFromEvent(e);
+      e.setMoveMode(!editor.hasAttribute("movemode"));
+    }
+    pageProto.setMoveMode= function(moveMode) {
+      // switch these cases amd get rid of the negation, i just cant copy/paste very well on this device
+        if (!moveMode) {
             scrmljs.lockedPageFocus = false;
             editor.removeAttribute("movemode");
-            e.div.removeAttribute("movingPage");
+            this.div.removeAttribute("movingPage");
             for (let page of editor.querySelectorAll("[canacceptmove]")) page.removeAttribute("canacceptmove");
         } else {
-            scrmljs.lockedPageFocus = e;
+            scrmljs.lockedPageFocus = this;
             editor.setAttribute("movemode", "");
-            e.div.setAttribute("movingpage", "");
-            e.dm("startMoveModeChecks");
+            this.div.setAttribute("movingpage", "");
+            this.dm("startMoveModeChecks");
         }
     }
     pageType.deleteBundleAction = function(e) {

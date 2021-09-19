@@ -105,14 +105,11 @@ let setDebugAction = function setDebugAction(action) {
     debugButton.onclick = action;
 }
 
-switch (1) {
+switch (0) {
     case 0: 
         setDebugAction(function() {
-            localStorage.clear();
-            localStorage.setItem("page 0", "chapter\nBook\n\no\n1 2");
-            localStorage.setItem("page 1", "chapter\nfirstChild\nFirst Child\nc\n");
-            localStorage.setItem("page 2", "chapter\nsecondChild\nSecond Child\nc\n");
-            window.location.reload();
+          window.localStorage.clear();
+          window.location.reload();
         });
     break; case 1:
         setDebugAction(function() {
