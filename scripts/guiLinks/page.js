@@ -138,7 +138,7 @@ pageType.initializers.host = function() {
     pageType.deleteBundleAction = function(e) {
         e = pageType.getLinkFromEvent(e);
         e.deletePage();
-    }   
+    }
 }
 
 pageType.initializers.worker = function() {
@@ -163,7 +163,7 @@ pageType.initializers.worker = function() {
     }
     pageProto.eraseLink = function eraseLink() {
         for (let unlink of this.unlinks) unlink.unlink();
-        this.page.manager.clearAll();
+        this.unlinks.splice(0, this.unlinks.length);
         linkProto.eraseLink.call(this);
     }
     pageProto.tryChangeName = function tryChangeName(newName) {

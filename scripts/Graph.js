@@ -1,5 +1,10 @@
 // First we create plain graphs. Structure consists of ui (universal identifier), typed members, named edges, and ancestry.
-let Graph = scrmljs.Graph = {}, idManager = scrmljs.idManager, newVarManager = scrmljs.newVarManager, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction;
+let Graph = scrmljs.Graph = {},
+    idManager = scrmljs.idManager,
+    newVarManager = scrmljs.newVarManager,
+    isEmpty = scrmljs.isEmpty,
+    emptyFunction = scrmljs.emptyFunction,
+    trueFunction = scrmljs.trueFunction;
 
 Graph.allGraphs = idManager.newManager("ui");
 Graph.graph = function graph(ui) {

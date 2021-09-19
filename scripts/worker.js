@@ -484,6 +484,7 @@ statementProto.newGraph = function newGraph() {
 
 function newStatement(name, nickname = "", protoModel = statementProto) {
     let returner = newPage(name, nickname, protoModel);
+  // full page name update on statement because full name is used in save string
     returner.manager.linkListener("fullName", function(fullName) {postMessage(["fullPageNameUpdate", returner.pageId, fullName])}, true);
     returner.graph = protoModel.newGraph();
     returner.graph.page = returner;
@@ -497,6 +498,8 @@ statementProto.showPage = function showPage(show) {
     if (show) {
         for (let member of members) if (member.memberId) guiLink.showMember(member);
         guiLink.dm("isInUniverse", graph.isInUniverse);
+    } else {
+      
     }
 }
 

@@ -27,7 +27,7 @@ protoModel.getManagedLink = function getManagedLink(linkId) {
 }
 
 protoModel.eraseLink = function eraseLink(linkId) {
-    //console.log("directly deleting " + linkId);
+   // console.log("directly deleting " + linkId);
     delete this.links[linkId];
 }
 
@@ -38,6 +38,7 @@ protoModel.eraseManagedLink = function eraseManagedLink(linkId) {
 }
 
 protoModel.flushErase = function flushErase() {
+    //console.log("flushing erase")
     this.links.flushErase();
 }
 
@@ -98,13 +99,13 @@ typeProto.tdm = function tdm(...data) {dmLog(this.mainLink.side + " tdming " + d
 linkProto = guiWorkerLink.linkProto = {};
 
 protoModel.newLink = function newLink(type, linkId) {
-    //console.log(this.side + " creating link " + linkId);
     let returner = Object.create(type.linkProto);
     returner.type = type;
     if (typeof linkId === "undefined") {
         if (this.links.isIdManager) {
             returner.tdm("createLink", this.links.items.length, type.extensionName);
             this.links.addItem(returner);
+            linkId = returner.linkId;
         } else throw Error("trying to make a link without a link id");
     } else {
         if (this.links.isIdManager) throw Error("trying to specify a linkId when a manager is present");
