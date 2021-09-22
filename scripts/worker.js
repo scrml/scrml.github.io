@@ -499,7 +499,7 @@ statementProto.showPage = function showPage(show) {
         for (let member of members) if (member.memberId) guiLink.showMember(member);
         guiLink.dm("isInUniverse", graph.isInUniverse);
     } else {
-      
+      for (let member of members) if (member.isVisible) member.isVisible = false;
     }
 }
 

@@ -247,6 +247,12 @@ let hostInitializer = function hostInitializer() {
         this.childrenTitle.setAttribute("colspan", maxChildren - 2);
     }
     
+    statementProto.hideMember = function hideMember(memberName) {
+        let member = this.members[memberName];
+        gui.orphan(member.div);
+        delete this.members[memberName];
+    }
+    
     statementType.childSelectFocusListener = function childSelectFocusListener(e) {
         let select = e.target, link = pageType.getLinkFromEvent(e), value = select.value;
         gui.filicide(select);
@@ -295,9 +301,11 @@ let workerInitializer = function workerInitializer() {
         for (let member of graph.members.items) if (member.id) link.showMember(member);
         link.dm("canModify", graph.canModify());
     }
+    
     statementProto.canModify = function canModify() {
         this.dm("canModify", this.page.graph.canModify());
     }
+    
     statementProto.showType = function showType(type) {
         if (type in this.visibleTypes) return;
         let me = this, graph = this.page.graph, typeGraph = Graph.graph(type);
@@ -305,14 +313,17 @@ let workerInitializer = function workerInitializer() {
             me.dm("setTypeName", graph.usesTypes[pagesByFullName[newFullName].graph.ui], newFullName);
         }, true);
     }
+    
     statementProto.changeTypeName = function changeTypeName(oldTypeName, newTypeName) {
         let graph = this.page.graph;
         graph.changeUsesType(graph.typesByName[oldTypeName], true, newTypeName);
         this.page.preSave();
     }
+    
     statementProto.newMember = function newMember(name, typeName, typePageId) {
         this.page.graph.addMember(name, getGraphFromPageId(typePageId).ui, typeName);
     }
+    
     statementProto.showMember = function showMember(member) {
         if (member.isVisible) throw Error("member " + member.name + " already visible");
         member.isVisible = true;
@@ -333,15 +344,26 @@ let workerInitializer = function workerInitializer() {
         }
         this.dm("setChildren", member.name, childInfo);
     }
+    
+    statementProto.hideMember = function hideMember(member) {
+        if (!member.isVisible) throw Error("member " + member.name + " already hidden");
+        member.isVisible = false;
+        for (let unlink of member.guiUnlinks) unlink.unlink();
+        member.guiUnlinks.splice(0, member.guiUnlinks.length);
+        this.dm("hideMember", member.name);
+    }
+    
     statementProto.tryChangeMemberName = function tryChangeMemberName(oldName, newName) {
         let graph = this.page.graph, member = graph.memberByName(oldName);
         if (member.canChangeName(newName)) member.manager.setVarValue("name", newName);
         else this.dm("memberNameChangeFail", oldName, newName);
     }
+    
     statementProto.setChild = function setChild(memberName, childName, childMemberName) {
         let graph = this.page.graph;
         graph.memberByName(memberName).setChild(childName, graph.membersByName[childMemberName]);
     }
+    
     statementProto.inUniverse = function inUniverse(putIn) {
         let graph = this.page.graph;
         if (graph.isInUniverse == putIn) return;
