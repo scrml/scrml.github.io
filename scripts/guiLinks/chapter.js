@@ -70,24 +70,104 @@ let hostInitializer = function hostInitializer() {
 }
 
 let workerInitializer = function workerInitializer() {
-    let extension = pageType.extensions.chapter, chapterProto = extension.linkProto = Object.create(pageType.linkProto);
-    chapterProto.isType = "chapter";
+    
+    // first the raw chapter stuff
+    
+    let pageProto = scrmljs.pageProtos.page, chapterProto = Object.create(pageProto);
+    
+    chapterProto.pageType = "chapter";
     chapterProto.isChapter = true;
+    
+    scrmljs.pageCreators.chapter = function newChapter(name, nickname, protoModel = chapterProto) {
+        let returner = scrmljs.pageCreators.page(name, nickname, protoModel);
+        returner.children = [];
+        returner.childPages = [];
+        return returner;
+    }
+    
+    chapterProto.isAncestorOf = function isAncestorOf(page) {
+        while (page) {
+            if (this === page) return true;
+            page = page.parent;
+        }
+        return false;
+    }
+    
+    chapterProto.updateFullName = function updateFullName() {
+        pageProto.updateFullName.call(this);
+        for (let child of this.children) child.updateFullName();
+    }
+    
+    chapterProto.updateFullSiblingNumber = function updateFullSiblingNumber(siblingNumber) {
+        pageProto.updateFullSiblingNumber.call(this, siblingNumber);
+        for (let child of this.children) child.updateFullSiblingNumber(child.siblingNumber);
+    }
+    
+    chapterProto.updateFullPageNumber = function updateFullPageNumber(pageNumber) {
+        pageProto.updateFullPageNumber.call(this, pageNumber);
+        for (let child of this.children) child.updateFullPageNumber(child.pageNumber);
+    }
+    
+    chapterProto.canAcceptMove = function canAcceptMove(page) {
+        if (page.isChapter && page.isAncestorOf(this)) return false;
+        for (let child of this.children) if (page !== child && child.name === page.name) return false;
+        return true;
+    }
+    
+    chapterProto.showPage = function showPage(open) {
+        pageProto.showPage.call(this, open);
+        if (this.isOpen) for (let childPage of this.children.slice().reverse()) childPage.showPage(open);
+    }
+    
+    chapterProto.togglePage = function togglePage(open = false) {
+        if (open === this.isOpen) return;
+        pageProto.togglePage.call(this, open);
+        // add the children in reverse order so that nextPage already exists in gui
+        if (this.isVisible) for (let childPage of this.children.slice().reverse()) childPage.showPage(open);
+    }
+    
+    chapterProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+        let line = pageProto.saveToSCRMLString.call(this, indent, tab);
+        if (this.children.length) {
+            line = line.replace(/\/>$/, ">");
+            for (let childPage of this.children) line += "\n" + childPage.saveToSCRMLString(indent + tab, tab);
+            line += "\n" + indent + "</" + this.name + ">";
+        }
+        return line;
+    }
+    
+    chapterProto.saveToAutosaveString = function saveToAutosaveString() {
+        let line = pageProto.saveToAutosaveString.call(this) + "\n";
+        for (let child of this.children) line += child.pageId + " ";
+        if (this.children.length > 0) line = line.substring(0, line.length - 1);
+        return line;
+    }
+    
+    chapterProto.canDelete = function canDelete() {
+        return this.children.length === 0;
+    }
+    
+    
+    // now for guiLink stuff
+    
+    let extension = pageType.extensions.chapter, cLinkProto = extension.linkProto = Object.create(pageType.linkProto);
+    cLinkProto.isType = "chapter";
+    cLinkProto.isChapter = true;
     chapterType = extension.type = Object.create(pageType);
-    chapterType.linkProto =chapterProto;
+    chapterType.linkProto =cLinkProto;
     chapterType.extensionName = "chapter";
     chapterType.createLink = function createLink(page, extensionName = "chapter") {
         pageType.createLink(page, extensionName);
         if (scrmljs.moveMode) page.guiLink.dm("canAcceptMove", page.canAcceptMove(scrmljs.moveMode));
     }
-    chapterProto.eraseLink = function eraseLink() {
-        for (let childPage of this.page.childPages) childPage.showPage(false);
+    cLinkProto.eraseLink = function eraseLink() {
+        for (let childPage of this.page.children) childPage.showPage(false);
         pageType.linkProto.eraseLink.call(this);
     }
-    chapterProto.tryNewPage = function tryNewPage(name, insertBefore, pageType) {
+    cLinkProto.tryNewPage = function tryNewPage(name, insertBefore, pageType) {
         let page = this.page;
-        for (let child of page.childPages) if (child.name === name) return this.dm("newPageFail", insertBefore);
-        let newPage = newPageByType[pageType](name);
+        for (let child of page.children) if (child.name === name) return this.dm("newPageFail", insertBefore);
+        let newPage = scrmljs.pageCreators[pageType](name);
         newPage.togglePage(true);
         newPage.moveTo(page, insertBefore === "none"? "none": mainLink.getLink(insertBefore).page, false);
         newPage.showPage(true);

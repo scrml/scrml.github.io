@@ -9,7 +9,7 @@
     min-height: 1.5em;
 }
 
-.siblingnumber, .fullpagenumber {
+.pagenumber, .fullpagenumber {
     margin-right: 1em;
 }
 
@@ -17,7 +17,7 @@
     background: rgb(240, 242, 240);
 }
 
-.editor[pagenumbermode="siblingnumber"] .fullpagenumber, .editor[pagenumbermode="fullpagenumber"] .siblingnumber {
+.editor[pagenumbermode="pagenumber"] .fullpagenumber, .editor[pagenumbermode="fullpagenumber"] .pagenumber {
     display: none;
 }
 
@@ -25,7 +25,7 @@
     display: none;
 }
 
-.editor[namemode="fullnamemode"] .siblingnumber, .editor[namemode="fullnamemode"] .fullpagenumber {
+.editor[namemode="fullnamemode"] .pagenumber, .editor[namemode="fullnamemode"] .fullpagenumber {
     display: none;
 }
 
@@ -65,6 +65,6 @@
     display: inline-block;
 } 
 
-[linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .siblingnumber, [linkid="0"] > .pagehead .fullpagenumber {
+[linkid="0"] > .pagehead .pagetools, [linkid="0"] > .pagehead .pagenumber, [linkid="0"] > .pagehead .fullpagenumber {
     display: none;
 }

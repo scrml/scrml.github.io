@@ -286,11 +286,83 @@ let hostInitializer = function hostInitializer() {
 }
 
 let workerInitializer = function workerInitializer() {
-    let extension = pageType.extensions.statement, statementProto = extension.linkProto = Object.create(pageType.linkProto);
-    statementProto.isType = "statement";
+    
+    // first the raw statement stuff
+    
+    let pageProto = scrmljs.pageProtos.page, statementProto = scrmljs.pageProtos.statement = Object.create(pageProto), Graph = scrmljs.Graph, TypedGraph = Graph.TypedGraph;
+    
+    statementProto.pageType = "statement";
     statementProto.isStatement = true;
+    // used in statement constructor to create blank graph
+    statementProto.newGraph = function newGraph() {
+        let returner = TypedGraph.newGraph(statementProto.graphProto);
+        returner.page = this;
+        return returner;
+    };
+
+    scrmljs.pageCreators.statement = function newStatement(name, nickname = "", protoModel = statementProto) {
+        let returner = scrmljs.pageCreators.page(name, nickname, protoModel);
+        // full page name update on statement because full name is used in save string
+        returner.manager.linkListener("fullName", function(fullName) {postMessage(["fullPageNameUpdate", returner.pageId, fullName])}, true);
+        returner.graph = protoModel.newGraph();
+        returner.graph.page = returner;
+        return returner;
+    }
+    
+    statementProto.showPage = function showPage(show) {
+        if (show === this.isVisible) return;
+        pageProto.showPage.call(this, show);
+        let graph = this.graph, members = graph.members.items, guiLink = this.guiLink;
+        if (show) {
+            for (let member of members) if (member.memberId) guiLink.showMember(member);
+            guiLink.dm("isInUniverse", graph.isInUniverse);
+        } else {
+          for (let member of members) if (member.isVisible) member.isVisible = false;
+        }
+    }
+    
+    statementProto.deletePage = function deletePage() {
+        pageProto.deletePage.call(this);
+        this.graph.deleteGraph();
+    }
+    
+    statementProto.saveToAutosaveString = function saveToAutosaveString() {
+        let graph = this.graph;
+        return pageProto.saveToAutosaveString.call(this) + "\n" + (graph.isInUniverse? "i": "o") + "\n" + graph.saveToAutosaveString();
+    }
+    
+    statementProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+        let line = pageProto.saveToSCRMLString.call(this, indent, tab);
+        let graph = this.graph, members = this.graph.members.items;
+        line = line.substring(0, line.length - 2);
+        if (this.graph.isInUniverse) line += " inUniverse=\"\"";
+        if (graph.isGenesis()) return line + "/>";
+        else line += ">";
+        line += "\n"+indent+tab+"<types>";
+        for (let type in graph.usesTypes) line += "\n"+indent+tab+tab+"<"+graph.usesTypes[type]+">"+Graph.graph(type).page.fullName+"</"+graph.usesTypes[type]+">";
+        line += "\n"+indent+tab+"</types>";
+        line += "\n"+indent+tab+"<terms>";
+        for (let member of graph.members.items) if (member.memberId) {
+            line += "\n"+indent+tab+tab+"<"+graph.usesTypes[member.type]+" name=\""+member.name+"\"";
+            if (member.children.items.length === 0) line += "/>";
+            else {
+                line += ">";
+                for (let child of member.children.items) line += "\n"+indent+tab+tab+tab+"<"+child.name+">"+graph.member(child.memberId).name+"</"+child.name+">";
+                line += "\n"+indent+tab+tab+"</"+graph.usesTypes[member.type]+">";
+            }
+        }
+        line += "\n"+indent+tab+"</terms>";
+        line += "\n"+indent+"</"+this.name+">";
+        return line;
+    }
+    
+    // now for the guiLink stuff
+    
+    let extension = pageType.extensions.statement, sLinkProto = extension.linkProto = Object.create(pageType.linkProto);
+    sLinkProto.isType = "statement";
+    sLinkProto.isStatement = true;
     statementType = extension.type = Object.create(pageType);
-    statementType.linkProto = statementProto;
+    statementType.linkProto = sLinkProto;
     statementType.extensionName = "statement";
     pageType.showStatement = statementType.createLink = function createLink(page, extensionName = "statement") {
         pageType.createLink(page, extensionName);
@@ -302,29 +374,30 @@ let workerInitializer = function workerInitializer() {
         link.dm("canModify", graph.canModify());
     }
     
-    statementProto.canModify = function canModify() {
+    sLinkProto.canModify = function canModify() {
         this.dm("canModify", this.page.graph.canModify());
     }
     
-    statementProto.showType = function showType(type) {
+    sLinkProto.showType = function showType(type) {
         if (type in this.visibleTypes) return;
         let me = this, graph = this.page.graph, typeGraph = Graph.graph(type);
         this.visibleTypes[type] = typeGraph.page.manager.linkListener("fullName", function(newFullName) {
+            // for some reason full name is wrong here
             me.dm("setTypeName", graph.usesTypes[pagesByFullName[newFullName].graph.ui], newFullName);
         }, true);
     }
     
-    statementProto.changeTypeName = function changeTypeName(oldTypeName, newTypeName) {
+    sLinkProto.changeTypeName = function changeTypeName(oldTypeName, newTypeName) {
         let graph = this.page.graph;
         graph.changeUsesType(graph.typesByName[oldTypeName], true, newTypeName);
         this.page.preSave();
     }
     
-    statementProto.newMember = function newMember(name, typeName, typePageId) {
+    sLinkProto.newMember = function newMember(name, typeName, typePageId) {
         this.page.graph.addMember(name, getGraphFromPageId(typePageId).ui, typeName);
     }
     
-    statementProto.showMember = function showMember(member) {
+    sLinkProto.showMember = function showMember(member) {
         if (member.isVisible) throw Error("member " + member.name + " already visible");
         member.isVisible = true;
         let unlinks = member.guiUnlinks = [], graph = this.page.graph;
@@ -345,7 +418,7 @@ let workerInitializer = function workerInitializer() {
         this.dm("setChildren", member.name, childInfo);
     }
     
-    statementProto.hideMember = function hideMember(member) {
+    sLinkProto.hideMember = function hideMember(member) {
         if (!member.isVisible) throw Error("member " + member.name + " already hidden");
         member.isVisible = false;
         for (let unlink of member.guiUnlinks) unlink.unlink();
@@ -353,18 +426,18 @@ let workerInitializer = function workerInitializer() {
         this.dm("hideMember", member.name);
     }
     
-    statementProto.tryChangeMemberName = function tryChangeMemberName(oldName, newName) {
+    sLinkProto.tryChangeMemberName = function tryChangeMemberName(oldName, newName) {
         let graph = this.page.graph, member = graph.memberByName(oldName);
         if (member.canChangeName(newName)) member.manager.setVarValue("name", newName);
         else this.dm("memberNameChangeFail", oldName, newName);
     }
     
-    statementProto.setChild = function setChild(memberName, childName, childMemberName) {
+    sLinkProto.setChild = function setChild(memberName, childName, childMemberName) {
         let graph = this.page.graph;
         graph.memberByName(memberName).setChild(childName, graph.membersByName[childMemberName]);
     }
     
-    statementProto.inUniverse = function inUniverse(putIn) {
+    sLinkProto.inUniverse = function inUniverse(putIn) {
         let graph = this.page.graph;
         if (graph.isInUniverse == putIn) return;
         else graph.putInUniverse(putIn);

@@ -23,6 +23,7 @@ let updateValue = function updateValue(newValue) {this.object[this.property] = n
 let unlink = function unlink() {this.varManager.unlink(this.varName, this.varManagerId)};
 
 protoModel.linkProperty = function linkProperty(varName, object, property = varName) {
+    if (!this.vars[varName]) throw Error("varManager cannot find varName " + varName);
     let adder = {
         varManager: this,
         varName: varName,
@@ -35,6 +36,7 @@ protoModel.linkProperty = function linkProperty(varName, object, property = varN
 }
 
 protoModel.linkListener = function linkListener(varName, listener, fireWith = undefined) {
+    if (!this.vars[varName]) throw Error("varManager cannot find varName " + varName);
     let adder = {
         varManager: this,
         varName: varName,

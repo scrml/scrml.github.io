@@ -80,7 +80,7 @@ scriptLoader.addEphemeralListener(function start() {
     }
     
     // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
-    for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
+    for (let pageNumberMode of ["pagenumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
     for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
         editor.setAttribute("pageaction", "new"+pageAction+"mode");
@@ -105,7 +105,7 @@ let setDebugAction = function setDebugAction(action) {
     debugButton.onclick = action;
 }
 
-switch (0) {
+switch (1) {
     case 0: 
         setDebugAction(function() {
           window.localStorage.clear();
@@ -132,7 +132,7 @@ exportbutton.addEventListener("click", function() {post("exportSCRMLFile")});
 
 // page display mode section
 let pageNumberListener = function(e) {editor.setAttribute("pagenumbermode", e.target.getAttribute("id"))}
-for (let pageNumberMode of ["siblingnumber", "fullpagenumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
+for (let pageNumberMode of ["pagenumber", "fullpagenumber"]) document.getElementById(pageNumberMode).addEventListener("change", pageNumberListener);
 let nameModeListener = function(e) {editor.setAttribute("namemode", e.target.getAttribute("id"))}
 for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) document.getElementById(nameMode).addEventListener("change", nameModeListener);
 for (let pageAction of ["chapter", "statement", "comment"]) document.getElementById("new"+pageAction+"mode").addEventListener("change", function() {

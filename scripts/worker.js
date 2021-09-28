@@ -1,7 +1,7 @@
 function updateMessage(line) {postMessage(["errorOut", line])};
 
 // script setup
-let pageTickets, pages, pagesByFullName = {}, guiLinks, idManager, overloadManager, mainLink, Graph, TypedGraph, functions = {}, scrmljs = {
+let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, TypedGraph, functions = {}, scrmljs = {
     filePrefix: "../",
     scriptLocations : {
         generalFunctions: "scripts/generalFunctions.js",
@@ -24,12 +24,12 @@ let pageTickets, pages, pagesByFullName = {}, guiLinks, idManager, overloadManag
         chapter: ["page"],
         Graph: ["varManager", "idManager", "generalFunctions"],
         TypedGraph: ["Graph"],
-        statement: ["chapter"]
+        statement: ["chapter", "TypedGraph"]
     }, isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
     }, emptyFunction: function emptyFunction() {}, trueFunction: function() {return true}
-}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty;
+}, emptyFunction = scrmljs.emptyFunction, trueFunction = scrmljs.trueFunction, isEmpty = scrmljs.isEmpty, pagesByFullName = scrmljs.pagesByFullName = {};
 
 scrmljs.importScript = function importScript(name, location, finished) {
     updateMessage("worker loading " + location);
@@ -66,7 +66,7 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
     for (let script in scrmljs.scripts) addScript(script);
     scriptLoader.items.idManager.addEphemeralListener("js", function() {
         idManager = scrmljs.idManager;
-        pages = idManager.newManager("pageId");
+        pages = scrmljs.pages = idManager.newManager("pageId");
     });
     scriptLoader.items.overloadManager.addEphemeralListener("js", function() {overloadManager = scrmljs.overloadManager});
     scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
@@ -76,8 +76,10 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
     scriptLoader.items.TypedGraph.addEphemeralListener("js", function() {
         Graph = scrmljs.Graph;
         TypedGraph = Graph.TypedGraph;
-        initializeGraphProtoForWorker();
     });
+    scriptLoader.items.statement.addEphemeralListener("js", function() {
+        initializeGraphProtoForWorker();
+    })
     scriptLoader.addEphemeralListener(function() {
         pageTickets = scrmljs.pageTickets = overloadManager.newOverloadManager();
         pageTickets.name = "pageTickets";
@@ -128,74 +130,13 @@ function getGraphFromPageId(pageId) {
     return pages.items[pageId].graph;
 }
 
-let pageProto = {}, chapterProto = Object.create(pageProto), statementProto = Object.create(pageProto), commentProto = Object.create(pageProto), guiLinkSetups = {};
+let guiLinkSetups = {};
 
 functions.log = console.log;
 
 functions.printAll = function() {
     console.log(scrmljs);
 };
-
-pageProto.isPage = true;
-
-function newPage(name, nickname = "", protoModel = pageProto) {
-    let returner = Object.create(protoModel);
-    pages.addItem(returner);
-    returner.manager = scrmljs.newVarManager();
-    returner.manager.setVarValue("pageId", returner.pageId);
-    returner.manager.linkProperty("pageId", returner);
-    postMessage(["newPage", returner.pageId, protoModel.pageType]);
-    returner.manager.setVarValue("name", name);
-    returner.manager.linkProperty("name", returner);
-    returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
-    returner.manager.linkListener("name", function() {returner.preSave()});
-    returner.manager.setVarValue("nickname", nickname);
-    returner.manager.linkProperty("nickname", returner);
-    returner.manager.linkListener("nickname", function() {returner.preSave()});
-    returner.manager.setVarValue("siblingNumber", 0);
-    returner.manager.linkProperty("siblingNumber", returner);
-    returner.manager.linkListener("siblingNumber", function(siblingNumber) {
-        returner.updateFullPageNumber(siblingNumber);
-        if (returner.nextPage) returner.nextPage.manager.setVarValue("siblingNumber", siblingNumber+1);
-    });
-    returner.manager.setVarValue("fullPageNumber", 0);
-    returner.manager.linkProperty("fullPageNumber", returner);
-    returner.manager.linkListener("fullPageNumber", function(fullPageNumber) {returner.updateFullName()});
-    returner.manager.setVarValue("fullName", name);
-    returner.manager.linkProperty("fullName", returner);
-    returner.manager.linkListener("fullName", function(newFullName, oldFullName) {
-        pagesByFullName[newFullName] = returner;
-        if (typeof oldFullName !== "undefined") delete pagesByFullName[oldFullName];
-    });
-    returner.isOpen = false;
-    returner.guiLink = false;
-    returner.isVisible = false;
-    returner.preSave();
-    return returner;
-}
-
-let newPageByType = {
-    chapter: newChapter,
-    statement: newStatement
-}
-
-pageProto.showPage = function showPage(show) {
-    if (show === this.isVisible) return;
-    if (show) mainLink.types.page.extensions[this.pageType].type.createLink(this);
-    else {
-        this.guiLink.eraseLink();
-        delete this.guiLink;
-    }
-    this.isVisible = show;
-}
-
-pageProto.canChangeName = function canChangeName(newName) {
-    let sibling = this;
-    while (sibling = sibling.previousPage) if (sibling.name === newName) return false;
-    sibling = this;
-    while (sibling = sibling.nextPage) if (sibling.name === newName) return false;
-    return true;
-}
 
 let preLoaders = [];
 
@@ -204,6 +145,7 @@ functions.preloadPageFromAutosave = function preloadPageFromAutosave(pageId, lin
 }
 
 functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
+    let creators = scrmljs.pageCreators, newChapter = creators.chapter, newStatement = creators.statement;
     // create all pages
     for (let i = 0; i < preLoaders.length; ++i) {
         let lines = preLoaders[i] = preLoaders[i].split("\n"), page, graph;
@@ -234,12 +176,14 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
     // root page saves differently
     pages.items[0].saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
         let line = "<SCRML format=\"editor\">\n";
-        line += chapterProto.saveToSCRMLString.call(pages.items[0], indent + tab, tab);
+        line += scrmljs.pageProtos.chapter.saveToSCRMLString.call(pages.items[0], indent + tab, tab);
         line += "\n</SCRML>";
         return line;
     }
     // set parent/child relationships
-    for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId][0] === "chapter") for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") pages.items[childId].moveTo(pages.items[pageId]);
+    for (let pageId = 0; pageId < preLoaders.length; ++pageId) if (preLoaders[pageId][0] === "chapter") for (let childId of preLoaders[pageId][4].split(" ")) if (childId !== "") {
+        pages.items[childId].moveTo(pages.items[pageId]);
+    }
     // set toggles
     for (let pageId = 0; pageId < preLoaders.length; ++pageId) pages.items[pageId].togglePage(preLoaders[pageId][3] === "o");
     // set up guiLinks for visible pages
@@ -259,256 +203,11 @@ functions.openPageProcess = function openPageProcess(line) {pageTickets.openProc
 
 functions.closePageProcess = function closePageProcess() {pageTickets.closeProcess()};
 
-pageProto.computeFullPageNumber = function computeFullPageNumber(siblingNumber) {
-    if (this.parent) {
-        if (this.parent.parent) return this.parent.fullPageNumber + "." + siblingNumber;
-        else return siblingNumber;
-    } else return "";
-}
-
-pageProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
-    this.manager.setVarValue("fullPageNumber", this.computeFullPageNumber(siblingNumber));
-}
-
-pageProto.computeFullName = function computeFullName() {
-    if (this.parent) return this.parent.fullName + "/" + this.name;
-    else return this.name;
-}
-
-pageProto.updateFullName = function updateFullName() {
-    this.manager.setVarValue("fullName", this.computeFullName());
-}
-
-pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
-    // some moves result in no change, so return if this is the case
-    if (this === insertBefore) return;
-    if (this.nextPage === insertBefore) return;
-    if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextPage) return;
-    
-    // notify the old parent of the move
-    if (this.parent) {
-        let oldParent = this.parent, sn = this.siblingNumber, prev = this.previousPage, next = this.nextPage;
-        this.previousPage = this.nextPage = undefined;
-        if (prev) prev.nextPage = next;
-        if (next) next.previousPage = prev;
-        oldParent.childPages.splice(sn - 1, 1);
-        if (next) next.manager.setVarValue("siblingNumber", next.siblingNumber - 1);
-        if (oldParent.isVisible) oldParent.guiLink.dm("canDelete", oldParent.canDelete());
-        oldParent.preSave();
-    }
-    
-    // move to new parent
-    this.parent = parent;
-    if (insertBefore !== "none") {
-        this.nextPage = insertBefore;
-        this.previousPage = insertBefore.previousPage;
-        if (this.previousPage) this.previousPage.nextPage = this;
-        insertBefore.previousPage = this;
-        parent.childPages.splice(insertBefore.siblingNumber - 1, 0, this);
-        this.manager.setVarValue("siblingNumber", insertBefore.siblingNumber);
-    } else {
-        let prev = parent.childPages[parent.childPages.length - 1];
-        parent.childPages.push(this);
-        this.previousPage = prev;
-        if (prev) prev.nextPage = this;
-        this.manager.setVarValue("siblingNumber", parent.childPages.length);
-    }
-    if (parent.isVisible) parent.guiLink.dm("canDelete", parent.canDelete());
-    parent.preSave();
-    
-    // if this is visible, message that the icon needs to move
-    if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
-}
-
-pageProto.togglePage = function togglePage(open = false) {
-    if (this.isOpen === open) return;
-    this.isOpen = open;
-    if (this.isVisible) this.guiLink.dm("togglePage", open);
-    this.preSave();
-}
-
-pageProto.setPageId = function setPageId(newPageId, oldPageId) {
-    if (oldPageId == newPageId) return;
-    this.pageId = newPageId;
-    if (typeof oldPageId === "undefined") return;
-    postMessage(["changePageId", newPageId, oldPageId]);
-    pageTickets.items[newPageId] = pageTickets.items[oldPageId];
-    delete pageTickets.items[oldPageId];
-    this.preSave();
-    if (this.parent) this.parent.preSave();
-}
-
-pageProto.deletePage = function deletePage() {
-    if (!this.canDelete()) throw Error("page " + this.pageId + " is still in use");
-    // erase gui link
-    this.showPage(false);
-    // remove from family tree
-    let prev = this.previousPage, next = this.nextPage;
-    if (prev) {
-        prev.nextPage = next;
-        prev.manager.setVarValue("siblingNumber", prev.siblingNumber);
-    } else if (next) next.manager.setVarValue("siblingNumber", this.siblingNumber);
-    if (next) next.previousPage = prev;
-    this.parent.childPages.splice(this.siblingNumber - 1, 1);
-    this.parent.preSave();
-    if (this.parent.isVisible) this.parent.guiLink.dm("canDelete", this.parent.canDelete());
-    // remove from list of all pages
-    pages.preErase(this.pageId);
-    postMessage(["deletePage", this.pageId]);
-}
-
-pageProto.preSave = function preSave() {pageTickets.addTicket(this.pageId, "save")};
-
-chapterProto.pageType = "chapter";
-chapterProto.isChapter = true;
-
-function newChapter(name, nickname, protoModel = chapterProto) {
-    let returner = newPage(name, nickname, protoModel);
-    returner.childPages = [];
-    return returner;
-}
-
-chapterProto.isAncestorOf = function isAncestorOf(page) {
-    while (page) {
-        if (this === page) return true;
-        page = page.parent;
-    }
-    return false;
-}
-
-chapterProto.updateFullName = function updateFullName() {
-    pageProto.updateFullName.call(this);
-    for (let child of this.childPages) child.updateFullName();
-}
-
-chapterProto.updateFullPageNumber = function updateFullPageNumber(siblingNumber) {
-    pageProto.updateFullPageNumber.call(this, siblingNumber);
-    for (let child of this.childPages) child.updateFullPageNumber(child.siblingNumber);
-}
-
-chapterProto.canAcceptMove = function canAcceptMove(page) {
-    if (page.isChapter && page.isAncestorOf(this)) return false;
-    for (let child of this.childPages) if (page !== child && child.name === page.name) return false;
-    return true;
-}
-
-chapterProto.showPage = function showPage(open) {
-    pageProto.showPage.call(this, open);
-    if (this.isOpen) for (let childPage of this.childPages.slice().reverse()) childPage.showPage(open);
-}
-
-chapterProto.togglePage = function togglePage(open = false) {
-    if (open === this.isOpen) return;
-    pageProto.togglePage.call(this, open);
-    // add the children in reverse order so that nextPage already exists in gui
-    if (this.isVisible) for (let childPage of this.childPages.slice().reverse()) childPage.showPage(open);
-}
-
-pageProto.saveToAutosaveString = function saveToAutosaveString() {
-    return this.pageType + "\n" + this.name + "\n" + this.nickname + "\n" + (this.isOpen? "o": "c");
-}
-
-pageProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
-    let line = indent + "<"+this.name + " pageType=\"" + this.pageType + "\"";
-    if (this.nickname !== "") line += " nickname=\"" + xmlEscape(this.nickname) + "\"";
-    if (this.isOpen) line += " open=\"\"";
-    line += "/>";
-    return line;
-}
-
-chapterProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
-    let line = pageProto.saveToSCRMLString.call(this, indent, tab);
-    if (this.childPages.length) {
-        line = line.replace(/\/>$/, ">");
-        for (let childPage of this.childPages) line += "\n" + childPage.saveToSCRMLString(indent + tab, tab);
-        line += "\n" + indent + "</" + this.name + ">";
-    }
-    return line;
-}
-
-statementProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
-    let line = pageProto.saveToSCRMLString.call(this, indent, tab);
-    let graph = this.graph, members = this.graph.members.items;
-    line = line.substring(0, line.length - 2);
-    if (this.graph.isInUniverse) line += " inUniverse=\"\"";
-    if (graph.isGenesis()) return line + "/>";
-    else line += ">";
-    line += "\n"+indent+tab+"<types>";
-    for (let type in graph.usesTypes) line += "\n"+indent+tab+tab+"<"+graph.usesTypes[type]+">"+Graph.graph(type).page.fullName+"</"+graph.usesTypes[type]+">";
-    line += "\n"+indent+tab+"</types>";
-    line += "\n"+indent+tab+"<terms>";
-    for (let member of graph.members.items) if (member.memberId) {
-        line += "\n"+indent+tab+tab+"<"+graph.usesTypes[member.type]+" name=\""+member.name+"\"";
-        if (member.children.items.length === 0) line += "/>";
-        else {
-            line += ">";
-            for (let child of member.children.items) line += "\n"+indent+tab+tab+tab+"<"+child.name+">"+graph.member(child.memberId).name+"</"+child.name+">";
-            line += "\n"+indent+tab+tab+"</"+graph.usesTypes[member.type]+">";
-        }
-    }
-    line += "\n"+indent+tab+"</terms>";
-    line += "\n"+indent+"</"+this.name+">";
-    return line;
-}
-
-function xmlEscape(line) {
+let xmlEscape = scrmljs.xmlEscape = function xmlEscape(line) {
     return line.replaceAll(/</gm, "&lt;").replaceAll(/&(?!lt;)(?!amp;)(?!gt;)(?!quot;)(?!apos;)(?!#\d+;)/gm, "&amp;").replaceAll(/>/gm, "&gt;").replaceAll(/"/gm, "&quot;").replaceAll(/'/gm, "&apos;");
 }
 
-chapterProto.saveToAutosaveString = function saveToAutosaveString() {
-    let line = pageProto.saveToAutosaveString.call(this) + "\n";
-    for (let child of this.childPages) line += child.pageId + " ";
-    if (this.childPages.length > 0) line = line.substring(0, line.length - 1);
-    return line;
-}
-
-statementProto.saveToAutosaveString = function saveToAutosaveString() {
-    let graph = this.graph;
-    return pageProto.saveToAutosaveString.call(this) + "\n" + (graph.isInUniverse? "i": "o") + "\n" + graph.saveToAutosaveString();
-}
-
-pageProto.canDelete = trueFunction;
-
-chapterProto.canDelete = function canDelete() {
-    return this.childPages.length === 0;
-}
-
-statementProto.pageType = "statement";
-statementProto.isStatement = true;
-// used in statement constructor to create blank graph
-statementProto.newGraph = function newGraph() {
-    let returner = TypedGraph.newGraph(statementProto.graphProto);
-    returner.page = this;
-    return returner;
-};
-
-function newStatement(name, nickname = "", protoModel = statementProto) {
-    let returner = newPage(name, nickname, protoModel);
-  // full page name update on statement because full name is used in save string
-    returner.manager.linkListener("fullName", function(fullName) {postMessage(["fullPageNameUpdate", returner.pageId, fullName])}, true);
-    returner.graph = protoModel.newGraph();
-    returner.graph.page = returner;
-    return returner;
-}
-
-statementProto.showPage = function showPage(show) {
-    if (show === this.isVisible) return;
-    pageProto.showPage.call(this, show);
-    let graph = this.graph, members = graph.members.items, guiLink = this.guiLink;
-    if (show) {
-        for (let member of members) if (member.memberId) guiLink.showMember(member);
-        guiLink.dm("isInUniverse", graph.isInUniverse);
-    } else {
-      for (let member of members) if (member.isVisible) member.isVisible = false;
-    }
-}
-
-statementProto.deletePage = function deletePage() {
-    pageProto.deletePage.call(this);
-    this.graph.deleteGraph();
-}
-
-function initializeGraphProtoForWorker(pageTypeProto = statementProto, protoModel = TypedGraph.protoModel) {
+function initializeGraphProtoForWorker(pageTypeProto = scrmljs.pageProtos.statement, protoModel = TypedGraph.protoModel) {
     let graphProto = pageTypeProto.graphProto = Object.create(protoModel), memberProtoModel = Object.create(graphProto.memberProto);
     
     graphProto.addMember = function addMember(name, type, typeName, memberProto = memberProtoModel) {

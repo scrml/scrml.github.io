@@ -1,5 +1,5 @@
 // Typed graphs are the structures of statements as graphs. Added functionality over Graph is type matching and the root element
-let Graph = scrmljs.Graph, TypedGraph = scrmljs.Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, subset = scrmljs.subset, universeProto, universe;
+let Graph = scrmljs.Graph, TypedGraph = Graph.TypedGraph = {}, isEmpty = scrmljs.isEmpty, emptyFunction = scrmljs.emptyFunction, subset = scrmljs.subset, universeProto, universe;
 
 TypedGraph.protoModel = Object.create(Graph.protoModel);
 TypedGraph.protoModel.thisIs = "TypedGraph";
