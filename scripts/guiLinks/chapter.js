@@ -154,7 +154,7 @@ let workerInitializer = function workerInitializer() {
     cLinkProto.isType = "chapter";
     cLinkProto.isChapter = true;
     chapterType = extension.type = Object.create(pageType);
-    chapterType.linkProto =cLinkProto;
+    chapterType.linkProto = cLinkProto;
     chapterType.extensionName = "chapter";
     chapterType.createLink = function createLink(page, extensionName = "chapter") {
         pageType.createLink(page, extensionName);

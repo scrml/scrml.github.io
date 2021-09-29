@@ -35,6 +35,8 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
 scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapter.js");
 scriptLoader.ensureJS("statement", ["page"], filePrefix + "scripts/guiLinks/statement.js");
+scriptLoader.ensureJS("nameless", ["page"], filePrefix + "scripts/guiLinks/nameless.js");
+scriptLoader.ensureJS("comment", ["nameless"], filePrefix + "scripts/guiLinks/comment.js");
 //scriptLoader.ensureJS("jax");
 scriptLoader.ensureJS("xml");
 scriptLoader.items.xml.addEphemeralListener("js", function() {xml = scrmljs.xml});
@@ -71,8 +73,6 @@ scriptLoader.addEphemeralListener(function start() {
             throw x;
         }
     }
-    
-    //workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
     
     workerFunctions.start = function() {
         bothInitialized.worker = true;
