@@ -63,13 +63,15 @@ scriptLoader.addEphemeralListener(function start() {
     // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
         //console.log("received message from worker " + e.data);
-        let line = e.data.toString();
+        let line = e.data.toString(), fname = e.data[0];
         try {
             workerFunctions[e.data.shift()](...e.data);
         } catch (x) {
             document.getElementById("errorout").textContent = line + "\n" + x.message;
             // force the program to halt even if the worker tries continuing
             worker.onmessage = emptyFunction;
+            console.log("couldn't find function " + fname);
+            console.log(workerFunctions);
             throw x;
         }
     }
@@ -175,9 +177,11 @@ workerFunctions.newPage = function newPage(pageId, pageType) {
 
 workerFunctions.changePageId = function changePageId(newId, oldId) {
     let option = fullPageNameOptions[oldId];
-    delete fullPageNameOptions[oldId];
-    fullPageNameOptions[newId] = option;
-    option.setAttribute("pageid", newId);
+    if (option) {
+        delete fullPageNameOptions[oldId];
+        fullPageNameOptions[newId] = option;
+        option.setAttribute("pageid", newId);
+    }
     storage.move("page " + oldId, "page " + newId);
 }
 

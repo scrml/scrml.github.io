@@ -166,7 +166,8 @@ pageType.initializers.worker = function() {
         returner.manager = scrmljs.newVarManager();
         returner.manager.setVarValue("pageId", returner.pageId);
         returner.manager.linkProperty("pageId", returner);
-        postMessage(["newPage", returner.pageId, protoModel.pageType]);
+        scrmljs.mainLink.postMessage("newPage", returner.pageId, protoModel.pageType);
+        scrmljs.mainLink.postMessage("newPage", returner.pageId, protoModel.pageType);
         returner.manager.setVarValue("name", name);
         returner.manager.linkProperty("name", returner);
         returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
@@ -256,9 +257,11 @@ pageType.initializers.worker = function() {
     
     pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
         // some moves result in no change, so return if this is the case
-        if (this === insertBefore) return;
-        if (this.nextSibling === insertBefore) return;
-        if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+        if (parent) {
+            if (this === insertBefore) return;
+            if (this.nextSibling === insertBefore) return;
+            if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+        }
         
         // notify the old parent of the move
         if (this.parent) {
@@ -306,6 +309,9 @@ pageType.initializers.worker = function() {
             if (oldParent.isVisible) oldParent.guiLink.dm("canDelete", oldParent.canDelete());
             oldParent.preSave();
         }
+        
+        // the orphaning above is also used for page deletion, which is marked by moving to no parent
+        if (!parent) return;
         
         // move to new parent
         this.parent = parent;
@@ -383,7 +389,7 @@ pageType.initializers.worker = function() {
         if (oldPageId == newPageId) return;
         this.pageId = newPageId;
         if (typeof oldPageId === "undefined") return;
-        scrmljs.mainLink.postMessage(["changePageId", newPageId, oldPageId]);
+        scrmljs.mainLink.postMessage("changePageId", newPageId, oldPageId);
         scrmljs.pageTickets.items[newPageId] = scrmljs.pageTickets.items[oldPageId];
         delete scrmljs.pageTickets.items[oldPageId];
         this.preSave();
@@ -395,41 +401,13 @@ pageType.initializers.worker = function() {
         // erase gui link
         this.showPage(false);
         // remove from family tree
-        if (this.parent) {
-            let oldParent = this.parent, sn = this.siblingNumber, ps = this.previousSibling, ns = this.nextSibling, pn = this.pageNumber, pp = this.previousPage, np = this.nextPage;
-            // fix sibling numbers
-            if (ps) ps.nextSibling = ns;
-            if (ns) ns.previousSibling = ps;
-            oldParent.children.splice(sn, 1);
-            if (ns) {
-                ns.manager.setVarValue("siblingNumber", sn);
-                ns.updateFullSiblingNumber();
-            }
-            // fix page numbers
-            if (this.hasPageNumber) {
-                if (ps) do {
-                    ps.nextPage = np;
-                    ps = ps.previousSibling;
-                } while (ps && (ps !== pp));
-                if (pp) pp.nextPage = np;
-                if (ns) do {
-                    ns.previousPage = pp;
-                    ns = ns.nextSibling;
-                } while (ns && (ns !== np));
-                if (np) np.previousPage = pp;
-                oldParent.childPages.splice(pn - 1, 1);
-                if (ns) ns.manager.setVarValue("pageNumber", pn);
-            }
-            // check and notify if old parent is now childless
-            if (oldParent.isVisible) oldParent.guiLink.dm("canDelete", oldParent.canDelete());
-            oldParent.preSave();
-        }
+        this.moveTo();
         
         this.parent.preSave();
         if (this.parent.isVisible) this.parent.guiLink.dm("canDelete", this.parent.canDelete());
         // remove from list of all pages
         pages.preErase(this.pageId);
-        scrmljs.mainLink.postMessage(["deletePage", this.pageId]);
+        scrmljs.mainLink.postMessage("deletePage", this.pageId);
     }
     
     pageProto.canDelete = trueFunction;
