@@ -40,7 +40,7 @@ let workerInitializer = function workerInitializer() {
     commentType.linkProto = cLinkProto;
     commentType.extensionName = "comment";
     commentType.createLink = function createLink(page, extensionName = "comment") {
-        namelessType.createLink(page, extensionName);
+        return namelessType.createLink(page, extensionName);
     }
 }
 

@@ -82,10 +82,7 @@ scriptLoader.addEphemeralListener(function start() {
     // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
     for (let pageNumberMode of ["pagenumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
-    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
-        editor.setAttribute("pageaction", "new"+pageAction+"mode");
-        scrmljs.pageMode = pageAction;
-    }
+    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) document.getElementById("new"+pageAction+"mode").dispatchEvent(new Event("change"));
     
     // make root chapter/saved pages
     if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
@@ -139,6 +136,8 @@ for (let pageAction of ["chapter", "statement", "comment"]) document.getElementB
     editor.setAttribute("pageaction", "new"+pageAction+"mode");
     scrmljs.pageMode = pageAction;
     for (let gap of document.querySelectorAll(".newpagein")) gap.setAttribute("placeholder", "new " + pageAction);
+    if (mainLink.types.page.extensions[pageAction].type.isNameless) editor.setAttribute("nameless", "");
+    else editor.removeAttribute("nameless");
 });
 
 // functions to be initialized

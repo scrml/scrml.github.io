@@ -49,3 +49,16 @@
 [ispage][canacceptmove="true"] > .pagegap .movehere, [ispage][canacceptmove="false"] > .pagegap .dontmovehere {
     display: block;
 }
+
+.newnamelessin {
+    width: 100%;
+    text-align: left;
+}
+
+.editor[nameless] .newpagein {
+    display: none;
+}
+
+.editor:not([nameless]) .newnamelessin {
+    display: none;
+}
