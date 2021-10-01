@@ -2,12 +2,28 @@
 <SCRML format="editor">
 	<GRML pageType="chapter" nickname="GRML Features" open="">
 		<Claim pageType="chapter">
+			<SCRMLJS_nameless_name_is_pageID21 pageType="comment" open="">
+				<tex>Claims are the way to do things in SCRML. Claims can be invoked. The general structure is
+\[\forall\text{ (context) }\exists\text{ (new term)}.\]
+
+The proof is a section where the claim can be proven.
+
+For now these are just genesis graphs, but eventually these will be baked into the compiler and editor. They are just here temporarily while the rest of the editor gets developed.</tex>
+			</SCRMLJS_nameless_name_is_pageID21>
 			<ForAll pageType="statement"/>
 			<Exists pageType="statement"/>
 			<Proof pageType="statement"/>
 		</Claim>
-		<Logic pageType="chapter" nickname="Logic Features">
+		<Logic pageType="chapter" nickname="Logic Features" open="">
+			<SCRMLJS_nameless_name_is_pageID22 pageType="comment" open="">
+				<tex>Like claims, these will eventually be baked into the editor. But probably not as rigidly as claims, since claims are more fundamental.
+
+For now just pretend `Wildcard&apos; is a variable whenever it comes up. That&apos;s how the finished editor will behave.</tex>
+			</SCRMLJS_nameless_name_is_pageID22>
 			<Wildcard pageType="statement" nickname="Testable Wildcard"/>
+			<SCRMLJS_nameless_name_is_pageID23 pageType="comment" open="">
+				<tex>True and False below are how you say a variable is true or false.</tex>
+			</SCRMLJS_nameless_name_is_pageID23>
 			<True pageType="statement">
 				<types>
 					<Testable>GRML/Logic/Wildcard</Testable>
@@ -24,9 +40,15 @@
 					<Testable name="this"/>
 				</terms>
 			</False>
+			<SCRMLJS_nameless_name_is_pageID24 pageType="comment" open="">
+				<tex>Contradiction is for when something is both true and false. The contradiction type is defined first as a genesis graph, then the behavior is defined with the fundamental contradiction claim.</tex>
+			</SCRMLJS_nameless_name_is_pageID24>
 			<Contradiction pageType="statement"/>
 			<Contradictions pageType="chapter" open="">
-				<Fundamental pageType="statement">
+				<SCRMLJS_nameless_name_is_pageID25 pageType="comment" open="">
+					<tex>Fundamental contradiction claim: Any time a logical variable is both true and false at the same time, that gives a contradiction.</tex>
+				</SCRMLJS_nameless_name_is_pageID25>
+				<Fundamental pageType="statement" open="">
 					<types>
 						<ForAll>GRML/Claim/ForAll</ForAll>
 						<Exists>GRML/Claim/Exists</Exists>
@@ -53,7 +75,17 @@
 						</Exists>
 					</terms>
 				</Fundamental>
+				<SCRMLJS_nameless_name_is_pageID26 pageType="comment" open="">
+					<tex>Let&apos;s walk through the above graph. It starts by saying let `this&apos; be a logical variable (ish). The term `true&apos; says that `this&apos; is true, and the term `false&apos; says `this&apos; is false. The term `forall&apos; is setting up the claim, specifying what we have said so far as the context/assumption for this claim.
+
+The contradiction is the term `contradiction&apos; and it is claimed to exist by making it a child of `exists.&apos; There is no proof for this claim because it&apos;s an axiom.
+
+In all this claim states that any time a logical variable is both true and false, that situation justifies a contradiction.</tex>
+				</SCRMLJS_nameless_name_is_pageID26>
 			</Contradictions>
+			<SCRMLJS_nameless_name_is_pageID27 pageType="comment" open="">
+				<tex>These are the typical logical gates. They only define the shape of the gate, they don&apos;t define the behavior.</tex>
+			</SCRMLJS_nameless_name_is_pageID27>
 			<Not pageType="statement">
 				<types>
 					<Testable>GRML/Logic/Wildcard</Testable>
@@ -63,6 +95,9 @@
 				</terms>
 			</Not>
 			<Nots pageType="chapter" open="">
+				<SCRMLJS_nameless_name_is_pageID28 pageType="comment" open="">
+					<tex>These two claims are axioms which define behavior of the `Not&apos; gate. If you negate something which you know to be true then you are justified in saying that the negation is false, and vice versa.</tex>
+				</SCRMLJS_nameless_name_is_pageID28>
 				<NotTrueIsFalse pageType="statement">
 					<types>
 						<ForAll>GRML/Claim/ForAll</ForAll>
@@ -222,5 +257,16 @@
 				</Proof>
 			</terms>
 		</NotNotTrueIsTrue>
+		<SCRMLJS_nameless_name_is_pageID29 pageType="comment" open="">
+			<tex>This is the first theorem with a proof so let&apos;s see how that works. Start with some logical variable (ish) called `base.&apos; Assume base is true (`baseTrue&apos;). Take the double negation of `base&apos; (the negation `this,&apos; which is itself negation of `notBase&apos;). That is the assumption for this claim: that we have a double negation of a true base term.
+
+We are claiming that the double negation is true. That is embodied in the term `isTrue,&apos; defined over the double negation `this.&apos; This claim is marked as a claim because it is a child of `exists.&apos;
+
+Now to prove it. Everything in the proof section (the descendants of `proof&apos; which are not also descendants of `forall&apos; or `exists&apos;) are either terms which are justified or applications of previous claims. The only justified term is `intermediate,&apos; which is a False defined over `notBase.&apos; That is, the only intermediate step is to show that the single negation of our base is false. This is proven by invoking the axiom that not true is false, seen here in the construction of the term `intermediateP.&apos;
+
+The assumption for `intermediateP&apos; is `intermediateAssumption&apos; which lines up with the ForAll term declaring the setup in the definition of NotTrueIsFalse. The claim is `intermediateResult.&apos; The claim invocation justifies the terms which are descendants of `intermediateResult&apos; and not of `intermediateAssumption,&apos; of which there is only one (`intermediate&apos;). Thus `intermediateP&apos; is the invocation of a previous claim which proves the intermediate result that the negation of our true base is false.
+
+The process is repeated with `secondStep&apos; but this time using the other axiom, that not false is true. The second step justifies the term we were trying to justify in the beginning, the claimed term `isTrue.&apos; Thus we have proven what we needed to prove. Moreover we can detect the axioms/other claims which we used in this proof: they are the children of `proof.&apos; These are the two behavioral statements about negation, NotTrueIsFalse and NotFalseIsTrue.</tex>
+		</SCRMLJS_nameless_name_is_pageID29>
 	</GRML>
 </SCRML>
