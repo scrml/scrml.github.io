@@ -13,7 +13,9 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, T
         chapter: "scripts/guiLinks/chapter.js",
         Graph: "scripts/Graph.js",
         TypedGraph: "scripts/TypedGraph.js",
-        statement: "scripts/guiLinks/statement.js"
+        statement: "scripts/guiLinks/statement.js",
+        nameless: "scripts/guiLinks/nameless.js",
+        comment: "scripts/guiLinks/comment.js"
     }, scripts: {
         generalFunctions: [],
         idManager: ["generalFunctions"],
@@ -24,7 +26,9 @@ let pageTickets, pages, guiLinks, idManager, overloadManager, mainLink, Graph, T
         chapter: ["page"],
         Graph: ["varManager", "idManager", "generalFunctions"],
         TypedGraph: ["Graph"],
-        statement: ["chapter", "TypedGraph"]
+        statement: ["chapter", "TypedGraph"],
+        nameless: ["page"],
+        comment: ["nameless"]
     }, isEmpty: function isEmpty(obj) {
         for (let prop in obj) if (Object.hasOwnProperty(prop)) return false;
         return true;
@@ -77,9 +81,6 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
         Graph = scrmljs.Graph;
         TypedGraph = Graph.TypedGraph;
     });
-    scriptLoader.items.statement.addEphemeralListener("js", function() {
-        initializeGraphProtoForWorker();
-    })
     scriptLoader.addEphemeralListener(function() {
         pageTickets = scrmljs.pageTickets = overloadManager.newOverloadManager();
         pageTickets.name = "pageTickets";
@@ -94,6 +95,7 @@ scrmljs.importScript("Loader", scrmljs.filePrefix + "scripts/loader.js", functio
         };
         pageTickets.addTicketFunction("save", function(pageId) {postMessage(["savePage", pageId, getPageFromPageId(pageId).saveToAutosaveString()])});
         updateMessage = function updateMessage(line) {postMessage(["setLoadingScreen", line])};
+        initializeGraphProtoForWorker();
         postMessage(["start"]);
     });
 });
@@ -112,8 +114,6 @@ onmessage = function onmessage(e) {
         throw x;
     }
 }
-
-//function fetched(type, id, dataName, ...data) {postMessage(["fetched", type, id, dataName, ...data])}
 
 function getPageFromPageId(pageId) {
     return pages.items[pageId];
@@ -145,7 +145,7 @@ functions.preloadPageFromAutosave = function preloadPageFromAutosave(pageId, lin
 }
 
 functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
-    let creators = scrmljs.pageCreators, newChapter = creators.chapter, newStatement = creators.statement;
+    let creators = scrmljs.pageCreators, newChapter = creators.chapter, newStatement = creators.statement, newComment = creators.comment;
     // create all pages
     for (let i = 0; i < preLoaders.length; ++i) {
         let lines = preLoaders[i] = preLoaders[i].split("\n"), page, graph;
@@ -170,6 +170,12 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
                     }
                 }
                 graph.putInUniverse(inUniverse === "i");
+            break; case "comment":
+                let comment = newComment(lines[1], lines[2]);
+                let numCommentLines = lines[4];
+                let commentLine = "";
+                for (let j = 0; j < numCommentLines; ++j) commentLine += lines[5+j] + "\n";
+                comment.manager.setVarValue("tex", commentLine.substring(0, commentLine.length - 1));
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }

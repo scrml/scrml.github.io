@@ -43,6 +43,10 @@ let hostInitializer = function hostInitializer() {
         let parentPage = mainLink.links[gaps.getGapParentId(gap)];
         parentPage.dm("tryNewPage", line, gaps.getGapNextPageId(gap), scrmljs.pageMode);
     }
+    gaps.newNamelessInAction = function newNamelessInAction(event) {
+        let gap = gaps.getPageGapFromEvent(event);
+        mainLink.links[gaps.getGapParentId(gap)].dm("newNameless", gaps.getGapNextPageId(gap), scrmljs.pageMode);
+    }
     gaps.doMove = function doMove(event) {
         let gap = gaps.getPageGapFromEvent(event);
         editor.removeAttribute("movemode");
@@ -55,6 +59,8 @@ let hostInitializer = function hostInitializer() {
         gap.newPageIn = gui.element("input", gap, ["class", "newpagein", "placeholder", "new "+scrmljs.pageMode, "disguise", ""]);
         gap.newPageIn.addEventListener("blur", gaps.clearPageGap);
         gap.newPageIn.addEventListener("change", gaps.newPageInChanged);
+        gap.newNamelessIn = gui.textShell("⇦", "button", gap, ["class", "newnamelessin"]);
+        gap.newNamelessIn.addEventListener("click", gaps.newNamelessInAction);
         gui.text("❌", gui.element("button", gap, ["class", "dontmovehere", "disabled", ""]));
         gap.moveHereButton = gui.element("button", gap, ["class", "movehere"]);
         gui.text("⇦", gap.moveHereButton);
@@ -73,7 +79,7 @@ let workerInitializer = function workerInitializer() {
     
     // first the raw chapter stuff
     
-    let pageProto = scrmljs.pageProtos.page, chapterProto = Object.create(pageProto);
+    let pageProto = scrmljs.pageProtos.page, chapterProto = scrmljs.pageProtos.chapter = Object.create(pageProto);
     
     chapterProto.pageType = "chapter";
     chapterProto.isChapter = true;
@@ -154,7 +160,7 @@ let workerInitializer = function workerInitializer() {
     cLinkProto.isType = "chapter";
     cLinkProto.isChapter = true;
     chapterType = extension.type = Object.create(pageType);
-    chapterType.linkProto =cLinkProto;
+    chapterType.linkProto = cLinkProto;
     chapterType.extensionName = "chapter";
     chapterType.createLink = function createLink(page, extensionName = "chapter") {
         pageType.createLink(page, extensionName);
@@ -171,6 +177,9 @@ let workerInitializer = function workerInitializer() {
         newPage.togglePage(true);
         newPage.moveTo(page, insertBefore === "none"? "none": mainLink.getLink(insertBefore).page, false);
         newPage.showPage(true);
+    }
+    cLinkProto.newNameless = function newNameless(insertBefore, pageType) {
+        cLinkProto.tryNewPage.call(this, undefined, insertBefore, pageType);
     }
 }
 

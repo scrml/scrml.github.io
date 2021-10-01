@@ -166,7 +166,8 @@ pageType.initializers.worker = function() {
         returner.manager = scrmljs.newVarManager();
         returner.manager.setVarValue("pageId", returner.pageId);
         returner.manager.linkProperty("pageId", returner);
-        postMessage(["newPage", returner.pageId, protoModel.pageType]);
+        scrmljs.mainLink.postMessage("newPage", returner.pageId, protoModel.pageType);
+        scrmljs.mainLink.postMessage("newPage", returner.pageId, protoModel.pageType);
         returner.manager.setVarValue("name", name);
         returner.manager.linkProperty("name", returner);
         returner.manager.linkListener("name", function(newName) {returner.updateFullName()});
@@ -255,10 +256,13 @@ pageType.initializers.worker = function() {
     }
     
     pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
-        // some moves result in no change, so return if this is the case
-        if (this === insertBefore) return;
-        if (this.nextSibling === insertBefore) return;
-        if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+        if (parent) {
+            // some moves result in no change, so return if this is the case
+            if (this === insertBefore || this.nextSibling === insertBefore) return;
+            if (this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+            // if this is visible, message that the icon needs to move
+            if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
+        }
         
         // notify the old parent of the move
         if (this.parent) {
@@ -287,7 +291,7 @@ pageType.initializers.worker = function() {
                     fixMe = fixMe.nextSibling;
                 }
                 // fix oldParent childPages
-                oldParent.childPages.splice(this.pageNumber, 1);
+                oldParent.childPages.splice(this.pageNumber-1, 1);
             }
             // reset myself
             this.previousSibling = this.nextSibling = this.previousPage = this.nextPage = undefined;
@@ -307,6 +311,9 @@ pageType.initializers.worker = function() {
             oldParent.preSave();
         }
         
+        // the orphaning above is also used for page deletion, which is marked by moving to no parent
+        if (!parent) return;
+        
         // move to new parent
         this.parent = parent;
         if (insertBefore === "none") {
@@ -319,7 +326,7 @@ pageType.initializers.worker = function() {
             this.manager.setVarValue("siblingNumber", parent.children.length - 1);
             this.updateFullSiblingNumber();
             // fix page stuff
-            if (this.isPage) {
+            if (this.hasPageNumber) {
                 parent.childPages.push(this);
                 let fixMe = this.previousSibling;
                 while (fixMe && !fixMe.hasPageNumber) {
@@ -332,7 +339,7 @@ pageType.initializers.worker = function() {
                     this.previousPage = fixMe;
                     this.manager.setVarValue("pageNumber", fixMe.pageNumber + 1);
                 } else this.manager.setVarValue("pageNumber", 1);
-            }
+            } else this.manager.setVarValue("pageNumber", ps? ps.pageNumber: 0);6
         } else {
             // I am not going to be the last child of parent
             // fix sibling stuff
@@ -367,9 +374,6 @@ pageType.initializers.worker = function() {
         this.updateFullPageNumber();
         if (parent.isVisible) parent.guiLink.dm("canDelete", parent.canDelete());
         parent.preSave();
-        
-        // if this is visible, message that the icon needs to move
-        if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
     }
 
     pageProto.togglePage = function togglePage(open = false) {
@@ -383,7 +387,7 @@ pageType.initializers.worker = function() {
         if (oldPageId == newPageId) return;
         this.pageId = newPageId;
         if (typeof oldPageId === "undefined") return;
-        scrmljs.mainLink.postMessage(["changePageId", newPageId, oldPageId]);
+        scrmljs.mainLink.postMessage("changePageId", newPageId, oldPageId);
         scrmljs.pageTickets.items[newPageId] = scrmljs.pageTickets.items[oldPageId];
         delete scrmljs.pageTickets.items[oldPageId];
         this.preSave();
@@ -395,41 +399,13 @@ pageType.initializers.worker = function() {
         // erase gui link
         this.showPage(false);
         // remove from family tree
-        if (this.parent) {
-            let oldParent = this.parent, sn = this.siblingNumber, ps = this.previousSibling, ns = this.nextSibling, pn = this.pageNumber, pp = this.previousPage, np = this.nextPage;
-            // fix sibling numbers
-            if (ps) ps.nextSibling = ns;
-            if (ns) ns.previousSibling = ps;
-            oldParent.children.splice(sn, 1);
-            if (ns) {
-                ns.manager.setVarValue("siblingNumber", sn);
-                ns.updateFullSiblingNumber();
-            }
-            // fix page numbers
-            if (this.hasPageNumber) {
-                if (ps) do {
-                    ps.nextPage = np;
-                    ps = ps.previousSibling;
-                } while (ps && (ps !== pp));
-                if (pp) pp.nextPage = np;
-                if (ns) do {
-                    ns.previousPage = pp;
-                    ns = ns.nextSibling;
-                } while (ns && (ns !== np));
-                if (np) np.previousPage = pp;
-                oldParent.childPages.splice(pn - 1, 1);
-                if (ns) ns.manager.setVarValue("pageNumber", pn);
-            }
-            // check and notify if old parent is now childless
-            if (oldParent.isVisible) oldParent.guiLink.dm("canDelete", oldParent.canDelete());
-            oldParent.preSave();
-        }
+        this.moveTo();
         
         this.parent.preSave();
         if (this.parent.isVisible) this.parent.guiLink.dm("canDelete", this.parent.canDelete());
         // remove from list of all pages
         pages.preErase(this.pageId);
-        scrmljs.mainLink.postMessage(["deletePage", this.pageId]);
+        scrmljs.mainLink.postMessage("deletePage", this.pageId);
     }
     
     pageProto.canDelete = trueFunction;
@@ -461,7 +437,7 @@ pageType.initializers.worker = function() {
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.unlinks.push(page.manager.linkListener("nickname", function(nickname) {link.dm("getNickname", nickname)}, true));
         link.dm("canDelete", page.canDelete());
-        if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextPage? page.nextPage.guiLink.linkId: "none", false);
+        if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextSibling? page.nextSibling.guiLink.linkId: "none", false);
         link.dm("togglePage", page.isOpen);
         link.dm("setPageNumber", page.pageNumber);
         link.dm("setFullPageNumber", page.fullPageNumber);

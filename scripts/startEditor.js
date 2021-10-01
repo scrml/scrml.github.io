@@ -20,7 +20,8 @@ scrmljs.lockedPageFocus = false;
 document.getElementById("errorout").textContent = "Loading components ...";
 
 // load required scripts
-scriptLoader.ensureJS("gui", ["generalFunctions"]);
+scriptLoader.ensureJS("xml");
+scriptLoader.ensureJS("gui", ["generalFunctions", "xml"]);
 scriptLoader.items.gui.addEphemeralListener("js", function() {
     gui = scrmljs.gui;
     document.getElementById("errorout").textContent = "Loading gui modules ...";
@@ -35,8 +36,10 @@ scriptLoader.items.guiWorkerLink.addEphemeralListener("js", function() {
 scriptLoader.ensureJS("page", ["guiWorkerLink"], filePrefix + "scripts/guiLinks/page.js");
 scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapter.js");
 scriptLoader.ensureJS("statement", ["page"], filePrefix + "scripts/guiLinks/statement.js");
-//scriptLoader.ensureJS("jax");
-scriptLoader.ensureJS("xml");
+scriptLoader.ensureJS("nameless", ["page"], filePrefix + "scripts/guiLinks/nameless.js");
+scriptLoader.ensureJS("comment", ["nameless"], filePrefix + "scripts/guiLinks/comment.js");
+scriptLoader.ensureJS("jax");
+//scriptLoader.ensureJS("xml");
 scriptLoader.items.xml.addEphemeralListener("js", function() {xml = scrmljs.xml});
 scriptLoader.ensureJS("fileConversion", ["storage", "xml", "gui"]);
 scriptLoader.items.fileConversion.addEphemeralListener("js", function() {fileConversion = scrmljs.fileConversion});
@@ -61,7 +64,7 @@ scriptLoader.addEphemeralListener(function start() {
     // all messages start with the name of the response handler function then list the arguments to give that handler
     worker.onmessage = function onmessage(e) {
         //console.log("received message from worker " + e.data);
-        let line = e.data.toString();
+        let line = e.data.toString(), fname = e.data[0];
         try {
             workerFunctions[e.data.shift()](...e.data);
         } catch (x) {
@@ -72,8 +75,6 @@ scriptLoader.addEphemeralListener(function start() {
         }
     }
     
-    //workerFunctions.showChapter = guiWorkerLink.linkCreators.chapter;
-    
     workerFunctions.start = function() {
         bothInitialized.worker = true;
         checkStartLoadingPages();
@@ -82,10 +83,7 @@ scriptLoader.addEphemeralListener(function start() {
     // first set the page modes to agree with what buttons are pressed, in case the button presses were cached by the browser
     for (let pageNumberMode of ["pagenumber", "fullpagenumber"]) if (document.getElementById(pageNumberMode).checked) editor.setAttribute("pagenumbermode", pageNumberMode);
     for (let nameMode of ["nodenamemode", "nicknamemode", "fullnamemode"]) if (document.getElementById(nameMode).checked) editor.setAttribute("namemode", nameMode);
-    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) {
-        editor.setAttribute("pageaction", "new"+pageAction+"mode");
-        scrmljs.pageMode = pageAction;
-    }
+    for (let pageAction of ["chapter", "statement", "comment"]) if (document.getElementById("new"+pageAction+"mode").checked) document.getElementById("new"+pageAction+"mode").dispatchEvent(new Event("change"));
     
     // make root chapter/saved pages
     if (!storage.fetch("page 0")) storage.store("page 0", "chapter\nBook\n\no\n");
@@ -139,6 +137,8 @@ for (let pageAction of ["chapter", "statement", "comment"]) document.getElementB
     editor.setAttribute("pageaction", "new"+pageAction+"mode");
     scrmljs.pageMode = pageAction;
     for (let gap of document.querySelectorAll(".newpagein")) gap.setAttribute("placeholder", "new " + pageAction);
+    if (mainLink.types.page.extensions[pageAction].type.isNameless) editor.setAttribute("newnamelessmode", "");
+    else editor.removeAttribute("newnamelessmode");
 });
 
 // functions to be initialized
@@ -176,9 +176,11 @@ workerFunctions.newPage = function newPage(pageId, pageType) {
 
 workerFunctions.changePageId = function changePageId(newId, oldId) {
     let option = fullPageNameOptions[oldId];
-    delete fullPageNameOptions[oldId];
-    fullPageNameOptions[newId] = option;
-    option.setAttribute("pageid", newId);
+    if (option) {
+        delete fullPageNameOptions[oldId];
+        fullPageNameOptions[newId] = option;
+        option.setAttribute("pageid", newId);
+    }
     storage.move("page " + oldId, "page " + newId);
 }
 
@@ -262,6 +264,10 @@ scrmljs.loadExample = function loadExample() {
     req.send();
 }
 
+let xmlUnescape = scrmljs.xmlUnescape = function xmlUnescape(line) {
+    return line.replaceAll(/&apos;/g, "\'").replaceAll(/&guot;/g, "\"").replaceAll(/&gt;/g, ">").replaceAll(/&amp;/g, "&").replaceAll(/&lt;/g, "<")
+}
+
 function importSCRMLFileEditor(doc) {
     let docRoot = xml.getRoot(doc), pageId = 0, ui = 1, rootPage, autosaves = [];
     while (doc.nodeType !== 9) doc = doc.parentElement;
@@ -326,6 +332,14 @@ function importSCRMLFileEditor(doc) {
             }
             line += "\n"+termLine;
         }
+        autosaves[pageId] = line;
+    }
+    for (let commentNode of rootPage.querySelectorAll("[pageType=\"comment\"]")) {
+        let texNode = commentNode.querySelector("tex");
+        let content = xmlUnescape(texNode.textContent), contentLines = content.split("\n");
+        let pageId = commentNode.getAttribute("pageId"), line = autosaves[pageId];
+        line += "\n" + contentLines.length;
+        for (let cline of contentLines) line += "\n" + cline;
         autosaves[pageId] = line;
     }
     pageId = 0;
