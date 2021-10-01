@@ -12,7 +12,8 @@ let hostInitializer = function hostInitializer() {
         let page = namelessType.createLink(linkId, extensionName);
         page.div.setAttribute("comment", "");
         page.texBox = gui.texBox(page.div, ["class", "texbox"], function(value) {
-            page.dm("setTex", value);
+            if (value === "") page.dm("deletePage");
+            else page.dm("setTex", value);
         });
     }
     
