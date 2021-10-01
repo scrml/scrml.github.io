@@ -14,7 +14,7 @@ For now these are just genesis graphs, but eventually these will be baked into t
 			<Exists pageType="statement"/>
 			<Proof pageType="statement"/>
 		</Claim>
-		<Logic pageType="chapter" nickname="Logic Features" open="">
+		<Logic pageType="chapter" nickname="Logic Features">
 			<SCRMLJS_nameless_name_is_pageID22 pageType="comment" open="">
 				<tex>Like claims, these will eventually be baked into the editor. But probably not as rigidly as claims, since claims are more fundamental.
 
