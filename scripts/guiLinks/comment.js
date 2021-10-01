@@ -11,12 +11,20 @@ let hostInitializer = function hostInitializer() {
     pageType.showComment = commentType.createLink = function createLink(linkId, extensionName = "comment") {
         let page = namelessType.createLink(linkId, extensionName);
         page.div.setAttribute("comment", "");
+        page.texBox = gui.texBox(page.div, ["class", "texbox"], function(value) {
+            page.dm("setTex", value);
+        });
+    }
+    
+    commentProto.setTex = function setTex(tex) {
+        this.texBox.setTex(tex);
+        if (tex !== "") this.texBox.toOutputMode();
     }
 }
 
 let workerInitializer = function workerInitializer() {
     // first the raw comment stuff
-    let pageProto = scrmljs.pageProtos.page, namelessProto = scrmljs.pageProtos.nameless, commentProto = Object.create(namelessProto);
+    let pageProto = scrmljs.pageProtos.page, namelessProto = scrmljs.pageProtos.nameless, commentProto = scrmljs.pageProtos.comment = Object.create(namelessProto);
     
     commentProto.pageType = "comment";
     commentProto.isComment = true;
@@ -24,11 +32,33 @@ let workerInitializer = function workerInitializer() {
     
     scrmljs.pageCreators.comment = function newComment(name, nickname, protoModel = commentProto) {
         let returner = scrmljs.pageCreators.nameless(name, nickname, protoModel);
+        returner.manager.setVarValue("tex", "");
+        returner.manager.linkProperty("tex", returner);
+        returner.manager.linkListener("tex", function(tex) {
+            if (returner.isVisible) returner.guiLink.dm("setTex", tex);
+            returner.preSave();
+        });
         return returner;
     }
     
     commentProto.showPage = function showPage(show) {
         namelessProto.showPage.call(this, show);
+    }
+    
+    commentProto.saveToAutosaveString = function saveToAutosaveString() {
+        let line = pageProto.saveToAutosaveString.call(this) + "\n";
+        let content = this.tex.split("\n");
+        line += content.length + "\n";
+        for (let cline of content) line += cline + "\n";
+        return line.substring(0, line.length - 1);
+    }
+    
+    commentProto.saveToSCRMLString = function saveToSCRMLString(indent = "", tab = "\t") {
+        let line = pageProto.saveToSCRMLString.call(this, indent, tab);
+        line = line.replace(/\/>$/, ">");
+        line += "\n" + indent + tab + "<tex>" + scrmljs.xmlEscape(this.tex) + "</tex>";
+        line += "\n" + indent + "</" + this.name + ">";
+        return line;
     }
     
     // now for guiLink stuff
@@ -41,7 +71,12 @@ let workerInitializer = function workerInitializer() {
     commentType.linkProto = cLinkProto;
     commentType.extensionName = "comment";
     commentType.createLink = function createLink(page, extensionName = "comment") {
-        return namelessType.createLink(page, extensionName);
+        namelessType.createLink(page, extensionName);
+        page.guiLink.dm("setTex", page.tex);
+    }
+    
+    cLinkProto.setTex = function setTex(tex) {
+        this.page.manager.setVarValue("tex", tex);
     }
 }
 

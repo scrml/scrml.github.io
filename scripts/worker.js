@@ -171,7 +171,11 @@ functions.flushLoadPagesFromAutosave = function flushLoadPagesFromAutosave() {
                 }
                 graph.putInUniverse(inUniverse === "i");
             break; case "comment":
-                newComment(lines[1], lines[2]);
+                let comment = newComment(lines[1], lines[2]);
+                let numCommentLines = lines[4];
+                let commentLine = "";
+                for (let j = 0; j < numCommentLines; ++j) commentLine += lines[5+j] + "\n";
+                comment.manager.setVarValue("tex", commentLine.substring(0, commentLine.length - 1));
             break; default: throw Error("do not recognize page type " + lines[0]);
         }
     }

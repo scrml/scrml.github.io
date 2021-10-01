@@ -1,0 +1,9 @@
+.texin {
+    width: calc(100% - 0.8em);
+}
+
+.texout {
+    width: 100%;
+    min-height: 1em;
+    white-space: pre-line;
+}

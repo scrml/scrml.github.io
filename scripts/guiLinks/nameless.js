@@ -28,9 +28,9 @@ let workerInitializer = function workerInitializer() {
     namelessProto.isNameless = true;
     
     nameless.namedConstructor = scrmljs.pageCreators.nameless = function newNameless(name, nickname, protoModel = namelessProto) {
-        if (typeof name === "undefined") return nameless.namelessConstructor(protoModel);
+        if (typeof name === "undefined" || name !== nameless.namePrefix + scrmljs.pages.items.length) return nameless.namelessConstructor(protoModel);
         let returner = scrmljs.pageCreators.page(name, nickname, protoModel);
-        if (name !== nameless.namePrefix + returner.pageId) throw Error("nameless page was given incompatible name" + name);
+        if (name !== nameless.namePrefix + returner.pageId) throw Error("nameless page was given incompatible name" + name + ", should be " + nameless.namePrefix + returner.pageId);
         return returner;
     }
     

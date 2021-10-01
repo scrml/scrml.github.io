@@ -60,3 +60,15 @@ xml.trim = function trim(node) {
         else if (childNode.nodeType === 1) xml.trim(childNode);
     }
 }
+
+xml.serializer = new XMLSerializer();
+
+// Take user-inputted TeX and do necessary escaping to make it allowable as an XML attribute. Requires DOM access.
+xml.stringToAtt = function texToAtt(line) {
+    if (!xml.stringConverterDoc) xml.stringConverterDoc = xml.newDocument("convert");
+    let doc = xml.stringConverterDoc;
+    let element = doc.createElement("x");
+    element.setAttribute("x", line);
+    let returner = xml.serializer.serializeToString(element);
+    return returner.substring(6, returner.length - 3);
+}

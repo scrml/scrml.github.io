@@ -9,7 +9,7 @@ let scriptLoader = scrmljs.scriptLoader,
 let gui = scrmljs.gui = {
     log: scrmljs.emptyFunction,
     defaultOptions: {},
-    allModules: ["animations", "buttons", "clipboard", "datalists", "deleteBundle", "details", "disabler", "focuseds", "inputs", "linkeds", "loadingScreen", "messages", "popup", "screens", "tables", "textWidth"]
+    allModules: ["animations", "buttons", "clipboard", "datalists", "deleteBundle", "details", "disabler", "focuseds", "inputs", "linkeds", "loadingScreen", "messages", "popup", "screens", "tables", "texBox", "textWidth"]
 }
 
 if (!scriptLoader.guiModulesTier) {

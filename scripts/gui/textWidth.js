@@ -30,3 +30,29 @@ gui.dynamizeWidth = function dynamizeWidth(input) {
     input.fixWidth = fixWidth;
     input.fixWidth();
 }
+
+// Event listener for auto-resizing textareas, returns the textarea itself
+gui.fixTextHeightListener = function fixTextHeightListener(event) {
+    // stash scroll location to avoid jumps
+    let scrollLeft = window.pageXOffset || (document.documentElement || document.body.parentNode || document.body).scrollLeft,
+        scrollTop = window.pageYOffset || (document.documentElement || document.body.parentNode || document.body).scrollTop;
+    
+    // resize textarea
+    event = event.target;
+    while (event.nodeName.toLowerCase() != "textarea") event = event.parentNode;
+    event.style.height = "auto";
+    event.style.height = event.scrollHeight+"px";
+    
+    // reset scroll location
+    window.scrollTo(scrollLeft, scrollTop);
+    return event;
+}
+
+gui.dynamizeHeight = function dymanizeHeight(textarea) {
+    textarea.addEventListener("input", gui.fixTextHeightListener);
+}
+
+gui.setTextareaContent = function setTextareaContent(textarea, line) {
+    textarea.value = line;
+    gui.fixTextHeightListener({target: textarea});
+}

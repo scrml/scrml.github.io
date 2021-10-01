@@ -79,7 +79,7 @@ let workerInitializer = function workerInitializer() {
     
     // first the raw chapter stuff
     
-    let pageProto = scrmljs.pageProtos.page, chapterProto = Object.create(pageProto);
+    let pageProto = scrmljs.pageProtos.page, chapterProto = scrmljs.pageProtos.chapter = Object.create(pageProto);
     
     chapterProto.pageType = "chapter";
     chapterProto.isChapter = true;

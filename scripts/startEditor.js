@@ -20,7 +20,8 @@ scrmljs.lockedPageFocus = false;
 document.getElementById("errorout").textContent = "Loading components ...";
 
 // load required scripts
-scriptLoader.ensureJS("gui", ["generalFunctions"]);
+scriptLoader.ensureJS("xml");
+scriptLoader.ensureJS("gui", ["generalFunctions", "xml"]);
 scriptLoader.items.gui.addEphemeralListener("js", function() {
     gui = scrmljs.gui;
     document.getElementById("errorout").textContent = "Loading gui modules ...";
@@ -37,8 +38,8 @@ scriptLoader.ensureJS("chapter", ["page"], filePrefix + "scripts/guiLinks/chapte
 scriptLoader.ensureJS("statement", ["page"], filePrefix + "scripts/guiLinks/statement.js");
 scriptLoader.ensureJS("nameless", ["page"], filePrefix + "scripts/guiLinks/nameless.js");
 scriptLoader.ensureJS("comment", ["nameless"], filePrefix + "scripts/guiLinks/comment.js");
-//scriptLoader.ensureJS("jax");
-scriptLoader.ensureJS("xml");
+scriptLoader.ensureJS("jax");
+//scriptLoader.ensureJS("xml");
 scriptLoader.items.xml.addEphemeralListener("js", function() {xml = scrmljs.xml});
 scriptLoader.ensureJS("fileConversion", ["storage", "xml", "gui"]);
 scriptLoader.items.fileConversion.addEphemeralListener("js", function() {fileConversion = scrmljs.fileConversion});
@@ -70,8 +71,6 @@ scriptLoader.addEphemeralListener(function start() {
             document.getElementById("errorout").textContent = line + "\n" + x.message;
             // force the program to halt even if the worker tries continuing
             worker.onmessage = emptyFunction;
-            console.log("couldn't find function " + fname);
-            console.log(workerFunctions);
             throw x;
         }
     }
@@ -265,6 +264,10 @@ scrmljs.loadExample = function loadExample() {
     req.send();
 }
 
+let xmlUnescape = scrmljs.xmlUnescape = function xmlUnescape(line) {
+    return line.replaceAll(/&apos;/g, "\'").replaceAll(/&guot;/g, "\"").replaceAll(/&gt;/g, ">").replaceAll(/&amp;/g, "&").replaceAll(/&lt;/g, "<")
+}
+
 function importSCRMLFileEditor(doc) {
     let docRoot = xml.getRoot(doc), pageId = 0, ui = 1, rootPage, autosaves = [];
     while (doc.nodeType !== 9) doc = doc.parentElement;
@@ -329,6 +332,14 @@ function importSCRMLFileEditor(doc) {
             }
             line += "\n"+termLine;
         }
+        autosaves[pageId] = line;
+    }
+    for (let commentNode of rootPage.querySelectorAll("[pageType=\"comment\"]")) {
+        let texNode = commentNode.querySelector("tex");
+        let content = xmlUnescape(texNode.textContent), contentLines = content.split("\n");
+        let pageId = commentNode.getAttribute("pageId"), line = autosaves[pageId];
+        line += "\n" + contentLines.length;
+        for (let cline of contentLines) line += "\n" + cline;
         autosaves[pageId] = line;
     }
     pageId = 0;
