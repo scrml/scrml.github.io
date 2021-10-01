@@ -1,3 +1,7 @@
-[nameless] .name {
+[nameless] .name, [nameless] .nickname, [nameless] .fullname {
+    display: none;
+}
+
+[numberless] .pagenumber, [numberless] .fullpagenumber {
     display: none;
 }

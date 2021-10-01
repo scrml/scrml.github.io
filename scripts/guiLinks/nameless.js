@@ -13,6 +13,7 @@ let hostInitializer = function hostInitializer() {
     pageType.showNameless = namelessType.createLink = function createLink(linkId, extensionName = "nameless") {
         let page = pageType.createLink(linkId, extensionName);
         page.div.setAttribute("nameless", "");
+        page.div.setAttribute("numberless", "");
         return page;
     }
 }
