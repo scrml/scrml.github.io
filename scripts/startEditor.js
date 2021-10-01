@@ -138,8 +138,8 @@ for (let pageAction of ["chapter", "statement", "comment"]) document.getElementB
     editor.setAttribute("pageaction", "new"+pageAction+"mode");
     scrmljs.pageMode = pageAction;
     for (let gap of document.querySelectorAll(".newpagein")) gap.setAttribute("placeholder", "new " + pageAction);
-    if (mainLink.types.page.extensions[pageAction].type.isNameless) editor.setAttribute("nameless", "");
-    else editor.removeAttribute("nameless");
+    if (mainLink.types.page.extensions[pageAction].type.isNameless) editor.setAttribute("newnamelessmode", "");
+    else editor.removeAttribute("newnamelessmode");
 });
 
 // functions to be initialized

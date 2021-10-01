@@ -55,10 +55,10 @@
     text-align: left;
 }
 
-.editor[nameless] .newpagein {
+.editor[newnamelessmode] .newpagein {
     display: none;
 }
 
-.editor:not([nameless]) .newnamelessin, .editor[movemode] .newnamelessin {
+.editor:not([newnamelessmode]) .newnamelessin, .editor[movemode] .newnamelessin {
     display: none;
 }
