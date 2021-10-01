@@ -59,6 +59,6 @@
     display: none;
 }
 
-.editor:not([nameless]) .newnamelessin {
+.editor:not([nameless]) .newnamelessin, .editor[movemode] .newnamelessin {
     display: none;
 }

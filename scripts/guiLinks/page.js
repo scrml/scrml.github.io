@@ -256,11 +256,12 @@ pageType.initializers.worker = function() {
     }
     
     pageProto.moveTo = function moveTo(parent, insertBefore = "none", doSmoothly = false) {
-        // some moves result in no change, so return if this is the case
         if (parent) {
-            if (this === insertBefore) return;
-            if (this.nextSibling === insertBefore) return;
-            if (this.parent && this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+            // some moves result in no change, so return if this is the case
+            if (this === insertBefore || this.nextSibling === insertBefore) return;
+            if (this.parent === parent && insertBefore === "none" && !this.nextSibling) return; // last sibling
+            // if this is visible, message that the icon needs to move
+            if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
         }
         
         // notify the old parent of the move
@@ -290,7 +291,7 @@ pageType.initializers.worker = function() {
                     fixMe = fixMe.nextSibling;
                 }
                 // fix oldParent childPages
-                oldParent.childPages.splice(this.pageNumber, 1);
+                oldParent.childPages.splice(this.pageNumber-1, 1);
             }
             // reset myself
             this.previousSibling = this.nextSibling = this.previousPage = this.nextPage = undefined;
@@ -325,7 +326,7 @@ pageType.initializers.worker = function() {
             this.manager.setVarValue("siblingNumber", parent.children.length - 1);
             this.updateFullSiblingNumber();
             // fix page stuff
-            if (this.isPage) {
+            if (this.hasPageNumber) {
                 parent.childPages.push(this);
                 let fixMe = this.previousSibling;
                 while (fixMe && !fixMe.hasPageNumber) {
@@ -338,7 +339,7 @@ pageType.initializers.worker = function() {
                     this.previousPage = fixMe;
                     this.manager.setVarValue("pageNumber", fixMe.pageNumber + 1);
                 } else this.manager.setVarValue("pageNumber", 1);
-            }
+            } else this.manager.setVarValue("pageNumber", ps? ps.pageNumber: 0);6
         } else {
             // I am not going to be the last child of parent
             // fix sibling stuff
@@ -373,9 +374,6 @@ pageType.initializers.worker = function() {
         this.updateFullPageNumber();
         if (parent.isVisible) parent.guiLink.dm("canDelete", parent.canDelete());
         parent.preSave();
-        
-        // if this is visible, message that the icon needs to move
-        if (this.isVisible) this.guiLink.dm("movePage", parent.guiLink.linkId, insertBefore === "none"? "none": insertBefore.guiLink.linkId, doSmoothly);
     }
 
     pageProto.togglePage = function togglePage(open = false) {
@@ -439,7 +437,7 @@ pageType.initializers.worker = function() {
         link.unlinks.push(page.manager.linkListener("name", function(name) {link.dm("getName", name)}, true));
         link.unlinks.push(page.manager.linkListener("nickname", function(nickname) {link.dm("getNickname", nickname)}, true));
         link.dm("canDelete", page.canDelete());
-        if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextPage? page.nextPage.guiLink.linkId: "none", false);
+        if (page.parent) link.dm("movePage", page.parent.guiLink.linkId, page.nextSibling? page.nextSibling.guiLink.linkId: "none", false);
         link.dm("togglePage", page.isOpen);
         link.dm("setPageNumber", page.pageNumber);
         link.dm("setFullPageNumber", page.fullPageNumber);

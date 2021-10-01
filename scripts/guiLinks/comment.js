@@ -20,6 +20,7 @@ let workerInitializer = function workerInitializer() {
     
     commentProto.pageType = "comment";
     commentProto.isComment = true;
+    commentProto.hasPageNumber = false;
     
     scrmljs.pageCreators.comment = function newComment(name, nickname, protoModel = commentProto) {
         let returner = scrmljs.pageCreators.nameless(name, nickname, protoModel);
